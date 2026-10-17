@@ -1,0 +1,11 @@
+# Keep credentials, installed packages, and generated uploads out of version control.
+node_modules
+.env
+.env.*
+!.env.example
+!.env.production.example
+.env.backup
+*credentials*
+uploads/*
+!uploads/.gitkeep
+private-uploads/

@@ -1,0 +1,1779 @@
+// Keep the six-step membership application synchronized with the member API.
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+// ESLint's core unused-vars rule does not detect the JSX member expression below.
+/* eslint-disable-next-line no-unused-vars */
+import { AnimatePresence, motion } from 'framer-motion';
+import useAuth from '../../context/useAuth.js';
+import { apiFileUrl } from '../../config/api.js';
+import PlanCard from '../../components/PlanCard.jsx';
+import { getPlans } from '../../lib/plansApi.js';
+import { mapPlanToCard } from '../../lib/planCardData.js';
+import {
+  addFamilyMember,
+  createMembershipRazorpayOrder,
+  deleteFamilyMember,
+  getMember,
+  getMembershipBankDetails,
+  getMembershipCheckoutQuote,
+  getPaymentMembership,
+  getPublicGstSettings,
+  getIdentityVerification,
+  purchaseMembership,
+  submitIdentityVerification,
+  savePlan,
+  saveProfile,
+  updateFamilyMember,
+  uploadMembershipVerificationDocument,
+  verifyMembershipPayment,
+} from '../../lib/memberApi.js';
+import apiClient from '../../lib/apiClient.js';
+import {
+  addMembershipDraftFamily,
+  deleteMembershipDraftFamily,
+  getMembershipDraft,
+  getMembershipDraftBankDetails,
+  getMembershipDraftQuote,
+  resendMembershipDraftOtp,
+  requestMembershipDraftPasswordLink,
+  saveMembershipDraftPlan,
+  saveMembershipDraftProfile,
+  startMembershipDraft,
+  submitMembershipDraftIdentity,
+  submitMembershipDraftPayment,
+  updateMembershipDraftFamily,
+  verifyMembershipDraftOtp,
+  verifyMembershipDraftPayment,
+} from '../../lib/membershipDraftApi.js';
+import { formatPoints, formatRupees } from '../../lib/formatters.js';
+import { isValidIdentityNumber } from '../../lib/identityValidation.js';
+import { getMyMembership } from '../Dashboard/memberDashboardApi.js';
+import './MembershipAll.css';
+
+const emptyProfile = {
+  fullName: '',
+  gender: 'male',
+  countryCode: '+91',
+  mobile: '',
+  dob: '',
+  interestArea: 'Luxury Stays',
+  agreePromo: false,
+};
+
+const emptyFamilyForm = {
+  fullName: '',
+  gender: 'female',
+  relationship: 'Spouse',
+  dob: '',
+};
+const maxImageSize = 10 * 1024 * 1024;
+const maxIdentityFileSize = 5 * 1024 * 1024;
+const emptyIdentityFiles = { panFront: null, panBack: null, secondFront: null, secondBack: null };
+const steps = ['Personal Details', 'Select Plan', 'Family Details', 'Review & Confirm', 'Payment', 'Set Password'];
+const money = formatRupees;
+
+function selectImageFile(event, setFile, setError) {
+  const file = event.target.files?.[0] || null;
+  if (file && file.size > maxImageSize) {
+    event.target.value = '';
+    setFile(null);
+    setError('Image must be 10 MB or smaller.');
+    return;
+  }
+
+  setError('');
+  setFile(file);
+}
+
+function selectIdentityFile(event, key, setFiles, setError, setPreviewUrl) {
+  const file = event.target.files?.[0] || null;
+  event.target.value = '';
+  if (!file) return;
+  if (file && !['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) {
+    setError('That file type is not supported. Choose a JPG, PNG, or PDF.');
+    return;
+  }
+  if (file && file.size > maxIdentityFileSize) {
+    setError('That file is larger than 5 MB. Choose a smaller file.');
+    return;
+  }
+  setError('');
+  setFiles((current) => ({ ...current, [key]: file }));
+  setPreviewUrl(key, file);
+}
+
+function formatIdentityFileSize(size) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function IdentityFileField({ label, file, previewUrl, onSelect, onRemove, disabled, required = false }) {
+  const inputRef = useRef(null);
+  return (
+    <div className="jm-field jm-identity-field">
+      <span className="jm-identity-field__label">{label} {required ? '(required)' : '(optional)'}</span>
+      <div className={`jm-identity-upload${file ? ' is-filled' : ''}`}>
+        <input
+          ref={inputRef}
+          className="jm-identity-upload__input"
+          type="file"
+          accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+          aria-label={`${label} upload`}
+          onChange={onSelect}
+          disabled={disabled}
+          required={required && !file}
+          tabIndex={file ? -1 : 0}
+        />
+        {file ? (
+          <div className="jm-identity-upload__content">
+            <div className="jm-identity-upload__visual">
+              {file.type === 'application/pdf' ? (
+                <div className="jm-identity-upload__pdf" aria-label="PDF document">
+                  <svg viewBox="0 0 32 32" aria-hidden="true">
+                    <path d="M8 2.5h10l7 7v20H8z" />
+                    <path d="M18 2.5v7h7M11 19h11M11 23h11" />
+                  </svg>
+                  <span>PDF document</span>
+                </div>
+              ) : (
+                <img src={previewUrl} alt={`${label} preview`} />
+              )}
+            </div>
+            <div className="jm-identity-upload__footer">
+              <div className="jm-identity-upload__file-info">
+                <span className="jm-identity-upload__file-name" title={file.name}>{file.name}</span>
+                <span className="jm-identity-upload__file-size">{formatIdentityFileSize(file.size)}</span>
+              </div>
+              <div className="jm-identity-upload__actions">
+                <button className="jm-btn-pill-outline" type="button" onClick={() => inputRef.current?.click()} disabled={disabled}>Replace</button>
+                <button className="jm-btn-pill-outline" type="button" onClick={onRemove} disabled={disabled}>Remove</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="jm-identity-upload__empty" aria-hidden="true">
+            <span className="jm-identity-upload__select">Choose a file</span>
+            <span>or click here to browse</span>
+          </div>
+        )}
+      </div>
+      <span className="jm-identity-field__hint">JPG, PNG or PDF, max 5 MB</span>
+    </div>
+  );
+}
+
+function loadRazorpayCheckout() {
+  if (window.Razorpay) return Promise.resolve();
+  const existingScript = document.querySelector('script[data-razorpay-checkout]');
+  if (existingScript) {
+    return new Promise((resolve, reject) => {
+      existingScript.addEventListener('load', resolve, { once: true });
+      existingScript.addEventListener('error', reject, { once: true });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.dataset.razorpayCheckout = 'true';
+    script.onload = resolve;
+    script.onerror = () => {
+      script.remove();
+      reject(new Error('The secure payment window could not be loaded. Please try again.'));
+    };
+    document.body.appendChild(script);
+  });
+}
+
+function dateInputValue(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+}
+
+function formatPlainDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!match) return '—';
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(0);
+  date.setFullYear(year, month - 1, day);
+  date.setHours(12, 0, 0, 0);
+
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+export default function MembershipAll() {
+  const { user } = useAuth();
+  const isLoggedIn = Boolean(user);
+  const userIdentity = user?._id || user?.id || user?.email || null;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [step, setStep] = useState(Math.min(6, Math.max(1, Number(searchParams.get('step')) || 1)));
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [plansError, setPlansError] = useState('');
+  const [profile, setProfile] = useState({ ...emptyProfile, email: user?.email || '' });
+  const [draftStarted, setDraftStarted] = useState(false);
+  const [draftEmailVerified, setDraftEmailVerified] = useState(Boolean(user));
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSubmitting, setOtpSubmitting] = useState(false);
+  const [otpResendSeconds, setOtpResendSeconds] = useState(0);
+  const [passwordLinkEmail, setPasswordLinkEmail] = useState('');
+  const [passwordLinkSent, setPasswordLinkSent] = useState(false);
+  const [passwordLinkMessage, setPasswordLinkMessage] = useState('');
+  const [passwordLinkResendSeconds, setPasswordLinkResendSeconds] = useState(0);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [identityVerification, setIdentityVerification] = useState(null);
+  const [panNumber, setPanNumber] = useState('');
+  const [secondIdType, setSecondIdType] = useState('aadhaar');
+  const [secondIdNumber, setSecondIdNumber] = useState('');
+  const [identityFiles, setIdentityFiles] = useState(emptyIdentityFiles);
+  const [identityPreviewUrls, setIdentityPreviewUrls] = useState({});
+  const identityPreviewUrlsRef = useRef({});
+  const [identitySubmitting, setIdentitySubmitting] = useState(false);
+  const [identityConsent, setIdentityConsent] = useState(false);
+  const [membership, setMembership] = useState(null);
+  const [family, setFamily] = useState([]);
+  const [familyForm, setFamilyForm] = useState(emptyFamilyForm);
+  const [familyPhoto, setFamilyPhoto] = useState(null);
+  const [editingFamilyId, setEditingFamilyId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [paymentMembership, setPaymentMembership] = useState(null);
+  const [paymentMembershipLoading, setPaymentMembershipLoading] = useState(false);
+  const [paymentMembershipError, setPaymentMembershipError] = useState('');
+  const [paymentReload, setPaymentReload] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState('upi');
+  const [bankDetails, setBankDetails] = useState(null);
+  const [bankDetailsLoading, setBankDetailsLoading] = useState(false);
+  const [bankDetailsError, setBankDetailsError] = useState('');
+  const [rtgsUtr, setRtgsUtr] = useState('');
+  const [rtgsTransferDate, setRtgsTransferDate] = useState('');
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [verificationFile, setVerificationFile] = useState(null);
+  const [verificationError, setVerificationError] = useState('');
+  const [verificationUploaded, setVerificationUploaded] = useState(false);
+  const [paymentUnavailable, setPaymentUnavailable] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+  const [companyDetails, setCompanyDetails] = useState({
+    companyName: '',
+    gstNumber: '',
+    contactPerson: '',
+  });
+  const [offlineSubmitted, setOfflineSubmitted] = useState(false);
+  const [paymentSubmittedMethod, setPaymentSubmittedMethod] = useState('');
+  const [membershipGateRetry, setMembershipGateRetry] = useState(0);
+  const [membershipGate, setMembershipGate] = useState({
+    key: userIdentity,
+    loading: Boolean(user),
+    membership: null,
+    error: '',
+  });
+
+  useEffect(() => () => {
+    Object.values(identityPreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    identityPreviewUrlsRef.current = {};
+  }, []);
+
+  useEffect(() => {
+    if (otpResendSeconds <= 0 && passwordLinkResendSeconds <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setOtpResendSeconds((seconds) => Math.max(0, seconds - 1));
+      setPasswordLinkResendSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [otpResendSeconds, passwordLinkResendSeconds]);
+
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => plan._id === membership?.plan?._id
+      || plan.slug === membership?.plan?.slug
+      || plan._id === paymentMembership?.plan?._id
+      || plan.slug === paymentMembership?.plan?.slug
+      || plan.name === paymentMembership?.plan?.name
+      || plan.title === paymentMembership?.plan?.name) || null,
+    [plans, membership, paymentMembership],
+  );
+  const paymentMembershipId = searchParams.get('membershipId');
+  const requestedStep = searchParams.get('step');
+
+  useEffect(() => {
+    if (step !== 5 || paymentMethod !== 'rtgs') return undefined;
+    let active = true;
+    setBankDetailsLoading(true);
+    setBankDetailsError('');
+    (isLoggedIn ? getMembershipBankDetails() : getMembershipDraftBankDetails()).then((details) => {
+      if (active) setBankDetails(details);
+    }).catch((requestError) => {
+      if (active) setBankDetailsError(requestError.message || 'Could not load bank transfer details.');
+    }).finally(() => {
+      if (active) setBankDetailsLoading(false);
+    });
+    return () => { active = false; };
+  }, [isLoggedIn, paymentMethod, step]);
+
+  useEffect(() => {
+    let active = true;
+    if (!isLoggedIn) {
+      setMembershipGate({ key: null, loading: false, membership: null, error: '' });
+      return () => { active = false; };
+    }
+    setMembershipGate({ key: userIdentity, loading: true, membership: null, error: '' });
+    getMyMembership()
+      .then((current) => {
+        if (active) setMembershipGate({ key: userIdentity, loading: false, membership: current, error: '' });
+      })
+      .catch((requestError) => {
+        if (!active) return;
+        if (requestError.status === 404) {
+          setMembershipGate({ key: userIdentity, loading: false, membership: null, error: '' });
+        } else {
+          setMembershipGate({
+            key: userIdentity,
+            loading: false,
+            membership: null,
+            error: requestError.message || 'We could not check your membership.',
+          });
+        }
+      });
+    return () => { active = false; };
+  }, [isLoggedIn, membershipGateRetry, userIdentity]);
+
+  const loadPlans = useCallback(async () => {
+    setPlansLoading(true);
+    setPlansError('');
+    try {
+      setPlans(await getPlans());
+    } catch (requestError) {
+      setPlansError(requestError.message || 'We could not load membership plans.');
+    } finally {
+      setPlansLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadApplication = isLoggedIn
+      ? Promise.all([getMember(), getIdentityVerification()]).then(([memberData, identityData]) => ({
+        memberData,
+        identityData,
+      }))
+      : getMembershipDraft().then((draft) => ({
+        draft,
+        memberData: {
+          profile: draft.profile,
+          family: (draft.family || []).map((member) => ({ ...member, _id: member._id || member.id })),
+          membership: draft.planId ? { status: 'draft', plan: { _id: draft.planId } } : null,
+        },
+        identityData: draft.identity,
+      }));
+    loadApplication
+      .then(({ memberData, identityData, draft }) => {
+        if (!active) return;
+        if (draft) {
+          setDraftStarted(true);
+          setDraftEmailVerified(Boolean(draft.emailVerified));
+          setProfile((current) => ({
+            ...current,
+            ...draft.profile,
+            email: draft.email || current.email,
+            dob: dateInputValue(draft.profile?.dob),
+          }));
+          setPasswordLinkEmail(draft.email || '');
+          if (['payment_submitted', 'paid'].includes(draft.status)) {
+            setStep(6);
+            setPaymentSubmittedMethod(draft.paymentMethod || '');
+            setSearchParams({ step: '6' }, { replace: true });
+          }
+        }
+        setMembership(memberData.membership);
+        setFamily((memberData.family || []).map((member) => ({ ...member, _id: member._id || member.id })));
+        setIdentityVerification(identityData);
+        if (memberData.profile && !draft) {
+          setProfile({
+            ...emptyProfile,
+            ...memberData.profile,
+            email: user?.email || '',
+            dob: dateInputValue(memberData.profile.dob),
+          });
+          setPasswordLinkEmail(user?.email || '');
+        }
+      })
+      .catch((requestError) => {
+        if (!active) return;
+        if (!isLoggedIn && requestError.status === 401) {
+          setDraftStarted(false);
+          setDraftEmailVerified(false);
+          return;
+        }
+        setError(requestError.message || 'Could not load your application.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [isLoggedIn, setSearchParams, user?.email]);
+
+  useEffect(() => {
+    loadPlans();
+  }, [loadPlans]);
+
+  useEffect(() => {
+    const membershipId = membership?._id || paymentMembershipId;
+    if (step !== 6 || !isLoggedIn || !user?.onboarding || !membershipId) return undefined;
+    let active = true;
+    getPaymentMembership(membershipId)
+      .then((details) => {
+        if (active && details.payment?.method) setPaymentSubmittedMethod(details.payment.method);
+      })
+      .catch((requestError) => {
+        if (active) setPaymentError(requestError.message || 'Could not load your payment status.');
+      });
+    return () => { active = false; };
+  }, [isLoggedIn, membership?._id, paymentMembershipId, step, user?.onboarding]);
+
+  useEffect(() => {
+    if (user && !user.onboarding && (user.status !== 'active' || user.emailVerified === false)) {
+      navigate('/login', {
+        replace: true,
+        state: {
+          from: { pathname: location.pathname, search: location.search || '?step=4' },
+          message: 'Please log in with an active member account to continue.',
+        },
+      });
+    }
+  }, [location.pathname, location.search, navigate, user]);
+
+  useEffect(() => {
+    if (step !== 5) return undefined;
+    if (requestedStep !== '5') return undefined;
+    if (!paymentMembershipId) {
+      if (!selectedPlan) {
+        navigate('/luxury-membership?step=2', { replace: true });
+        return undefined;
+      }
+      let active = true;
+      setPaymentMembershipLoading(true);
+      setPaymentMembershipError('');
+      const quoteRequest = isLoggedIn
+        ? Promise.all([getMembershipCheckoutQuote(selectedPlan._id), getPublicGstSettings()])
+          .then(([serverQuote, gstSettings]) => ({
+            ...serverQuote,
+            gstRate: gstSettings.rate,
+            gstEnabled: gstSettings.enabled,
+            gstLabel: gstSettings.label,
+          }))
+        : getMembershipDraftQuote(selectedPlan._id);
+      quoteRequest.then((serverQuote) => {
+        if (!active) return;
+        setPaymentMembership({
+          status: 'pending_payment',
+          amount: serverQuote.total,
+          planFee: serverQuote.planFee,
+          gst: serverQuote.gst,
+          gstRate: serverQuote.gstRate ?? serverQuote.gstPercent,
+          gstEnabled: serverQuote.gstEnabled,
+          gstLabel: serverQuote.gstLabel || 'GST',
+          currency: serverQuote.currency,
+          plan: { name: selectedPlan.name || selectedPlan.title },
+        });
+      }).catch((requestError) => {
+        if (active) setPaymentMembershipError(requestError.message || 'Could not calculate your payment details.');
+      }).finally(() => {
+        if (active) setPaymentMembershipLoading(false);
+      });
+      return () => { active = false; };
+    }
+
+    let active = true;
+    setPaymentMembershipLoading(true);
+    setPaymentMembershipError('');
+    getPaymentMembership(paymentMembershipId)
+      .then((result) => {
+        if (!active) return;
+        if (result.status === 'active') {
+          if (user?.onboarding) {
+            setStep(6);
+            setSearchParams({ step: '6' });
+          }
+          else navigate('/dashboard', { replace: true });
+          return;
+        }
+        if (!['pending_payment', 'pending_verification'].includes(result.status)) {
+          navigate('/luxury-membership?step=2', { replace: true });
+          return;
+        }
+        setOfflineSubmitted(
+          result.status === 'pending_verification'
+          || (result.payment?.status === 'pending' && result.payment.method !== 'razorpay'),
+        );
+        setVerificationUploaded(Boolean(result.verificationDocumentUploaded));
+        setPaymentMembership(result);
+      })
+      .catch((requestError) => {
+        if (!active) return;
+        if (requestError.status === 401) {
+          navigate('/login', {
+            replace: true,
+            state: {
+              from: { pathname: location.pathname, search: location.search },
+              message: 'Please log in with your active member account to continue.',
+            },
+          });
+          return;
+        }
+        if (requestError.status === 404) {
+          navigate('/luxury-membership?step=2', { replace: true });
+          return;
+        }
+        setPaymentMembershipError(requestError.message || 'Payment details could not be loaded.');
+      })
+      .finally(() => {
+        if (active) setPaymentMembershipLoading(false);
+      });
+    return () => { active = false; };
+  }, [isLoggedIn, location.pathname, location.search, navigate, paymentMembershipId, paymentReload, requestedStep, selectedPlan, setSearchParams, step, user?.onboarding]);
+
+  useEffect(() => {
+    if (step !== 4 || !selectedPlan?._id) return undefined;
+    let active = true;
+    setQuote(null);
+    setQuoteError('');
+    setQuoteLoading(true);
+    const quoteRequest = isLoggedIn
+      ? Promise.all([getMembershipCheckoutQuote(selectedPlan._id), getPublicGstSettings()])
+        .then(([serverQuote, gstSettings]) => ({
+          ...serverQuote,
+          gstEnabled: gstSettings.enabled,
+          gstPercent: gstSettings.rate,
+          gstLabel: gstSettings.label,
+        }))
+      : getMembershipDraftQuote(selectedPlan._id);
+    quoteRequest.then((serverQuote) => {
+      if (!active) return;
+      setQuote(serverQuote);
+    }).catch((requestError) => {
+      if (active) setQuoteError(requestError.message || 'Could not calculate your payment details.');
+    }).finally(() => {
+      if (active) setQuoteLoading(false);
+    });
+    return () => { active = false; };
+  }, [isLoggedIn, selectedPlan?._id, step]);
+
+  function moveTo(nextStep) {
+    setStep(nextStep);
+    setSearchParams({ step: String(nextStep) });
+    setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function updateIdentityPreviewUrl(key, file) {
+    const nextUrls = { ...identityPreviewUrlsRef.current };
+    if (nextUrls[key]) URL.revokeObjectURL(nextUrls[key]);
+    if (file) {
+      nextUrls[key] = URL.createObjectURL(file);
+    } else {
+      delete nextUrls[key];
+    }
+    identityPreviewUrlsRef.current = nextUrls;
+    setIdentityPreviewUrls(nextUrls);
+  }
+
+  function clearIdentityFiles(keys) {
+    const nextUrls = { ...identityPreviewUrlsRef.current };
+    keys.forEach((key) => {
+      if (nextUrls[key]) URL.revokeObjectURL(nextUrls[key]);
+      delete nextUrls[key];
+    });
+    identityPreviewUrlsRef.current = nextUrls;
+    setIdentityPreviewUrls(nextUrls);
+    setIdentityFiles((current) => ({
+      ...current,
+      ...Object.fromEntries(keys.map((key) => [key, null])),
+    }));
+  }
+
+  function removeIdentityFile(key) {
+    clearIdentityFiles([key]);
+  }
+
+  function resetSecondIdentityFiles() {
+    clearIdentityFiles(['secondFront', 'secondBack']);
+  }
+
+  async function submitDraftOtp() {
+    setOtpSubmitting(true);
+    setError('');
+    try {
+      const result = await verifyMembershipDraftOtp(otpCode);
+      setDraftEmailVerified(Boolean(result.emailVerified));
+      setOtpCode('');
+      setError('');
+    } catch (requestError) {
+      setError(requestError.message || 'The verification code could not be checked.');
+    } finally {
+      setOtpSubmitting(false);
+    }
+  }
+
+  async function resendDraftOtp() {
+    setOtpSubmitting(true);
+    setError('');
+    try {
+      await resendMembershipDraftOtp();
+      setOtpResendSeconds(60);
+      setError('');
+    } catch (requestError) {
+      setError(requestError.message || 'A new verification code could not be sent.');
+    } finally {
+      setOtpSubmitting(false);
+    }
+  }
+
+  async function submitProfile(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      if (!isLoggedIn && !draftStarted) {
+        const fullName = profile.fullName.trim();
+        const started = await startMembershipDraft({
+          firstName: fullName.split(/\s+/)[0],
+          email: profile.email.trim(),
+          profile: { fullName },
+        });
+        setDraftStarted(true);
+        setDraftEmailVerified(Boolean(started.emailVerified));
+        setPasswordLinkEmail(profile.email.trim());
+        setOtpResendSeconds(started.otpRetryAfterSeconds || (started.emailVerified ? 0 : 60));
+        return;
+      }
+      if (!isLoggedIn && !draftEmailVerified) {
+        setError('Verify your email before uploading documents or continuing.');
+        return;
+      }
+      const needsIdentitySubmission = !identityVerification
+        || ['not_submitted', 'rejected'].includes(identityVerification.status);
+      if (needsIdentitySubmission) {
+        const normalizedPan = panNumber.trim().toUpperCase();
+        const normalizedSecondId = secondIdNumber.trim().toUpperCase().replace(/[\s-]/g, '');
+        const validPan = isValidIdentityNumber('pan', normalizedPan);
+        const validSecondId = isValidIdentityNumber(secondIdType, normalizedSecondId);
+        if (!validPan || !validSecondId) {
+          setError('Enter a valid PAN and a valid selected second ID number.');
+          return;
+        }
+        if (!identityFiles.panFront || !identityFiles.secondFront || !identityFiles.secondBack) {
+          setError('Upload the PAN front and both sides of your selected second ID.');
+          return;
+        }
+        if (!identityConsent) {
+          setError('Please consent to identity document storage before continuing.');
+          return;
+        }
+        setIdentitySubmitting(true);
+      }
+      const profileValues = {
+        ...profile,
+        email: undefined,
+        dob: profile.dob,
+      };
+      const saved = isLoggedIn
+        ? await saveProfile(profileValues, profilePhoto)
+        : await saveMembershipDraftProfile(profileValues, profilePhoto);
+      setProfile((current) => ({
+        ...current,
+        ...saved,
+        email: user?.email || profile.email,
+        dob: dateInputValue(saved.dob ?? current.dob),
+      }));
+      setProfilePhoto(null);
+      if (needsIdentitySubmission) {
+        const identityValues = {
+          panNumber: panNumber.trim().toUpperCase(),
+          secondIdType,
+          secondIdNumber: secondIdNumber.trim(),
+          consent: identityConsent,
+        };
+        const submitted = isLoggedIn
+          ? await submitIdentityVerification(identityValues, identityFiles)
+          : await submitMembershipDraftIdentity(identityValues, identityFiles);
+        setIdentityVerification(submitted);
+        setPanNumber('');
+        setSecondIdNumber('');
+        setIdentityConsent(false);
+        clearIdentityFiles(Object.keys(emptyIdentityFiles));
+      }
+      const adminPaymentAwaitingDocuments = user?.onboarding
+        && membership?.planModel === 'Plan'
+        && membership.status === 'pending_verification';
+      moveTo(adminPaymentAwaitingDocuments ? 6 : 2);
+    } catch (requestError) {
+      setError(requestError.status === 429 && requestError.retryAfterSeconds
+        ? `Too many attempts. Please try again in ${Math.ceil(requestError.retryAfterSeconds / 60)} minutes.`
+        : requestError.message);
+    } finally {
+      setSaving(false);
+      setIdentitySubmitting(false);
+    }
+  }
+
+  async function choosePlan(plan) {
+    setSaving(true);
+    setError('');
+    try {
+      const saved = isLoggedIn
+        ? await savePlan(plan._id)
+        : await saveMembershipDraftPlan(plan._id);
+      setMembership(isLoggedIn ? saved : { status: 'draft', plan: { _id: saved._id } });
+      moveTo(3);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function resetFamilyForm() {
+    setFamilyForm(emptyFamilyForm);
+    setFamilyPhoto(null);
+    setEditingFamilyId(null);
+  }
+
+  async function submitFamily(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const saved = editingFamilyId
+        ? (isLoggedIn
+          ? await updateFamilyMember(editingFamilyId, familyForm, familyPhoto)
+          : await updateMembershipDraftFamily(editingFamilyId, familyForm, familyPhoto))
+        : (isLoggedIn
+          ? await addFamilyMember(familyForm, familyPhoto)
+          : await addMembershipDraftFamily(familyForm, familyPhoto));
+      const normalizedSaved = { ...saved, _id: saved._id || saved.id };
+      setFamily((current) => editingFamilyId
+        ? current.map((member) => (member._id === normalizedSaved._id ? normalizedSaved : member))
+        : [...current, normalizedSaved]);
+      resetFamilyForm();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startFamilyEdit(member) {
+    setEditingFamilyId(member._id);
+    setFamilyForm({
+      fullName: member.fullName,
+      gender: member.gender,
+      relationship: member.relationship,
+      dob: dateInputValue(member.dob),
+    });
+    setFamilyPhoto(null);
+  }
+
+  async function removeFamilyMember(id) {
+    setSaving(true);
+    setError('');
+    try {
+      if (isLoggedIn) await deleteFamilyMember(id);
+      else await deleteMembershipDraftFamily(id);
+      setFamily((current) => current.filter((member) => member._id !== id));
+      if (editingFamilyId === id) resetFamilyForm();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveDraftAndReview() {
+    if (!selectedPlan) {
+      setError('Please choose a plan before continuing.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (isLoggedIn) await savePlan(selectedPlan._id);
+      else await saveMembershipDraftPlan(selectedPlan._id);
+      moveTo(4);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmAndOpenPayment() {
+    if (!selectedPlan?._id) {
+      setError('Please choose a membership plan before continuing.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (isLoggedIn) await savePlan(selectedPlan._id);
+      else await saveMembershipDraftPlan(selectedPlan._id);
+      setSearchParams({ step: '5', planId: selectedPlan._id });
+      setStep(5);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function paySecurely() {
+    if (!selectedPlan?._id || paymentProcessing || offlineSubmitted) return;
+    let rtgsDetails;
+    if (paymentMethod === 'rtgs') {
+      const utr = rtgsUtr.trim();
+      if (!/^[a-z\d/-]{6,50}$/i.test(utr) || !rtgsTransferDate) {
+        setPaymentError('Enter a valid RTGS UTR (6–50 letters, numbers, / or -) and transfer date.');
+        return;
+      }
+      rtgsDetails = { utr, transferDate: rtgsTransferDate };
+    }
+    setPaymentProcessing(true);
+    setPaymentError('');
+    setPaymentUnavailable(false);
+
+    try {
+      const serverPaymentMethod = ['upi', 'card', 'razorpay'].includes(paymentMethod)
+        ? 'razorpay'
+        : paymentMethod;
+      if (!isLoggedIn) {
+        const purchase = await submitMembershipDraftPayment({
+          planId: selectedPlan._id,
+          paymentMethod: serverPaymentMethod,
+          ...(selectedPlan.requiresCompanyDetails ? { companyDetails } : {}),
+          ...(rtgsDetails ? { rtgsDetails } : {}),
+        });
+        if (!purchase.orderId) {
+          setPasswordLinkEmail(profile.email.trim());
+          setPasswordLinkSent(false);
+          setPaymentSubmittedMethod(purchase.paymentMethod || paymentMethod);
+          setOfflineSubmitted(true);
+          setPaymentMembership((current) => ({ ...current, ...purchase }));
+          moveTo(6);
+          return;
+        }
+        await loadRazorpayCheckout();
+        const checkout = new window.Razorpay({
+          key: purchase.keyId,
+          amount: purchase.amount,
+          currency: purchase.currency,
+          name: 'Orianaa Club',
+          description: `${paymentMembership.plan.name} membership`,
+          order_id: purchase.orderId,
+          method: ['upi', 'card'].includes(paymentMethod) ? { [paymentMethod]: true } : undefined,
+          config: ['upi', 'card'].includes(paymentMethod) ? {
+            display: {
+              blocks: {
+                selected: {
+                  name: `Pay using ${paymentMethod.toUpperCase()}`,
+                  instruments: [{ method: paymentMethod }],
+                },
+              },
+              sequence: ['block.selected'],
+              preferences: { show_default_blocks: false },
+            },
+          } : undefined,
+          theme: { color: '#0d4a39' },
+          handler: async (result) => {
+            try {
+              const verification = await verifyMembershipDraftPayment({
+                razorpay_order_id: result.razorpay_order_id || purchase.orderId,
+                razorpay_payment_id: result.razorpay_payment_id,
+                razorpay_signature: result.razorpay_signature,
+              });
+              setPasswordLinkEmail(profile.email.trim());
+              setPasswordLinkSent(false);
+              setPaymentSubmittedMethod('razorpay');
+              setOfflineSubmitted(false);
+              setPaymentMembership((current) => ({ ...current, ...verification }));
+              moveTo(6);
+            } catch (requestError) {
+              setPaymentError(requestError.message || 'Payment could not be verified. Please retry.');
+            } finally {
+              setPaymentProcessing(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setPaymentProcessing(false);
+              setPaymentError('Payment was cancelled. You can try again when ready.');
+            },
+          },
+        });
+        checkout.on('payment.failed', () => {
+          setPaymentProcessing(false);
+          setPaymentError('Payment failed. Please check your details and try again.');
+        });
+        checkout.open();
+        return;
+      }
+      const purchase = await purchaseMembership(
+        selectedPlan._id,
+        serverPaymentMethod,
+        selectedPlan.requiresCompanyDetails ? companyDetails : undefined,
+        rtgsDetails,
+      );
+      if (serverPaymentMethod === 'razorpay') {
+        Object.assign(purchase, await createMembershipRazorpayOrder(purchase.paymentId));
+      }
+      setSearchParams({ step: '5', membershipId: purchase.membershipId });
+      if (!purchase.orderId) {
+        setOfflineSubmitted(true);
+        setPaymentMembership((current) => ({
+          ...current,
+          ...purchase,
+          status: purchase.status,
+          paymentMethod: purchase.paymentMethod,
+          amount: purchase.amount,
+        }));
+        if (user?.onboarding) {
+          setPasswordLinkEmail(user.email);
+          setPasswordLinkSent(false);
+          setPaymentSubmittedMethod(purchase.paymentMethod || paymentMethod);
+          moveTo(6);
+        }
+        return;
+      }
+      await loadRazorpayCheckout();
+      const checkout = new window.Razorpay({
+        key: purchase.keyId,
+        amount: purchase.amount,
+        currency: purchase.currency,
+        name: 'Orianaa Club',
+        description: `${paymentMembership.plan.name} membership`,
+        order_id: purchase.orderId,
+        method: ['upi', 'card'].includes(paymentMethod) ? { [paymentMethod]: true } : undefined,
+        config: ['upi', 'card'].includes(paymentMethod) ? {
+          display: {
+            blocks: {
+              selected: {
+                name: `Pay using ${paymentMethod.toUpperCase()}`,
+                instruments: [{ method: paymentMethod }],
+              },
+            },
+            sequence: ['block.selected'],
+            preferences: { show_default_blocks: false },
+          },
+        } : undefined,
+        theme: { color: '#0d4a39' },
+        handler: async (result) => {
+          try {
+            const verification = await verifyMembershipPayment({
+              razorpay_order_id: result.razorpay_order_id || purchase.orderId,
+              razorpay_payment_id: result.razorpay_payment_id,
+              razorpay_signature: result.razorpay_signature,
+            });
+            if (user?.onboarding) {
+              setPaymentMembership((current) => ({ ...current, status: verification.status }));
+              setPasswordLinkEmail(user.email);
+              setPasswordLinkSent(false);
+              setPaymentSubmittedMethod('razorpay');
+              moveTo(6);
+            } else if (verification.status === 'pending_verification') {
+              setOfflineSubmitted(true);
+              setPaymentMembership((current) => ({ ...current, status: verification.status }));
+            } else {
+              navigate('/dashboard', { replace: true });
+            }
+
+          } catch (requestError) {
+            setPaymentError(requestError.message || 'Payment could not be verified. Please retry.');
+          } finally {
+            setPaymentProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentProcessing(false);
+            setPaymentError('Payment was cancelled. You can try again when ready.');
+          },
+        },
+      });
+      checkout.on('payment.failed', () => {
+        setPaymentProcessing(false);
+        setPaymentError('Payment failed. Please check your details and try again.');
+      });
+      checkout.open();
+    } catch (requestError) {
+      setPaymentProcessing(false);
+      if (requestError.status === 503) {
+        setPaymentUnavailable(true);
+      } else {
+        setPaymentError(requestError.message || 'We could not start your payment. Please try again.');
+      }
+    }
+  }
+
+  async function requestPasswordLink(event) {
+    event.preventDefault();
+    if (!passwordLinkEmail.trim() || passwordLinkResendSeconds > 0) return;
+    setPaymentError('');
+    try {
+      const response = isLoggedIn
+        ? await apiClient.post('/auth/onboarding/password-link', { email: passwordLinkEmail.trim() })
+        : await requestMembershipDraftPasswordLink(passwordLinkEmail.trim());
+      const result = response.data || response;
+      if (result.maskedEmail) {
+        setPasswordLinkSent(true);
+        setPasswordLinkMessage(`Password link sent to ${result.maskedEmail}`);
+        setProfile((current) => ({ ...current, email: passwordLinkEmail.trim() }));
+      } else {
+        setPasswordLinkSent(false);
+        setPasswordLinkMessage(result.message || response.message || 'If the address can be used, a password link will be sent.');
+      }
+      setPasswordLinkResendSeconds(60);
+    } catch (requestError) {
+      if (requestError.retryAfterSeconds) {
+        setPasswordLinkResendSeconds(requestError.retryAfterSeconds);
+      }
+      setPaymentError(requestError.message || 'The password setup link could not be requested.');
+    }
+  }
+
+  async function submitVerificationDocument() {
+    if (!verificationFile) {
+      setVerificationError('Choose a verification image to upload.');
+      return;
+    }
+    setPaymentProcessing(true);
+    setVerificationError('');
+    try {
+      await uploadMembershipVerificationDocument(verificationFile);
+      setVerificationFile(null);
+      setVerificationUploaded(true);
+    } catch (requestError) {
+      setVerificationError(requestError.message || 'We could not upload your verification document.');
+    } finally {
+      setPaymentProcessing(false);
+    }
+  }
+
+  if (loading) {
+    return <main className="join-membership-page jm-loading">Loading your membership application…</main>;
+  }
+
+  const membershipGateLoading = isLoggedIn
+    && (membershipGate.key !== userIdentity || membershipGate.loading);
+  if (membershipGateLoading) {
+    return <main className="join-membership-page jm-loading">Loading your membership application…</main>;
+  }
+  if (isLoggedIn && membershipGate.error) {
+    return <main className="join-membership-page">
+      <section className="jm-application-card">
+        <p className="jm-api-message jm-api-message--error" role="alert">{membershipGate.error}</p>
+        <button
+          className="jm-btn-submit"
+          type="button"
+          onClick={() => setMembershipGateRetry((count) => count + 1)}
+        >Try again</button>
+      </section>
+    </main>;
+  }
+
+  const existingMembership = membershipGate.membership;
+  const isLockedActiveMembership = existingMembership?.status === 'active'
+    && existingMembership.canRenew === false;
+  const isRenewableMembership = ['active', 'expired'].includes(existingMembership?.status)
+    && existingMembership.canRenew === true;
+  const pendingMessage = existingMembership?.status === 'pending_verification'
+    ? 'Your membership is pending document verification'
+    : existingMembership?.status === 'pending_payment'
+      ? 'Your membership payment is pending admin confirmation'
+      : '';
+
+  if (isLoggedIn && !user?.onboarding && (isLockedActiveMembership || isRenewableMembership || pendingMessage)) {
+    return <main className="join-membership-page">
+      <section className="jm-application-card">
+        {isLockedActiveMembership
+          ? <>
+            <p className="jm-api-message" role="status">
+              You already have an active membership. Renewal or upgrade opens when your points are fully used or expired.
+            </p>
+            <p><strong>Tier:</strong> {existingMembership.tier || 'Membership'}</p>
+            <p><strong>Points balance:</strong> {formatPoints(existingMembership.pointsBalance || 0)}</p>
+            <p><strong>Points expiry:</strong> {formatPlainDate(dateInputValue(existingMembership.pointsExpireAt))}</p>
+            <button className="jm-btn-submit" type="button" onClick={() => navigate('/dashboard')}>
+              Go to My Dashboard
+            </button>
+          </>
+          : <>
+            <p className="jm-api-message" role="status">
+              {pendingMessage || 'Your points are fully used (or expired). You can renew or upgrade your plan.'}
+            </p>
+            <button
+              className="jm-btn-submit"
+              type="button"
+              onClick={() => navigate(pendingMessage ? '/dashboard' : '/dashboard?tab=Renew')}
+            >
+              {pendingMessage ? 'Go to My Dashboard' : 'Renew or upgrade'}
+            </button>
+          </>}
+      </section>
+    </main>;
+  }
+
+  return (
+    <main className="join-membership-page">
+      <div className="join-stepper-wrap">
+        <div className="join-mobile-stepper" aria-label={`Step ${step} of ${steps.length}: ${steps[step - 1]}`}>
+          <p className="join-mobile-stepper__count">Step {step} of {steps.length}</p>
+          <h2 className="join-mobile-stepper__title">{steps[step - 1]}</h2>
+          <div
+            className="join-mobile-stepper__progress"
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={steps.length}
+            aria-valuenow={step}
+            aria-label="Membership application progress"
+          >
+            <span style={{ width: `${(step / steps.length) * 100}%` }} />
+          </div>
+        </div>
+        <div className="join-stepper">
+          {steps.map((label, index) => {
+            const number = index + 1;
+            return (
+              <Fragment key={label}>
+                <div className={`join-step-item ${step === number ? 'is-active' : ''} ${step > number ? 'is-completed' : ''}`}>
+                  <button
+                    type="button"
+                    className="join-step-circle"
+                    disabled={number >= step}
+                    onClick={() => number < step && moveTo(number)}
+                    aria-label={`Go to ${label}`}
+                  >
+                    {number}
+                  </button>
+                  <span className="join-step-label">{label}</span>
+                </div>
+                {number < steps.length && <span className={`join-step-line ${step > number ? 'is-active-line' : ''}`} />}
+              </Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.section
+          key={step}
+          className="jm-step-container"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -18 }}
+          transition={{ duration: 0.3 }}
+        >
+          <header className="jm-plans-header">
+            <h1 className="jm-plans-header__title">Your Orianaa Club Membership</h1>
+            <p className="jm-plans-header__desc">
+              {steps[step - 1]} — your details are saved securely to your account.
+            </p>
+          </header>
+
+          {error && <p className="jm-api-message jm-api-message--error" role="alert">{error}</p>}
+
+          {step === 1 && (
+            <form className="jm-application-card jm-hero-form" onSubmit={submitProfile}>
+              <div className="jm-application-grid">
+                <label className="jm-field">Full name
+                  <input className="jm-input" required minLength="2" maxLength="120" value={profile.fullName}
+                    onChange={(event) => setProfile({ ...profile, fullName: event.target.value })} />
+                </label>
+                <label className="jm-field">Gender
+                  <select className="jm-input jm-select" value={profile.gender}
+                    onChange={(event) => setProfile({ ...profile, gender: event.target.value })}>
+                    <option value="male">Male</option><option value="female">Female</option>
+                    <option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </label>
+                <label className="jm-field">Account email
+                  <input
+                    className="jm-input"
+                    type="email"
+                    autoComplete="email"
+                    required={!isLoggedIn}
+                    value={profile.email}
+                    readOnly={isLoggedIn || draftStarted}
+                    onChange={(event) => setProfile({ ...profile, email: event.target.value })}
+                  />
+                </label>
+                <label className="jm-field">Country code
+                  <input className="jm-input" required value={profile.countryCode}
+                    onChange={(event) => setProfile({ ...profile, countryCode: event.target.value })} />
+                </label>
+                <label className="jm-field">Mobile number
+                  <input className="jm-input" required type="tel" value={profile.mobile}
+                    onChange={(event) => setProfile({ ...profile, mobile: event.target.value })} />
+                </label>
+                <label className="jm-field">Date of birth
+                  <input className="jm-input" required type="date" value={profile.dob}
+                    onChange={(event) => setProfile({ ...profile, dob: event.target.value })} />
+                </label>
+                <label className="jm-field">Interest area
+                  <select className="jm-input jm-select" value={profile.interestArea}
+                    onChange={(event) => setProfile({ ...profile, interestArea: event.target.value })}>
+                    {['Luxury Stays', 'Fine Dining', 'Wellness & Spa', 'Family Vacations', 'Celebrations']
+                      .map((interest) => <option key={interest}>{interest}</option>)}
+                  </select>
+                </label>
+                <label className="jm-field">Profile photo (JPG, PNG, or WebP; max 10 MB)
+                  <input className="jm-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    onChange={(event) => selectImageFile(event, setProfilePhoto, setError)} />
+                </label>
+              </div>
+              {!isLoggedIn && draftStarted && (
+                <section className="jm-payment-alert mt-5" aria-label="Email verification">
+                  {draftEmailVerified ? (
+                    <p role="status">Email verified. Your identity documents can now be submitted.</p>
+                  ) : (
+                    <>
+                      <p>Enter the 6-digit code sent to your email before uploading identity documents.</p>
+                      <label className="jm-field mt-3" htmlFor="membership-email-otp">Email verification code
+                        <input
+                          className="jm-input"
+                          id="membership-email-otp"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          pattern="[0-9]{6}"
+                          maxLength="6"
+                          value={otpCode}
+                          onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        />
+                      </label>
+                      <div className="jm-family-actions mt-3">
+                        <button
+                          className="jm-btn-submit"
+                          type="button"
+                          onClick={submitDraftOtp}
+                          disabled={otpSubmitting || otpCode.length !== 6}
+                        >{otpSubmitting ? 'Verifying…' : 'Verify email'}</button>
+                        <button
+                          className="jm-btn-pill-outline"
+                          type="button"
+                          onClick={resendDraftOtp}
+                          disabled={otpSubmitting || otpResendSeconds > 0}
+                        >{otpResendSeconds > 0 ? `Resend code in ${otpResendSeconds}s` : 'Resend code'}</button>
+                      </div>
+                    </>
+                  )}
+                </section>
+              )}
+              <section className="jm-review-card mt-6" aria-labelledby="identity-verification-heading">
+                <h2 className="jm-review-card__title" id="identity-verification-heading">Document Verification</h2>
+                {!isLoggedIn && !draftEmailVerified ? (
+                  <p className="jm-quote-status">Verify your email to unlock document verification.</p>
+                ) : identityVerification?.status && !['not_submitted', 'rejected'].includes(identityVerification.status) ? (
+                  <div className="jm-payment-alert" role="status">
+                    <p>Your identity documents are already submitted.</p>
+                    <p>Status: {identityVerification.status.replaceAll('_', ' ')}</p>
+                    <p>PAN: {identityVerification.panMask} · {identityVerification.idType?.replaceAll('_', ' ')}: {identityVerification.idMask}</p>
+                  </div>
+                ) : (
+                  <>
+                    {identityVerification?.status === 'rejected' && <p className="jm-payment-error" role="alert">
+                      Documents were rejected: {identityVerification.rejectionReason || 'Please upload corrected documents.'}
+                    </p>}
+                    <section className="jm-identity-block" aria-labelledby="pan-card-heading">
+                      <h3 className="jm-identity-block__title" id="pan-card-heading">PAN Card</h3>
+                      <div className="jm-document-verification-grid">
+                        <label className="jm-field jm-identity-field">PAN number (required)
+                          <input
+                            className="jm-input"
+                            required
+                            maxLength="10"
+                            autoCapitalize="characters"
+                            value={panNumber}
+                            onChange={(event) => setPanNumber(event.target.value.toUpperCase())}
+                            placeholder="ABCDE1234F"
+                          />
+                        </label>
+                        <IdentityFileField label="PAN card front" file={identityFiles.panFront}
+                          previewUrl={identityPreviewUrls.panFront} required disabled={saving}
+                          onRemove={() => removeIdentityFile('panFront')}
+                          onSelect={(event) => selectIdentityFile(
+                            event, 'panFront', setIdentityFiles, setError, updateIdentityPreviewUrl,
+                          )} />
+                        <IdentityFileField label="PAN card back" file={identityFiles.panBack}
+                          previewUrl={identityPreviewUrls.panBack} disabled={saving}
+                          onRemove={() => removeIdentityFile('panBack')}
+                          onSelect={(event) => selectIdentityFile(
+                            event, 'panBack', setIdentityFiles, setError, updateIdentityPreviewUrl,
+                          )} />
+                      </div>
+                    </section>
+                    <section className="jm-identity-block" aria-labelledby="second-id-heading">
+                      <h3 className="jm-identity-block__title" id="second-id-heading">Second ID (choose any one)</h3>
+                      <div className="jm-document-verification-grid">
+                        <label className="jm-field jm-identity-field">Second ID type
+                          <select className="jm-input jm-select" value={secondIdType} onChange={(event) => {
+                            setSecondIdType(event.target.value);
+                            setSecondIdNumber('');
+                            resetSecondIdentityFiles();
+                          }}>
+                            <option value="aadhaar">Aadhaar Card</option>
+                            <option value="driving_licence">Driving Licence</option>
+                            <option value="passport">Passport</option>
+                          </select>
+                        </label>
+                        <label className="jm-field jm-identity-field">Document number (required)
+                          <input
+                            className="jm-input"
+                            required
+                            maxLength="30"
+                            autoCapitalize="characters"
+                            inputMode={secondIdType === 'aadhaar' ? 'numeric' : 'text'}
+                            value={secondIdNumber}
+                            onChange={(event) => setSecondIdNumber(event.target.value.toUpperCase())}
+                            placeholder={secondIdType === 'aadhaar' ? '12-digit Aadhaar number' : secondIdType === 'passport' ? 'Passport number' : 'Driving Licence number'}
+                          />
+                        </label>
+                        <IdentityFileField label={`${secondIdType.replaceAll('_', ' ')} front`} file={identityFiles.secondFront}
+                          previewUrl={identityPreviewUrls.secondFront} required disabled={saving}
+                          onRemove={() => removeIdentityFile('secondFront')}
+                          onSelect={(event) => selectIdentityFile(
+                            event, 'secondFront', setIdentityFiles, setError, updateIdentityPreviewUrl,
+                          )} />
+                        <IdentityFileField label={`${secondIdType.replaceAll('_', ' ')} back`} file={identityFiles.secondBack}
+                          previewUrl={identityPreviewUrls.secondBack} required disabled={saving}
+                          onRemove={() => removeIdentityFile('secondBack')}
+                          onSelect={(event) => selectIdentityFile(
+                            event, 'secondBack', setIdentityFiles, setError, updateIdentityPreviewUrl,
+                          )} />
+                      </div>
+                    </section>
+                    <label className="jm-promo-agree mt-4">
+                      <input
+                        type="checkbox"
+                        className="jm-checkbox"
+                        required
+                        checked={identityConsent}
+                        onChange={(event) => setIdentityConsent(event.target.checked)}
+                      />
+                      <span className="jm-promo-text">I consent to Orianaa Club storing my identity documents for membership verification.</span>
+                    </label>
+                  </>
+                )}
+              </section>
+              <label className="jm-promo-agree">
+                <input type="checkbox" className="jm-checkbox" checked={Boolean(profile.agreePromo)}
+                  onChange={(event) => setProfile({ ...profile, agreePromo: event.target.checked })} />
+                <span className="jm-promo-text">I agree to receive promotional messages from Orianaa Club.</span>
+              </label>
+              <button className="jm-btn-submit" disabled={saving}>{saving || identitySubmitting ? 'Saving…' : 'Save & Continue'}</button>
+            </form>
+          )}
+
+          {step === 2 && (
+            plansLoading ? (
+              <div className="jm-plans-loading-grid" aria-label="Loading membership plans" aria-busy="true">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <div className="jm-plan-skeleton" key={index}>
+                    <span /><span /><span /><span /><span />
+                  </div>
+                ))}
+              </div>
+            ) : plansError ? (
+              <div className="jm-plans-error" role="alert">
+                <p>{plansError}</p>
+                <button className="jm-btn-submit" type="button" onClick={loadPlans}>Retry</button>
+              </div>
+            ) : plans.length === 0 ? (
+              <p className="jm-plans-empty">No active membership plans are available right now.</p>
+            ) : (
+              <div className="mb-plans-grid">
+                {plans.map((plan, index) => (
+                  <PlanCard
+                    key={plan.slug}
+                    plan={mapPlanToCard(plan)}
+                    index={index}
+                    buttonLabel="Select Plan"
+                    onSelect={() => choosePlan(plan)}
+                    selected={selectedPlan?.slug === plan.slug}
+                    disabled={saving}
+                  />
+                ))}
+              </div>
+            )
+          )}
+
+          {step === 3 && (
+            <div className="jm-application-card">
+              <h2>Family members</h2>
+              <p>This plan allows up to {selectedPlan?.maxFamilyMembers ?? 0} additional family profiles.</p>
+              <form className="jm-application-grid" onSubmit={submitFamily}>
+                <label className="jm-field">Full name
+                  <input className="jm-input" required minLength="2" value={familyForm.fullName}
+                    onChange={(event) => setFamilyForm({ ...familyForm, fullName: event.target.value })} />
+                </label>
+                <label className="jm-field">Gender
+                  <select className="jm-input jm-select" value={familyForm.gender}
+                    onChange={(event) => setFamilyForm({ ...familyForm, gender: event.target.value })}>
+                    <option value="male">Male</option><option value="female">Female</option>
+                    <option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option>
+                  </select>
+                </label>
+                <label className="jm-field">Relationship
+                  <input className="jm-input" required value={familyForm.relationship}
+                    onChange={(event) => setFamilyForm({ ...familyForm, relationship: event.target.value })} />
+                </label>
+                <label className="jm-field">Date of birth
+                  <input className="jm-input" required type="date" value={familyForm.dob}
+                    onChange={(event) => setFamilyForm({ ...familyForm, dob: event.target.value })} />
+                </label>
+                <label className="jm-field">Photo (optional; max 10 MB)
+                  <input className="jm-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    onChange={(event) => selectImageFile(event, setFamilyPhoto, setError)} />
+                </label>
+                <div className="jm-family-actions">
+                  <button className="jm-btn-submit" disabled={saving}>{saving ? 'Saving…' : editingFamilyId ? 'Update member' : 'Add family member'}</button>
+                  {editingFamilyId && <button type="button" className="jm-btn-pill-outline" onClick={resetFamilyForm}>Cancel edit</button>}
+                </div>
+              </form>
+              <div className="jm-family-list">
+                <h3>Added Family Members ({family.length})</h3>
+                {family.map((member) => (
+                  <div className="jm-family-chip" key={member._id}>
+                    {member.photoUrl && <img className="jm-family-photo" src={apiFileUrl(member.photoUrl)} alt="" />}
+                    <span>{member.fullName} <small>({member.relationship} · {member.gender})</small></span>
+                    <button className="jm-btn-pill-outline" type="button" onClick={() => startFamilyEdit(member)}>Edit</button>
+                    <button className="jm-family-chip__delete" type="button" disabled={saving}
+                      onClick={() => removeFamilyMember(member._id)} aria-label={`Delete ${member.fullName}`}>Delete</button>
+                  </div>
+                ))}
+              </div>
+              <div className="jm-family-actions">
+                <button className="jm-btn-pill-outline" type="button" onClick={() => moveTo(2)}>Back</button>
+                <button className="jm-btn-submit" type="button" onClick={saveDraftAndReview} disabled={saving}>
+                  {saving ? 'Saving…' : 'Continue to review'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="jm-review-layout">
+              <section className="jm-review-plan-card" aria-label="Selected membership plan">
+                <h2 className="jm-review-plan-card__title">{selectedPlan?.title || 'Selected plan'}</h2>
+                <p className="jm-review-plan-card__rate">1 Redemption points = 1 Rupee</p>
+                <div className="jm-review-plan-card__benefits">
+                  {(selectedPlan?.benefits || []).map((benefit, index) => (
+                    <div className="jm-review-plan-card__benefit" key={`${selectedPlan.slug}-${index}`}>
+                      <strong>{formatPoints(benefit.points)} points</strong>
+                      <span>{benefit.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="jm-review-plan-card__price">
+                  <span>Plan price</span>
+                  <strong>{money(selectedPlan?.price)}</strong>
+                </div>
+                <button className="jm-review-plan-card__change" type="button" onClick={() => moveTo(2)}>
+                  Change Plan
+                </button>
+              </section>
+
+              <div className="jm-review-right">
+                <section className="jm-review-card" aria-readonly="true">
+                  <h2 className="jm-review-card__title">Personal Details</h2>
+                  <dl className="jm-review-details">
+                    <div><dt>Name</dt><dd>{profile.fullName || '—'}</dd></div>
+                    <div><dt>Gender</dt><dd>{profile.gender ? profile.gender.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : '—'}</dd></div>
+                    <div><dt>Date of Birth</dt><dd>{formatPlainDate(profile.dob)}</dd></div>
+                    <div><dt>Phone</dt><dd>{profile.mobile ? `${profile.countryCode || ''} ${profile.mobile}`.trim() : '—'}</dd></div>
+                  </dl>
+                </section>
+
+                <section className="jm-review-card jm-payment-details" aria-label="Payment details">
+                  <h2 className="jm-review-card__title">Payment Details</h2>
+                  {quoteLoading ? (
+                    <p className="jm-quote-status" role="status">Calculating your payment details…</p>
+                  ) : quoteError ? (
+                    <p className="jm-quote-status jm-quote-status--error" role="alert">{quoteError}</p>
+                  ) : quote ? (
+                    <div className="jm-fee-rows">
+                      <div className="jm-fee-row">
+                        <span className="jm-fee-row__label">Plan fee</span>
+                        <strong>{money(quote.planFee / 100)}</strong>
+                      </div>
+                      {quote.gstEnabled && <div className="jm-fee-row">
+                        <span className="jm-fee-row__label">{quote.gstLabel} ({quote.gstPercent}%)</span>
+                        <strong>{money(quote.gst / 100)}</strong>
+                      </div>}
+                      <div className="jm-fee-row jm-fee-row--total">
+                        <span className="jm-fee-row__label">Total</span>
+                        <strong>{money(quote.total / 100)}</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="jm-quote-status" role="status">Select a plan to view payment details.</p>
+                  )}
+                  <button
+                    className="jm-btn-submit jm-confirm-payment"
+                    type="button"
+                    onClick={confirmAndOpenPayment}
+                    disabled={saving || quoteLoading || Boolean(quoteError) || !quote}
+                  >
+                    {saving ? 'Preparing payment…' : 'Confirm & Proceed to Payment'}
+                  </button>
+                </section>
+                {selectedPlan?.requiresCompanyDetails && (
+                  <section className="jm-review-card" aria-label="Company details">
+                    <h2 className="jm-review-card__title">Company Details</h2>
+                    <div className="jm-application-grid">
+                      {[
+                        ['Company name', 'companyName'],
+                        ['GST number', 'gstNumber'],
+                        ['Contact person', 'contactPerson'],
+                      ].map(([label, field]) => (
+                        <label className="jm-field" key={field}>{label}
+                          <input
+                            className="jm-input"
+                            required
+                            value={companyDetails[field]}
+                            onChange={(event) => setCompanyDetails({
+                              ...companyDetails,
+                              [field]: event.target.value,
+                            })}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <section className="jm-payment-page" aria-labelledby="jm-payment-heading">
+              <h2 className="jm-payment-title" id="jm-payment-heading">Select Payment Method</h2>
+              {paymentMembershipLoading ? (
+                <p className="jm-quote-status" role="status">Loading your payment details…</p>
+              ) : paymentMembershipError ? (
+                <div className="jm-payment-alert" role="alert">
+                  <p>{paymentMembershipError}</p>
+                  <button className="jm-btn-pill-outline" type="button" onClick={() => setPaymentReload((value) => value + 1)}>
+                    Retry
+                  </button>
+                </div>
+              ) : paymentMembership ? (
+                <>
+                  <fieldset className="jm-payment-methods-grid" disabled={paymentProcessing}>
+                    <legend className="sr-only">Choose a payment method</legend>
+                    {[
+                      { id: 'upi', label: 'UPI', icon: <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M26.8 4 12 26.1h9.5L19.2 44 36 19.7h-10L26.8 4Z" fill="currentColor" /></svg> },
+                      { id: 'card', label: 'Card', icon: <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5" fill="none" stroke="currentColor" strokeWidth="3" /><path d="M7 19h34M13 30h10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg> },
+                      { id: 'razorpay', label: 'Razorpay', icon: <span className="jm-razorpay-mark" aria-hidden="true">R</span> },
+                      { id: 'bank_transfer', label: 'Bank transfer', icon: <span aria-hidden="true">⌂</span> },
+                      { id: 'cheque', label: 'Cheque', icon: <span aria-hidden="true">▤</span> },
+                      { id: 'rtgs', label: 'RTGS', icon: <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 17h30m0 0-7-7m7 7-7 7M40 31H10m0 0 7-7m-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg> },
+                    ].map((option) => (
+                      <label className={`jm-pay-card ${paymentMethod === option.id ? 'is-selected-pay' : ''}`} key={option.id}>
+                        <input
+                          className="jm-payment-radio"
+                          type="radio"
+                          name="payment-method"
+                          value={option.id}
+                          checked={paymentMethod === option.id}
+                          onChange={() => setPaymentMethod(option.id)}
+                        />
+                        <span className={`jm-pay-card__logo jm-pay-card__logo--${option.id}`}>{option.icon}</span>
+                        <span className="jm-pay-card__name">{option.label}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  <p className="jm-payment-total">
+                    <span>{paymentMembership.plan.name}</span>
+                  </p>
+                  <div className="jm-fee-rows">
+                    <div className="jm-fee-row">
+                      <span className="jm-fee-row__label">Plan fee</span>
+                      <strong className="jm-fee-row__val">{money(paymentMembership.planFee / 100)}</strong>
+                    </div>
+                    {paymentMembership.gstEnabled && <div className="jm-fee-row">
+                      <span className="jm-fee-row__label">{paymentMembership.gstLabel} ({paymentMembership.gstRate}%)</span>
+                      <strong className="jm-fee-row__val">{money(paymentMembership.gst / 100)}</strong>
+                    </div>}
+                    <div className="jm-fee-row jm-fee-row--total">
+                      <span className="jm-fee-row__label">Total</span>
+                      <strong className="jm-fee-row__val">{money(paymentMembership.amount / 100)}</strong>
+                    </div>
+                  </div>
+                  {paymentMethod === 'rtgs' && (
+                    <section className="jm-payment-alert" aria-label="RTGS bank transfer details">
+                      <h3>Bank details</h3>
+                      {bankDetailsLoading ? (
+                        <p role="status">Loading bank details…</p>
+                      ) : bankDetailsError ? (
+                        <p role="alert">{bankDetailsError}</p>
+                      ) : bankDetails ? (
+                        <dl>
+                          <div><dt>Account name</dt><dd>{bankDetails.accountName || '—'}</dd></div>
+                          <div><dt>Account number</dt><dd>{bankDetails.accountNumber || '—'}</dd></div>
+                          <div><dt>IFSC</dt><dd>{bankDetails.ifsc || '—'}</dd></div>
+                          <div><dt>Bank</dt><dd>{bankDetails.bank || '—'}</dd></div>
+                          <div><dt>Branch</dt><dd>{bankDetails.branch || '—'}</dd></div>
+                        </dl>
+                      ) : null}
+                      <label className="jm-field" htmlFor="rtgs-utr">RTGS UTR / reference number
+                        <input
+                          className="jm-input"
+                          id="rtgs-utr"
+                          required
+                          minLength="6"
+                          maxLength="50"
+                          pattern="[A-Za-z0-9/-]+"
+                          value={rtgsUtr}
+                          onChange={(event) => setRtgsUtr(event.target.value)}
+                          disabled={paymentProcessing}
+                        />
+                      </label>
+                      <label className="jm-field" htmlFor="rtgs-transfer-date">Transfer date
+                        <input
+                          className="jm-input"
+                          id="rtgs-transfer-date"
+                          type="date"
+                          required
+                          value={rtgsTransferDate}
+                          onChange={(event) => setRtgsTransferDate(event.target.value)}
+                          disabled={paymentProcessing}
+                        />
+                      </label>
+                    </section>
+                  )}
+
+                  {paymentMembership.status === 'pending_verification' ? (
+                    <div className="jm-payment-alert" role="status">
+                      <p>Payment confirmed. Upload your eligibility proof for administrator review.</p>
+                      {verificationUploaded ? (
+                        <p>Your verification document has been submitted.</p>
+                      ) : (
+                        <div className="jm-verification-upload">
+                          <label htmlFor="membership-verification-document">Verification document image</label>
+                          <input
+                            id="membership-verification-document"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            onChange={(event) => selectImageFile(event, setVerificationFile, setVerificationError)}
+                            disabled={paymentProcessing}
+                          />
+                          {verificationFile && <span>{verificationFile.name}</span>}
+                          {verificationError && <p className="jm-payment-error" role="alert">{verificationError}</p>}
+                          <button
+                            className="jm-btn-submit"
+                            type="button"
+                            onClick={submitVerificationDocument}
+                            disabled={paymentProcessing || !verificationFile}
+                          >
+                            {paymentProcessing ? 'Uploading…' : 'Upload proof'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : offlineSubmitted ? (
+                    <div className="jm-payment-alert" role="status">
+                      Payment method saved. Your membership will become active after an administrator confirms receipt.
+                    </div>
+                  ) : paymentUnavailable ? (
+                    <div className="jm-payment-alert" role="status">
+                      <p>Online payment is not enabled yet. Your membership is saved as pending payment.</p>
+                      <button className="jm-btn-pill-outline" type="button" onClick={() => moveTo(4)}>Back to Review</button>
+                    </div>
+                  ) : (
+                    <>
+                      {paymentError && <p className="jm-payment-error" role="alert">{paymentError}</p>}
+                      <button
+                        className="jm-btn-submit jm-pay-securely"
+                        type="button"
+                        onClick={paySecurely}
+                        disabled={paymentProcessing || paymentMembershipLoading || !paymentMembership
+                          || (paymentMethod === 'rtgs' && (bankDetailsLoading || Boolean(bankDetailsError) || !bankDetails))}
+                      >
+                        {paymentProcessing ? 'Processing…' : ['upi', 'card', 'razorpay'].includes(paymentMethod)
+                          ? 'Pay Securely'
+                          : 'Submit payment method'}
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : null}
+            </section>
+          )}
+
+          {step === 6 && (
+            <section className="jm-application-card jm-password-link-card" aria-labelledby="password-link-heading">
+              <h2 id="password-link-heading">Set Password</h2>
+              <p className="mt-2">
+                {paymentSubmittedMethod === 'razorpay'
+                  ? 'Payment received.'
+                  : 'Payment submitted, awaiting confirmation.'}
+              </p>
+              <form className="jm-password-link-form mt-4" onSubmit={requestPasswordLink}>
+                <label className="jm-field" htmlFor="password-link-email">
+                  Email
+                  <input
+                    className="jm-input"
+                    id="password-link-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={passwordLinkEmail}
+                    onChange={(event) => {
+                      setPasswordLinkEmail(event.target.value);
+                      setPasswordLinkSent(false);
+                      setPasswordLinkMessage('');
+                    }}
+                  />
+                </label>
+                {passwordLinkSent && <p className="mt-3" role="status">{passwordLinkMessage}</p>}
+                {passwordLinkMessage && !passwordLinkSent
+                  && <p className="mt-3" role="status">{passwordLinkMessage}</p>}
+                <p className="mt-3 text-sm">Check your inbox and spam folder.</p>
+                <button
+                  className="jm-btn-submit mt-4"
+                  type="submit"
+                  disabled={passwordLinkResendSeconds > 0}
+                >
+                  {passwordLinkResendSeconds > 0
+                    ? `${passwordLinkSent ? 'Resend' : 'Send link'} in ${passwordLinkResendSeconds}s`
+                    : passwordLinkSent
+                      ? 'Resend'
+                      : 'Send password setup link'}
+                </button>
+              </form>
+              {paymentError && <p className="jm-payment-error mt-4" role="alert">{paymentError}</p>}
+            </section>
+          )}
+        </motion.section>
+      </AnimatePresence>
+    </main>
+  );
+}

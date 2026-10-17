@@ -1,0 +1,540 @@
+/* =========================================================
+   ORIANAA CLUB — MEMBERSHIP BENEFITS PAGE
+   Figma-Matched Luxury Layout & Interactive System
+   ========================================================= */
+
+:root {
+  --mb-green: #0d4a39;
+  --mb-green-deep: #08382b;
+  --mb-green-hover: #125e49;
+  --mb-gold: #e2ad32;
+  --mb-gold-light: #f1d99c;
+  --mb-gold-dark: #b8912d;
+  --mb-paper: #f7f5f1;
+  --mb-card-bg: #ffffff;
+  --mb-ink: #111310;
+  --mb-muted: #5a6058;
+  --mb-border: #e8e4dc;
+  --mb-serif: "Playfair Display", Georgia, serif;
+  --mb-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.mb-page {
+  background: var(--mb-paper);
+  color: var(--mb-ink);
+  font-family: var(--mb-sans);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ─────────────────────────────────────────────────────────
+   HERO SECTION
+   ───────────────────────────────────────────────────────── */
+.mb-hero {
+  position: relative;
+  height: 90vh;
+  min-height: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+.mb-hero__bg {
+  position: absolute;
+  inset: -10%;
+  background-size: cover;
+  background-position: center;
+  will-change: transform;
+}
+
+.mb-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(13, 20, 16, 0.45) 0%,
+    rgba(13, 20, 16, 0.72) 65%,
+    rgba(13, 20, 16, 0.88) 100%
+  );
+}
+
+.mb-hero-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--mb-gold-light);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.mb-hero__content {
+  position: relative;
+  z-index: 2;
+  width: min(880px, calc(100% - 48px));
+  margin: 0 auto;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mb-hero__title {
+  margin: 0 0 18px;
+  font-family: var(--mb-serif);
+  font-size: clamp(48px, 6.5vw, 84px);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: #ffffff;
+}
+
+.mb-hero__subtitle {
+  max-width: 620px;
+  margin: 0 0 34px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.mb-hero__cta {
+  display: inline-block;
+  padding: 14px 34px;
+  border-radius: 999px;
+  background: var(--mb-green);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mb-hero__cta:hover {
+  background: var(--mb-green-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ─────────────────────────────────────────────────────────
+   FEATURE ROWS (1 & 2)
+   ───────────────────────────────────────────────────────── */
+.mb-feature-section {
+  padding: 100px 0 60px;
+  background: var(--mb-paper);
+}
+
+.mb-feature-section--alt {
+  padding: 60px 0 100px;
+}
+
+.mb-feature-container {
+  width: min(1200px, calc(100% - 64px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  align-items: center;
+  gap: 80px;
+}
+
+.mb-feature-container--reverse {
+  grid-template-columns: 1.05fr 1fr;
+}
+
+.mb-feature-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.mb-feature-eyebrow {
+  margin: 0 0 14px;
+  font-family: var(--mb-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: capitalize;
+  color: var(--mb-gold-dark);
+}
+
+.mb-feature-heading {
+  margin: 0 0 20px;
+  font-family: var(--mb-serif);
+  font-size: clamp(38px, 4.2vw, 56px);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--mb-ink);
+}
+
+.mb-feature-text {
+  max-width: 460px;
+  margin: 0 0 34px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--mb-muted);
+}
+
+.mb-feature-btn {
+  display: inline-block;
+  padding: 13px 28px;
+  border-radius: 999px;
+  background: var(--mb-green);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  align-self: flex-start;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(13, 74, 57, 0.2);
+}
+
+.mb-feature-btn:hover {
+  background: var(--mb-green-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(13, 74, 57, 0.28);
+}
+
+/* Feature 1 Media */
+.mb-feature-media {
+  position: relative;
+}
+
+.mb-feature-image-wrapper {
+  position: relative;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 16px 50px rgba(13, 74, 57, 0.12), 0 4px 16px rgba(0, 0, 0, 0.05);
+  height: 480px;
+}
+
+.mb-feature-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mb-feature-image-wrapper:hover .mb-feature-img {
+  transform: scale(1.04);
+}
+
+/* Gold Wave on Image Corner */
+.mb-feature-wave {
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 220px;
+  height: 160px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Feature 2: Stacked Images */
+.mb-stacked-media {
+  position: relative;
+  height: 480px;
+}
+
+.mb-stacked-image {
+  position: absolute;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 16px 45px rgba(13, 74, 57, 0.14), 0 4px 16px rgba(0, 0, 0, 0.06);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mb-stacked-image--back {
+  top: 0;
+  left: 0;
+  width: 72%;
+  height: 380px;
+  z-index: 1;
+  opacity: 0.9;
+}
+
+.mb-stacked-image--front {
+  bottom: 0;
+  right: 20px;
+  width: 74%;
+  height: 390px;
+  z-index: 2;
+}
+
+.mb-stacked-media:hover .mb-stacked-image--back {
+  transform: translate(-10px, -10px) scale(1.02);
+}
+
+.mb-stacked-media:hover .mb-stacked-image--front {
+  transform: translate(6px, 6px) scale(1.02);
+}
+
+/* ─────────────────────────────────────────────────────────
+   MEMBERSHIP PLANS SECTION
+   ───────────────────────────────────────────────────────── */
+.mb-plans-section {
+  padding: 100px 0 110px;
+  background: var(--mb-paper);
+}
+
+.mb-plans-header {
+  text-align: center;
+  max-width: 980px;
+  margin: 0 auto 64px;
+}
+
+.mb-plans-title {
+  margin: 0 0 12px;
+  font-family: var(--mb-serif);
+  font-size: clamp(38px, 4.5vw, 56px);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--mb-ink);
+}
+
+.mb-plans-subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: var(--mb-muted);
+}
+
+/* Points Explainer Guide */
+.mb-points-guide {
+  margin-top: 36px;
+  padding: 24px 30px;
+  background: #ffffff;
+  border: 1px solid var(--mb-border);
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  text-align: left;
+}
+
+.mb-points-guide__step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mb-points-guide__step p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--mb-muted);
+}
+
+.mb-points-guide__divider {
+  width: 1px;
+  height: 48px;
+  background: var(--mb-border);
+  flex-shrink: 0;
+}
+
+.mb-points-guide__tag {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.mb-points-guide__tag--first {
+  background: rgba(226, 173, 50, 0.16);
+  color: var(--mb-gold-dark);
+}
+
+.mb-points-guide__tag--after {
+  background: rgba(13, 74, 57, 0.1);
+  color: var(--mb-green);
+}
+
+.mb-points-guide__tag--default {
+  background: #f0ede6;
+  color: #4b4f49;
+}
+
+@media (max-width: 768px) {
+  .mb-points-guide {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px 18px;
+    gap: 18px;
+  }
+
+  .mb-points-guide__divider {
+    width: 100%;
+    height: 1px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   JOIN THE ORIANAA CLUB SECTION
+   ───────────────────────────────────────────────────────── */
+.mb-join-section {
+  padding: 60px 0 100px;
+  background: var(--mb-paper);
+}
+
+.mb-join-card {
+  width: min(1200px, calc(100% - 64px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  background: #ffffff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 12px 50px rgba(13, 74, 57, 0.08), 0 2px 16px rgba(0, 0, 0, 0.04);
+}
+
+.mb-join-image-wrap {
+  position: relative;
+  overflow: hidden;
+  min-height: 380px;
+}
+
+.mb-join-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mb-join-image-wrap:hover .mb-join-image {
+  transform: scale(1.04);
+}
+
+.mb-join-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px 72px;
+}
+
+.mb-join-title {
+  margin: 0 0 16px;
+  font-family: var(--mb-serif);
+  font-size: clamp(34px, 3.8vw, 50px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--mb-ink);
+}
+
+.mb-join-desc {
+  max-width: 420px;
+  margin: 0 0 34px;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--mb-muted);
+}
+
+.mb-join-btn {
+  display: inline-block;
+  padding: 13px 30px;
+  border-radius: 999px;
+  background: var(--mb-green);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  align-self: flex-start;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(13, 74, 57, 0.2);
+}
+
+.mb-join-btn:hover {
+  background: var(--mb-green-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(13, 74, 57, 0.28);
+}
+
+/* ─────────────────────────────────────────────────────────
+   RESPONSIVE DESIGN (Tablet & Mobile)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .mb-feature-container,
+  .mb-feature-container--reverse {
+    grid-template-columns: 1fr;
+    gap: 50px;
+  }
+
+  .mb-feature-container--reverse .mb-stacked-media {
+    order: 2;
+  }
+
+  .mb-join-card {
+    grid-template-columns: 320px 1fr;
+  }
+
+  .mb-join-content {
+    padding: 48px 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mb-hero {
+    min-height: 540px;
+    height: 80vh;
+  }
+
+  .mb-hero__title {
+    font-size: 42px;
+  }
+
+  .mb-feature-section {
+    padding: 60px 0 40px;
+  }
+
+  .mb-feature-section--alt {
+    padding: 40px 0 60px;
+  }
+
+  .mb-feature-image-wrapper {
+    height: 320px;
+  }
+
+  .mb-stacked-media {
+    height: 340px;
+  }
+
+  .mb-stacked-image--back {
+    height: 260px;
+  }
+
+  .mb-stacked-image--front {
+    height: 270px;
+  }
+
+  .mb-plans-section {
+    padding: 60px 0 70px;
+  }
+
+  .mb-join-card {
+    grid-template-columns: 1fr;
+  }
+
+  .mb-join-image-wrap {
+    min-height: 260px;
+    height: 260px;
+  }
+
+  .mb-join-content {
+    padding: 40px 24px 44px;
+  }
+}

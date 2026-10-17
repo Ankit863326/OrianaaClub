@@ -1,0 +1,531 @@
+/* =========================================================
+   ORIANAA CLUB — EXPERIENCES PAGE
+   Fully matching Figma layout
+   ========================================================= */
+
+:root {
+  --exp-green: #0d4a39;
+  --exp-green-deep: #08382b;
+  --exp-gold: #e2ad32;
+  --exp-gold-light: #f1d99c;
+  --exp-paper: #f7f5f1;
+  --exp-ink: #111310;
+  --exp-muted: #5a6058;
+  --exp-serif: "Playfair Display", Georgia, serif;
+  --exp-sans: "Inter", system-ui, sans-serif;
+}
+
+.exp-page {
+  background: var(--exp-paper);
+  color: var(--exp-ink);
+  font-family: var(--exp-sans);
+  overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────
+   HERO
+   ───────────────────────────────────────────────────────── */
+.exp-hero {
+  position: relative;
+  height: 100vh;
+  min-height: 680px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.exp-hero__bg {
+  position: absolute;
+  inset: -12%;
+  background-image: url("https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=2400&q=90");
+  background-size: cover;
+  background-position: center;
+  will-change: transform;
+}
+
+.exp-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(5, 20, 13, 0.88) 0%, rgba(5, 20, 13, 0.42) 55%, rgba(5, 20, 13, 0.18) 100%),
+    linear-gradient(to right, rgba(5, 20, 13, 0.55) 0%, transparent 65%);
+}
+
+/* floating particles */
+.exp-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--exp-gold-light);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.exp-hero__content {
+  position: relative;
+  z-index: 2;
+  width: min(1200px, calc(100% - 80px));
+  margin: 0 auto;
+  padding-bottom: 96px;
+  color: #fff;
+}
+
+.exp-hero__eyebrow {
+  margin: 0 0 20px;
+  font-family: var(--exp-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: var(--exp-gold-light);
+  text-transform: uppercase;
+}
+
+.exp-hero__title {
+  margin: 0;
+  font-family: var(--exp-serif);
+  font-size: clamp(52px, 7.5vw, 108px);
+  font-weight: 400;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.exp-hero__title em {
+  font-style: italic;
+  color: var(--exp-gold-light);
+}
+
+.exp-hero__sub {
+  max-width: 520px;
+  margin: 28px 0 38px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.exp-hero__cta {
+  display: inline-block;
+  padding: 15px 34px;
+  border-radius: 999px;
+  background: var(--exp-green);
+  color: #fff;
+  font-family: var(--exp-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border: 2px solid var(--exp-green);
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.exp-hero__cta:hover {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+.exp-hero__scroll {
+  position: absolute;
+  right: 52px;
+  bottom: 48px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transform: rotate(90deg);
+  transform-origin: right center;
+  pointer-events: none;
+}
+
+.exp-hero__scroll span {
+  display: block;
+  width: 44px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.exp-hero__scroll p {
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+/* ─────────────────────────────────────────────────────────
+   OUR EXPERIENCES SECTION HEADER
+   ───────────────────────────────────────────────────────── */
+.exp-section {
+  padding: 100px 0 60px;
+  background: var(--exp-paper);
+}
+
+.exp-section__header {
+  width: min(1200px, calc(100% - 80px));
+  margin: 0 auto 72px;
+}
+
+.exp-section__kicker {
+  margin: 0 0 14px;
+  font-family: var(--exp-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  color: var(--exp-green);
+  text-transform: uppercase;
+}
+
+.exp-section__title {
+  margin: 0;
+  font-family: var(--exp-serif);
+  font-size: clamp(42px, 5vw, 68px);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--exp-ink);
+}
+
+/* ─────────────────────────────────────────────────────────
+   EXPERIENCE ROWS  —  image always LEFT, content RIGHT
+   Alternate rows get a lighter bg on content panel
+   ───────────────────────────────────────────────────────── */
+.exp-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.exp-row {
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  min-height: 520px;
+  border-top: 1px solid rgba(13, 74, 57, 0.1);
+}
+
+.exp-row:last-child {
+  border-bottom: 1px solid rgba(13, 74, 57, 0.1);
+}
+
+/* ── Image panel ── */
+.exp-row__image-wrap {
+  position: relative;
+  overflow: hidden;
+  min-height: 480px;
+}
+
+.exp-row__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.exp-row__image-wrap:hover .exp-row__image {
+  transform: scale(1.06);
+}
+
+.exp-row__img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(13, 74, 57, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Content panel ── */
+.exp-row__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 72px;
+  background: #ffffff;
+}
+
+.exp-row--alt .exp-row__content {
+  background: #f4f1ec;
+}
+
+.exp-row__category {
+  margin: 0 0 12px;
+  font-family: var(--exp-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--exp-green);
+}
+
+.exp-row__heading {
+  margin: 0;
+  font-family: var(--exp-serif);
+  font-size: clamp(26px, 2.8vw, 40px);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--exp-ink);
+}
+
+.exp-row__line {
+  width: 48px;
+  height: 2px;
+  background: var(--exp-gold);
+  margin: 20px 0;
+  transform-origin: left;
+}
+
+.exp-row__desc {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--exp-muted);
+  max-width: 460px;
+}
+
+/* ── Tags — ALL items shown as pills ── */
+.exp-row__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 32px;
+}
+
+.exp-row__tag {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--exp-green);
+  color: #fff;
+  font-family: var(--exp-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  cursor: default;
+  transition: background 0.28s ease, color 0.28s ease, transform 0.22s ease;
+  white-space: nowrap;
+}
+
+/* ── Read More button ── */
+.exp-row__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  border: 2px solid var(--exp-green);
+  color: var(--exp-green);
+  background: transparent;
+  text-decoration: none;
+  font-family: var(--exp-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  align-self: flex-start;
+  transition: background 0.28s ease, color 0.28s ease;
+}
+
+.exp-row__btn:hover {
+  background: var(--exp-green);
+  color: #fff;
+}
+
+.exp-row__btn span {
+  transition: transform 0.28s ease;
+}
+
+.exp-row__btn:hover span {
+  transform: translateX(5px);
+}
+
+/* ─────────────────────────────────────────────────────────
+   JOIN THE ORIANAA CLUB
+   White card with image left + text right (matches Figma)
+   ───────────────────────────────────────────────────────── */
+.exp-join {
+  padding: 80px 0 100px;
+  background: var(--exp-paper);
+}
+
+.exp-join__card {
+  width: min(1200px, calc(100% - 80px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 60px rgba(13, 74, 57, 0.1), 0 2px 16px rgba(0, 0, 0, 0.06);
+}
+
+.exp-join__image-wrap {
+  position: relative;
+  overflow: hidden;
+  min-height: 380px;
+}
+
+.exp-join__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.exp-join__image-wrap:hover .exp-join__image {
+  transform: scale(1.05);
+}
+
+.exp-join__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 70px;
+}
+
+.exp-join__heading {
+  margin: 0;
+  font-family: var(--exp-serif);
+  font-size: clamp(36px, 4vw, 54px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: var(--exp-ink);
+}
+
+.exp-join__desc {
+  max-width: 380px;
+  margin: 18px 0 36px;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--exp-muted);
+}
+
+.exp-join__btn {
+  display: inline-block;
+  padding: 14px 30px;
+  border-radius: 8px;
+  background: var(--exp-green);
+  color: #fff;
+  font-family: var(--exp-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  align-self: flex-start;
+  transition: background 0.3s, transform 0.22s;
+}
+
+.exp-join__btn:hover {
+  background: var(--exp-green-deep);
+}
+
+/* ─────────────────────────────────────────────────────────
+   TABLET
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .exp-hero__content,
+  .exp-section__header {
+    width: calc(100% - 56px);
+  }
+
+  .exp-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .exp-row__content {
+    padding: 50px 44px;
+  }
+
+  .exp-join__card {
+    width: calc(100% - 56px);
+    grid-template-columns: 300px 1fr;
+  }
+
+  .exp-join__content {
+    padding: 50px 52px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .exp-hero__title {
+    font-size: clamp(2.25rem, 9vw, 3.25rem);
+    line-height: 1.05;
+  }
+
+  .exp-hero {
+    min-height: 620px;
+  }
+
+  .exp-hero__content {
+    width: calc(100% - 40px);
+    padding-bottom: 64px;
+  }
+
+  .exp-hero__scroll {
+    display: none;
+  }
+
+  .exp-section {
+    padding: 64px 0 32px;
+  }
+
+  .exp-section__header {
+    width: calc(100% - 40px);
+    margin-bottom: 44px;
+  }
+
+  .exp-row {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: auto;
+  }
+
+  .exp-row__image-wrap {
+    min-height: 280px;
+    height: 280px;
+  }
+
+  .exp-row__content {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 36px 24px 44px;
+  }
+
+  .exp-row__tags {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .exp-row__heading {
+    font-size: 26px;
+  }
+
+  .exp-row__tag {
+    font-size: 10px;
+    padding: 7px 13px;
+  }
+
+  .exp-join {
+    padding: 48px 0 72px;
+  }
+
+  .exp-join__card {
+    width: calc(100% - 40px);
+    grid-template-columns: 1fr;
+  }
+
+  .exp-join__image-wrap {
+    min-height: 240px;
+    height: 240px;
+  }
+
+  .exp-join__content {
+    padding: 40px 28px 48px;
+  }
+
+  .exp-join__heading {
+    font-size: 34px;
+  }
+}

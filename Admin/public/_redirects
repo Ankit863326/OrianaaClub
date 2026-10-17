@@ -1,0 +1,2 @@
+# Keep client-side React Router paths working on static hosting.
+/* /index.html 200

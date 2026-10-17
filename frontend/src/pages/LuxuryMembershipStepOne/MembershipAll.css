@@ -1,0 +1,1755 @@
+/* =========================================================
+   ORIANAA CLUB — JOIN MEMBERSHIP 5-STEP FLOW
+   Pixel-Matched to all 5 Figma Designs
+   ========================================================= */
+
+:root {
+  --flow-bg: #f7f5f1;
+  --jm-green: #0d4a39;
+  --jm-green-deep: #08382b;
+  --jm-green-hover: #125e49;
+  --jm-gold: #e2ad32;
+  --jm-gold-light: #f1d99c;
+  --jm-gold-dark: #b8912d;
+  --jm-paper: var(--flow-bg);
+  --jm-gray-bg: #ececec;
+  --jm-gray-input: #f0f0f0;
+  --jm-border: #e0ded9;
+  --jm-ink: #111310;
+  --jm-muted: #5a6058;
+  --jm-serif: "Playfair Display", Georgia, serif;
+  --jm-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.join-membership-page {
+  background: var(--flow-bg);
+  color: var(--jm-ink);
+  font-family: var(--jm-sans);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────
+   STEPPER NAVIGATION (Steps 2 to 5)
+   ───────────────────────────────────────────────────────── */
+.join-stepper-wrap {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 108px 20px 24px;
+}
+
+.join-mobile-stepper {
+  display: none;
+}
+
+.join-stepper {
+  width: min(1000px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.join-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+.join-step-item.is-completed {
+  cursor: pointer;
+}
+
+.join-step-circle {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 1.5px solid #d0cfcb;
+  background: #ffffff;
+  color: #7a7873;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.step-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.join-step-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #7a7873;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+/* Active Step */
+.join-step-item.is-active .join-step-circle {
+  border-color: #111310;
+  border-width: 2px;
+  color: #111310;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.join-step-item.is-active .join-step-label {
+  color: #111310;
+  font-weight: 700;
+}
+
+/* Completed Step */
+.join-step-item.is-completed .join-step-circle {
+  border-color: var(--jm-green);
+  color: var(--jm-green);
+  background: rgba(13, 74, 57, 0.06);
+}
+
+.join-step-item.is-completed .join-step-label {
+  color: var(--jm-green);
+}
+
+/* Stepper Connector Lines */
+.join-step-line {
+  flex: 1;
+  height: 1.5px;
+  background: #d8d6d0;
+  margin: 0 14px 28px;
+  transition: background 0.3s ease;
+}
+
+.join-step-line.is-active-line {
+  background: var(--jm-green);
+}
+
+.join-step-item {
+  position: relative;
+  z-index: 1;
+}
+
+.join-step-circle:disabled {
+  cursor: default;
+}
+
+.jm-loading {
+  padding: 160px 24px 80px;
+  text-align: center;
+  color: var(--jm-muted);
+}
+
+.jm-application-card {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 48px);
+  background: #fff;
+  border: 1px solid var(--jm-border);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+}
+
+.jm-password-link-card {
+  color: var(--jm-ink);
+}
+
+.jm-password-link-form {
+  width: min(100%, 440px);
+  color: var(--jm-ink);
+}
+
+.jm-password-link-form .jm-btn-submit {
+  width: 100%;
+}
+
+.jm-application-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.jm-application-grid .jm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--jm-muted);
+  font-size: 13px;
+}
+
+.jm-identity-block + .jm-identity-block {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--jm-border);
+}
+
+.jm-identity-block__title {
+  margin: 0 0 16px;
+  color: var(--jm-ink);
+  font-family: var(--jm-serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.jm-document-verification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.jm-identity-field {
+  min-width: 0;
+  box-sizing: border-box;
+  gap: 8px;
+  color: var(--jm-muted);
+  font-size: 13px;
+}
+
+.jm-identity-field > .jm-input,
+.jm-identity-field > select,
+.jm-identity-upload {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.jm-identity-field__label {
+  color: var(--jm-muted);
+  font-size: 13px;
+}
+
+.jm-identity-field__hint {
+  color: var(--jm-muted);
+  font-size: 12px;
+}
+
+.jm-identity-upload {
+  position: relative;
+  height: 164px;
+  min-height: 164px;
+  overflow: hidden;
+  border: 1px dashed var(--jm-border);
+  border-radius: 10px;
+  background: var(--jm-gray-input);
+}
+
+.jm-identity-upload:focus-within {
+  border-color: var(--jm-green);
+  box-shadow: 0 0 0 3px rgba(13, 74, 57, 0.1);
+}
+
+.jm-identity-upload__input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.jm-identity-upload.is-filled .jm-identity-upload__input {
+  pointer-events: none;
+}
+
+.jm-identity-upload__empty {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--jm-muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.jm-identity-upload__select {
+  padding: 8px 14px;
+  border: 1px solid var(--jm-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--jm-green);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.jm-identity-upload__content {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: 8px 10px;
+  gap: 8px;
+}
+
+.jm-identity-upload__visual {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #f3f4f2;
+  border-radius: 6px;
+}
+
+.jm-identity-upload__visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  image-orientation: from-image;
+}
+
+.jm-identity-upload__pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--jm-muted);
+  font-size: 11px;
+}
+
+.jm-identity-upload__pdf svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--jm-green);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.jm-identity-upload__footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.jm-identity-upload__file-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jm-identity-upload__file-name {
+  overflow: hidden;
+  color: var(--jm-ink);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jm-identity-upload__file-size {
+  color: var(--jm-muted);
+  font-size: 10px;
+}
+
+.jm-identity-upload__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.jm-identity-upload__actions .jm-btn-pill-outline {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .jm-document-verification-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.jm-api-message {
+  width: min(900px, 100%);
+  margin: -24px auto 30px;
+  padding: 14px 18px;
+  border: 1px solid rgba(13, 74, 57, 0.2);
+  border-radius: 10px;
+  color: var(--jm-green);
+  background: #fff;
+}
+
+.jm-api-message--error {
+  color: #9b2626;
+  border-color: rgba(155, 38, 38, 0.25);
+}
+
+.jm-application-card > .jm-promo-agree,
+.jm-application-card > .jm-btn-submit {
+  margin-top: 24px;
+}
+
+.jm-family-list {
+  margin-top: 28px;
+}
+
+.jm-family-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--jm-border);
+}
+
+.jm-family-photo,
+.jm-profile-photo {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.jm-profile-photo {
+  width: 96px;
+  height: 96px;
+}
+
+.jm-family-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.jm-family-actions .jm-btn-submit {
+  width: auto;
+}
+
+.jm-family-chip__delete,
+.jm-btn-pill-outline {
+  padding: 9px 16px;
+  border: 1px solid var(--jm-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--jm-green);
+  cursor: pointer;
+}
+
+.jm-family-chip__delete {
+  color: #9b2626;
+}
+
+.jm-review-layout {
+  align-items: start;
+}
+
+.jm-review-card > .jm-btn-submit,
+.jm-review-card > .jm-btn-pill-outline {
+  margin: 14px 10px 0 0;
+}
+
+.jm-btn-submit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+@media (max-width: 700px) {
+  .join-stepper-wrap {
+    padding: 100px 12px 18px;
+  }
+
+  .join-stepper {
+    gap: 7px;
+  }
+
+  .join-step-line {
+    margin: 0 4px 28px;
+  }
+
+  .join-step-circle {
+    width: 40px;
+    height: 40px;
+  }
+
+  .join-step-label {
+    max-width: 76px;
+    font-size: 10px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .jm-application-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jm-family-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   STEP 1: PERSONAL DETAILS (Hero Form)
+   ───────────────────────────────────────────────────────── */
+.jm-hero-step {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 138px 24px 80px;
+  overflow: hidden;
+}
+
+.jm-hero-step__bg {
+  position: absolute;
+  inset: -5%;
+  background-image: url("https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=2200&q=90");
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+.jm-hero-step__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(5, 20, 14, 0.75) 0%,
+    rgba(5, 20, 14, 0.5) 45%,
+    rgba(5, 20, 14, 0.35) 100%
+  );
+  z-index: 1;
+}
+
+.jm-hero-step__container {
+  position: relative;
+  z-index: 2;
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  align-items: center;
+  gap: 70px;
+}
+
+.jm-hero-left {
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.jm-hero-left__title {
+  margin: 0 0 16px;
+  font-family: var(--jm-serif);
+  font-size: clamp(48px, 5.2vw, 76px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.jm-hero-left__sub {
+  margin: 0 0 44px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.88);
+  max-width: 440px;
+}
+
+.jm-hero-left__location {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(10, 20, 15, 0.4);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 14px;
+  align-self: flex-start;
+}
+
+.loc-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--jm-gold-light);
+}
+
+/* Step 1 White Form Card */
+.jm-identity-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.jm-identity-upload {
+  height: 164px;
+}
+
+.jm-hero-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 44px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  max-width: 500px;
+  margin-left: auto;
+}
+
+.jm-hero-card__header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.jm-hero-card__title {
+  margin: 0 0 8px;
+  font-family: var(--jm-serif);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--jm-ink);
+}
+
+.jm-hero-card__sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--jm-muted);
+  line-height: 1.5;
+}
+
+.jm-hero-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.jm-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.jm-input {
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--jm-gray-input);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: var(--jm-sans);
+  font-size: 14px;
+  color: var(--jm-ink);
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.jm-input:focus {
+  background: #ffffff;
+  border-color: var(--jm-green);
+  box-shadow: 0 0 0 3px rgba(13, 74, 57, 0.1);
+}
+
+.jm-input--error {
+  border-color: #ef4444;
+}
+
+.jm-select {
+  cursor: pointer;
+}
+
+.jm-field--phone {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 10px;
+}
+
+.jm-phone-prefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--jm-gray-input);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--jm-ink);
+  padding: 0 10px;
+}
+
+.jm-promo-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  margin: 4px 0 10px;
+}
+
+.jm-checkbox {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--jm-green);
+}
+
+.jm-promo-text {
+  font-size: 12px;
+  color: var(--jm-muted);
+  line-height: 1.45;
+}
+
+.jm-btn-submit {
+  width: 100%;
+  padding: 16px 28px;
+  border-radius: 999px;
+  background: var(--jm-green);
+  color: var(--jm-gold-light);
+  font-family: var(--jm-sans);
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(13, 74, 57, 0.25);
+  transition: all 0.3s ease;
+}
+
+.jm-btn-submit:hover {
+  background: var(--jm-green-deep);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(13, 74, 57, 0.35);
+}
+
+/* ─────────────────────────────────────────────────────────
+   COMMON STEP CONTAINER (Steps 2, 3, 4, 5)
+   ───────────────────────────────────────────────────────── */
+.jm-step-container {
+  width: min(1200px, calc(100% - 48px));
+  margin: 60px auto 100px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   STEP 2: SELECT PLAN
+   ───────────────────────────────────────────────────────── */
+.jm-plans-header {
+  margin-bottom: 54px;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  align-items: flex-end;
+  gap: 40px;
+}
+
+.jm-plans-header__title {
+  margin: 0;
+  font-family: var(--jm-serif);
+  font-size: clamp(38px, 4vw, 54px);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--jm-ink);
+}
+
+.jm-plans-header__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--jm-muted);
+}
+
+.jm-plans-loading-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 30px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   STEP 3: FAMILY DETAILS
+   ───────────────────────────────────────────────────────── */
+.jm-family-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 60px 54px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid var(--jm-border);
+}
+
+.jm-family-card__wave {
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 260px;
+  height: 200px;
+  pointer-events: none;
+}
+
+.jm-family-card__content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 50px;
+  align-items: center;
+}
+
+.jm-family-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.jm-family-avatar-box {
+  width: 170px;
+  height: 170px;
+  border-radius: 18px;
+  background: #d8d8d8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.jm-family-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.jm-avatar-placeholder {
+  width: 64px;
+  height: 64px;
+  color: #8c8c8c;
+}
+
+.jm-btn-upload {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: 1.5px solid #111310;
+  background: #ffffff;
+  color: #111310;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.jm-btn-upload:hover {
+  background: #f0f0f0;
+}
+
+.jm-file-hidden {
+  display: none;
+}
+
+.jm-family-inputs-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.jm-family-inputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.jm-input--family {
+  background: var(--jm-gray-bg);
+  border-radius: 12px;
+  padding: 15px 20px;
+  font-size: 14px;
+}
+
+.jm-btn-add-member {
+  padding: 16px 36px;
+  border-radius: 12px;
+  background: var(--jm-green);
+  color: var(--jm-gold-light);
+  font-family: var(--jm-sans);
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  align-self: flex-start;
+  min-width: 240px;
+}
+
+.jm-btn-add-member:hover {
+  background: var(--jm-green-deep);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(13, 74, 57, 0.25);
+}
+
+.jm-family-list {
+  margin-top: 36px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px 30px;
+  border: 1px solid var(--jm-border);
+}
+
+.jm-family-list h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-family: var(--jm-serif);
+}
+
+.jm-family-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.jm-family-chip {
+  padding: 8px 16px;
+  background: rgba(13, 74, 57, 0.08);
+  border: 1px solid rgba(13, 74, 57, 0.2);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--jm-green);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jm-family-chip__delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999999;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 4px;
+  padding: 2px 5px;
+  border-radius: 50%;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.jm-family-chip__delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.jm-family-error-msg {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.jm-family-actions {
+  margin-top: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.jm-btn-pill-outline {
+  padding: 14px 44px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--jm-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  color: var(--jm-ink);
+  font-family: var(--jm-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.jm-btn-pill-outline:hover {
+  border-color: #111310;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* ─────────────────────────────────────────────────────────
+   STEP 4: REVIEW & CONFIRM + REGISTER PASSWORD
+   ───────────────────────────────────────────────────────── */
+.jm-review-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.18fr);
+  gap: clamp(22px, 3vw, 40px);
+  align-items: start;
+}
+
+.jm-review-plan-card {
+  align-self: stretch;
+  padding: clamp(28px, 3vw, 40px);
+  border: 1px solid var(--jm-green);
+  border-radius: 20px;
+  background: var(--jm-green);
+  color: #fff;
+  box-shadow: 0 14px 45px rgba(13, 74, 57, 0.25);
+}
+
+.jm-review-plan-card__title {
+  margin: 0 0 10px;
+  font-family: var(--jm-serif);
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 500;
+  line-height: 1.2;
+  color: #fff;
+}
+
+.jm-review-plan-card__rate {
+  margin: 0 0 28px;
+  color: var(--jm-gold-light);
+  font-size: 13px;
+}
+
+.jm-review-plan-card__benefits {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.jm-review-plan-card__benefit {
+  display: grid;
+  gap: 5px;
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.jm-review-plan-card__benefit strong {
+  color: #fff;
+  font-size: 17px;
+}
+
+.jm-review-plan-card__benefit span {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.jm-review-plan-card__price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 25px 0 22px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+}
+
+.jm-review-plan-card__price strong {
+  color: var(--jm-gold-light);
+  font-family: var(--jm-serif);
+  font-size: 26px;
+  white-space: nowrap;
+}
+
+.jm-review-plan-card__change {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--jm-gold-light);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--jm-gold-light);
+  font: 600 14px var(--jm-sans);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.jm-review-plan-card__change:hover {
+  background: var(--jm-gold-light);
+  color: var(--jm-green);
+}
+
+.jm-review-right {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.jm-review-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 34px 38px;
+  border: 1px solid var(--jm-border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
+}
+
+.jm-review-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+
+.jm-review-details > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--jm-gray-bg);
+}
+
+.jm-review-details dt {
+  margin-bottom: 7px;
+  color: var(--jm-muted);
+  font-size: 12px;
+}
+
+.jm-review-details dd {
+  margin: 0;
+  color: var(--jm-ink);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.jm-review-card__title {
+  margin: 0 0 20px;
+  font-family: var(--jm-serif);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--jm-ink);
+}
+
+.jm-review-card__sub {
+  margin: -10px 0 20px;
+  font-size: 13px;
+  color: var(--jm-muted);
+}
+
+.jm-review-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.jm-review-pill {
+  background: var(--jm-gray-bg);
+  border-radius: 12px;
+  padding: 15px 20px;
+  font-size: 14px;
+  color: #333333;
+}
+
+/* Payment Fee Breakdown Rows */
+.jm-fee-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.jm-fee-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--jm-gray-bg);
+  border-radius: 12px;
+  padding: 15px 22px;
+  font-size: 14px;
+}
+
+.jm-fee-row__label {
+  color: #555555;
+}
+
+.jm-fee-row__val {
+  font-weight: 700;
+  color: var(--jm-ink);
+}
+
+.jm-fee-row--total {
+  background: #f4f2ec;
+  border: 1px solid rgba(226, 173, 50, 0.4);
+}
+
+.jm-fee-row--total .jm-fee-row__val {
+  font-size: 16px;
+  color: var(--jm-green);
+}
+
+.jm-confirm-payment {
+  margin-top: 24px;
+}
+
+.jm-quote-status {
+  margin: 0;
+  color: var(--jm-muted);
+  font-size: 14px;
+}
+
+.jm-quote-status--error {
+  color: #9b2626;
+}
+
+/* ─────────────────────────────────────────────────────────
+   STEP 5: PAYMENT (UPI / Card / Razorpay)
+   ───────────────────────────────────────────────────────── */
+.jm-payment-container {
+  text-align: center;
+  max-width: 900px;
+}
+
+.jm-payment-title {
+  margin: 0 0 54px;
+  font-family: var(--jm-serif);
+  font-size: clamp(36px, 4vw, 50px);
+  font-weight: 400;
+  color: var(--jm-ink);
+}
+
+.jm-payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+
+.jm-pay-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 50px 24px;
+  border: 1.5px solid var(--jm-border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  transition: all 0.3s ease;
+}
+
+.jm-pay-card:hover {
+  border-color: var(--jm-green);
+  box-shadow: 0 16px 40px rgba(13, 74, 57, 0.12);
+}
+
+.jm-pay-card.is-selected-pay {
+  border-color: var(--jm-green);
+  box-shadow: 0 0 0 2px var(--jm-green);
+}
+
+.jm-pay-card__logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #f4f4f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #222222;
+}
+
+.jm-pay-card__logo--upi {
+  background: #f0f8f4;
+}
+
+.jm-pay-card__logo--razorpay {
+  background: #eef4fb;
+  width: 90px;
+}
+
+.jm-pay-card__name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--jm-ink);
+}
+
+/* Payment Processing & Success Modal */
+.jm-pay-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 16, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.jm-pay-modal {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 48px 40px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+
+.jm-spinner {
+  display: inline-block;
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(13, 74, 57, 0.2);
+  border-top-color: var(--jm-green);
+  border-radius: 50%;
+  animation: jmSpin 0.8s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes jmSpin {
+  to { transform: rotate(360deg); }
+}
+
+.jm-pay-modal--success {
+  border: 2px solid var(--jm-green);
+}
+
+.jm-success-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--jm-green);
+  color: var(--jm-gold-light);
+  font-size: 36px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  box-shadow: 0 8px 24px rgba(13, 74, 57, 0.35);
+}
+
+.jm-pay-modal--success h2 {
+  margin: 0 0 10px;
+  font-family: var(--jm-serif);
+  font-size: 28px;
+  color: var(--jm-green);
+}
+
+.jm-success-msg {
+  font-size: 15px;
+  color: var(--jm-muted);
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+
+.jm-success-redirect {
+  font-size: 13px;
+  color: var(--jm-gold-dark);
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+.jm-plan-skeleton {
+  flex: 0 0 calc(33.333% - 20px);
+  min-width: 260px;
+  min-height: 390px;
+  padding: 34px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  border: 1px solid var(--jm-border);
+  border-radius: 20px;
+  background: #fff;
+}
+
+.jm-plan-skeleton span {
+  height: 16px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eee 25%, #f8f7f4 50%, #eee 75%);
+  background-size: 200% 100%;
+  animation: jm-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.jm-plan-skeleton span:first-child {
+  width: 70%;
+  height: 30px;
+}
+
+.jm-plan-skeleton span:last-child {
+  width: 100%;
+  height: 46px;
+  margin-top: auto;
+}
+
+@keyframes jm-skeleton-shimmer {
+  to { background-position: -200% 0; }
+}
+
+.jm-plans-error,
+.jm-plans-empty {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  padding: 30px;
+  border: 1px solid var(--jm-border);
+  border-radius: 18px;
+  background: #fff;
+  text-align: center;
+  color: var(--jm-muted);
+}
+
+.jm-plans-error p {
+  margin: 0 0 20px;
+}
+
+.jm-plans-error .jm-btn-submit {
+  width: auto;
+  min-width: 140px;
+}
+
+.jm-payment-coming-soon {
+  width: min(760px, 100%);
+  margin: 30px auto 90px;
+  padding: clamp(28px, 6vw, 64px);
+  border: 1px solid var(--jm-border);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 14px 45px rgba(13, 74, 57, 0.1);
+  text-align: center;
+}
+
+.jm-payment-coming-soon__eyebrow {
+  color: var(--jm-gold-dark);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.jm-payment-coming-soon__title {
+  margin: 14px 0;
+  font-family: var(--jm-serif);
+  font-size: clamp(30px, 4vw, 44px);
+  font-weight: 500;
+  color: var(--jm-green);
+}
+
+.jm-payment-coming-soon > p {
+  color: var(--jm-muted);
+  line-height: 1.7;
+}
+
+.jm-payment-summary {
+  margin: 28px 0;
+  text-align: left;
+}
+
+.jm-payment-coming-soon__note {
+  margin: 0 0 24px;
+  font-size: 13px;
+}
+
+.jm-payment-page {
+  width: min(900px, 100%);
+  margin: 30px auto 90px;
+}
+
+.jm-payment-page .jm-payment-title {
+  margin-bottom: 42px;
+  text-align: center;
+}
+
+.jm-payment-page .jm-payment-methods-grid {
+  width: 100%;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.jm-payment-page .jm-pay-card {
+  position: relative;
+  min-height: 210px;
+  padding: 32px 20px;
+  border: 2px solid var(--jm-border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+.jm-payment-page .jm-pay-card.is-selected-pay {
+  border: 2px solid var(--jm-green);
+  box-shadow: 0 12px 32px rgba(13, 74, 57, 0.14);
+}
+
+.jm-payment-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.jm-payment-radio:focus-visible + .jm-pay-card__logo {
+  outline: 3px solid var(--jm-gold-dark);
+  outline-offset: 4px;
+}
+
+.jm-payment-page .jm-pay-card__logo {
+  width: 76px;
+  height: 76px;
+  color: var(--jm-green);
+}
+
+.jm-payment-page .jm-pay-card__logo svg {
+  width: 38px;
+  height: 38px;
+}
+
+.jm-payment-page .jm-pay-card__logo--card {
+  color: #243b53;
+  background: #f0f4f8;
+}
+
+.jm-payment-page .jm-pay-card__logo--razorpay {
+  width: 76px;
+  background: #eef4fb;
+  color: #315fbd;
+}
+
+.jm-razorpay-mark {
+  font-family: Arial, sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.jm-payment-page .jm-pay-card__name {
+  font-family: var(--jm-serif);
+  font-size: 22px;
+}
+
+.jm-payment-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 32px 0 18px;
+  padding: 18px 0;
+  border-top: 1px solid var(--jm-border);
+  border-bottom: 1px solid var(--jm-border);
+  color: var(--jm-muted);
+}
+
+.jm-payment-total strong {
+  color: var(--jm-green);
+  text-align: right;
+}
+
+.jm-payment-page .jm-pay-securely {
+  width: 100%;
+}
+
+.jm-payment-error,
+.jm-payment-alert {
+  color: #9b2525;
+  text-align: center;
+}
+
+.jm-payment-alert {
+  padding: 24px;
+  border: 1px solid var(--jm-border);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--jm-ink);
+}
+
+.jm-payment-alert p {
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─────────────────────────────────────────────────────────
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .jm-hero-step__container {
+    grid-template-columns: 1fr;
+    gap: 50px;
+  }
+
+  .jm-hero-card {
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .jm-plans-header {
+    grid-template-columns: 1fr;
+  }
+
+  .jm-plans-loading-grid {
+    justify-content: center;
+  }
+
+  .jm-plan-skeleton {
+    flex-basis: calc(50% - 15px);
+  }
+
+  .jm-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+@media (max-width: 768px) {
+  .jm-application-card {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 24px 18px;
+  }
+
+  .jm-application-card .jm-input {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .jm-payment-page .jm-payment-methods-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .jm-payment-page .jm-pay-card {
+    min-height: 150px;
+    padding: 24px;
+  }
+
+  .jm-payment-total {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .jm-payment-total strong {
+    text-align: left;
+  }
+
+  .join-stepper {
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+
+  .join-step-circle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .step-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .join-step-label {
+    font-size: 11px;
+  }
+
+  .jm-hero-step {
+    padding: 40px 16px 60px;
+  }
+
+  .jm-hero-left__title {
+    font-size: 38px;
+  }
+
+  .jm-hero-card {
+    padding: 30px 20px;
+  }
+
+  .jm-field--phone {
+    grid-template-columns: 75px 1fr;
+  }
+
+  .jm-plans-loading-grid {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .jm-plan-skeleton {
+    flex-basis: 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .jm-family-card {
+    padding: 36px 20px;
+  }
+
+  .jm-family-card__content {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+
+  .jm-family-inputs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jm-review-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jm-review-details {
+    grid-template-columns: 1fr;
+  }
+
+  .jm-review-card {
+    padding: 28px 22px;
+  }
+
+  .jm-fee-row {
+    gap: 12px;
+    padding: 14px 16px;
+  }
+}
+
+@media (max-width: 639px) {
+  .join-mobile-stepper {
+    display: grid;
+    gap: 8px;
+  }
+
+  .join-mobile-stepper__count {
+    margin: 0;
+    color: var(--jm-muted);
+    font-size: 12px;
+  }
+
+  .join-mobile-stepper__title {
+    margin: 0;
+    color: var(--jm-ink);
+    font-family: var(--jm-serif);
+    font-size: clamp(24px, 7vw, 32px);
+    font-weight: 400;
+    line-height: 1.1;
+  }
+
+  .join-mobile-stepper__progress {
+    height: 2px;
+    overflow: hidden;
+    background: #d8d6d0;
+  }
+
+  .join-mobile-stepper__progress span {
+    display: block;
+    height: 100%;
+    background: var(--jm-green);
+    transition: width 0.3s ease;
+  }
+
+  .join-stepper {
+    display: none;
+  }
+}

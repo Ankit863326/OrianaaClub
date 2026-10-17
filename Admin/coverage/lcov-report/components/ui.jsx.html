@@ -1,0 +1,448 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for components/ui.jsx</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">components</a> ui.jsx</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">97.29% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>36/37</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">83.33% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>65/78</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">95.83% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>23/24</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">96.77% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>30/31</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">411x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">411x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">533x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">138x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">123x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">33x</span>
+<span class="cline-any cline-yes">33x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">33x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">58x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">314x</span>
+<span class="cline-any cline-yes">58x</span>
+<span class="cline-any cline-yes">314x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">86x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// These shared controls give every admin page the same simple, accessible building blocks.
+import { useState } from 'react';
+import { Eye, EyeOff, LoaderCircle, X } from 'lucide-react';
+&nbsp;
+export const formatRupees = (rupees) =&gt; new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 2,
+}).format(Number(rupees || 0));
+&nbsp;
+export const formatPaise = (paise) =&gt; formatRupees(Number(paise || <span class="branch-1 cbranch-no" title="branch not covered" >0)</span> / 100);
+export const formatPoints = (points) =&gt; Number(points || 0).toLocaleString('en-IN');
+&nbsp;
+export function Button({ children, variant = 'primary', className = '', ...props }) {
+  const colors = {
+    primary: 'bg-forest text-white hover:bg-forest/90',
+    secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+    danger: 'bg-red-600 text-white hover:bg-red-700',
+    gold: 'bg-gold text-midnight hover:bg-gold/90',
+  };
+  return &lt;button className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${colors[variant]} ${className}`} {...props}&gt;{children}&lt;/button&gt;;
+}
+&nbsp;
+export function FormField({ label, children, className = '' }) {
+  return &lt;label className={`grid gap-1.5 text-sm font-medium text-slate-700 ${className}`}&gt;&lt;span&gt;{label}&lt;/span&gt;{children}&lt;/label&gt;;
+}
+&nbsp;
+export const controlClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-forest focus:ring-2 focus:ring-forest/15';
+&nbsp;
+export function PageHeading({ eyebrow, title, description, actions }) {
+  return &lt;div className="mb-6 flex flex-wrap items-end justify-between gap-4"&gt;
+    &lt;div&gt;{eyebrow &amp;&amp; &lt;p className="mb-1 text-xs font-bold uppercase tracking-[.18em] text-gold"&gt;{eyebrow}&lt;/p&gt;}
+      &lt;h1 className="font-display text-3xl text-slate-900 sm:text-4xl"&gt;{title}&lt;/h1&gt;
+      {description &amp;&amp; &lt;p className="mt-2 max-w-2xl text-sm text-slate-500"&gt;{description}&lt;/p&gt;}
+    &lt;/div&gt;
+    {actions &amp;&amp; &lt;div className="flex flex-wrap gap-2"&gt;{actions}&lt;/div&gt;}
+  &lt;/div&gt;;
+}
+&nbsp;
+export function Panel({ children, className = '' }) {
+  return &lt;section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-soft sm:p-6 ${className}`}&gt;{children}&lt;/section&gt;;
+}
+&nbsp;
+export function StatCard({ label, value, detail, icon: Icon }) {
+  return &lt;Panel className="grid gap-3"&gt;
+    &lt;div className="flex items-center justify-between text-sm text-slate-500"&gt;&lt;span&gt;{label}&lt;/span&gt;{Icon &amp;&amp; &lt;Icon size={19} className="text-gold" /&gt;}&lt;/div&gt;
+    &lt;strong className="font-display text-2xl text-slate-900"&gt;{value}&lt;/strong&gt;
+    {detail &amp;&amp; &lt;small className="text-xs text-slate-500"&gt;{detail}&lt;/small&gt;}
+  &lt;/Panel&gt;;
+}
+&nbsp;
+export function Badge({ children, tone }) {
+  const normalized = String(tone || children || <span class="branch-2 cbranch-no" title="branch not covered" >'')</span>.toLowerCase();
+  const classes = normalized.includes('pending') || normalized.includes('new')
+    ? 'bg-amber-100 text-amber-800'
+    : normalized.includes('active') || normalized.includes('paid') || normalized.includes('sent') || normalized.includes('published')
+      ? 'bg-emerald-100 text-emerald-800'
+      : <span class="branch-1 cbranch-no" title="branch not covered" >normalized.includes('suspend') || normalized.includes('failed') || normalized.includes('reject') || normalized.includes('closed')</span>
+        ? 'bg-red-100 text-red-700'
+        : 'bg-slate-100 text-slate-700';
+  return &lt;span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${classes}`}&gt;{children}&lt;/span&gt;;
+}
+&nbsp;
+export function LoadingState() {
+  return &lt;div className="grid min-h-40 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-500" role="status"&gt;&lt;LoaderCircle className="animate-spin" size={24} /&gt;Loading…&lt;/div&gt;;
+}
+&nbsp;
+export function EmptyState({ children = 'There is nothing to show yet.' }) {
+  return &lt;div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500"&gt;{children}&lt;/div&gt;;
+}
+&nbsp;
+export function Toast({ kind = 'success', children, onDismiss }) {
+  const color = kind === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  return &lt;div className={`mb-4 flex items-start justify-between gap-4 rounded-xl border px-4 py-3 text-sm ${color}`} role={kind === 'error' ? 'alert' : 'status'}&gt;{children}{onDismiss &amp;&amp; &lt;button onClick={onDismiss} aria-label="Dismiss message"&gt;&lt;X size={16} /&gt;&lt;/button&gt;}&lt;/div&gt;;
+}
+&nbsp;
+export function DataTable({ columns, rows = <span class="branch-0 cbranch-no" title="branch not covered" >[],</span> empty = 'No records found.' }) {
+  if (!rows.length) return &lt;EmptyState&gt;{empty}&lt;/EmptyState&gt;;
+  return &lt;div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft"&gt;
+    &lt;table className="w-full min-w-[680px] border-collapse text-left text-sm"&gt;
+      &lt;thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"&gt;&lt;tr&gt;{columns.map((column) =&gt; &lt;th key={column.key} className="px-4 py-3 font-semibold"&gt;{column.label}&lt;/th&gt;)}&lt;/tr&gt;&lt;/thead&gt;
+      &lt;tbody className="divide-y divide-slate-100"&gt;{rows.map((row, index) =&gt; &lt;tr key={row._id || row.id || <span class="branch-2 cbranch-no" title="branch not covered" >index}</span> className="hover:bg-slate-50/70"&gt;
+        {columns.map((column) =&gt; &lt;td key={column.key} className="px-4 py-3.5 text-slate-700"&gt;{column.render ? column.render(row) : (row[column.key] ?? '—')}&lt;/td&gt;)}
+      &lt;/tr&gt;)}&lt;/tbody&gt;
+    &lt;/table&gt;
+  &lt;/div&gt;;
+}
+&nbsp;
+export function Pagination({ info, onPage }) {
+  if (!info?.pages || info.pages &lt;= 1) return null;
+  return &lt;div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500"&gt;
+    &lt;span&gt;{info.total ?? <span class="branch-1 cbranch-no" title="branch not covered" >0}</span> records&lt;/span&gt;
+    &lt;div className="flex items-center gap-3"&gt;
+      &lt;Button variant="secondary" disabled={info.page &lt;= 1} onClick={<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onPage(info.page - 1)}</span>&gt;Previous&lt;/Button&gt;
+      &lt;span&gt;Page {info.page} of {info.pages}&lt;/span&gt;
+      &lt;Button variant="secondary" disabled={info.page &gt;= info.pages} onClick={() =&gt; onPage(info.page + 1)}&gt;Next&lt;/Button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;;
+}
+&nbsp;
+export function ConfirmDialog({ title, children, onCancel, onConfirm, confirmLabel = 'Confirm', busy = false }) {
+  return &lt;div className="fixed inset-0 z-50 grid place-items-center bg-midnight/55 p-4" role="presentation"&gt;
+    &lt;section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="confirm-title"&gt;
+      &lt;h2 id="confirm-title" className="font-display text-2xl text-slate-900"&gt;{title}&lt;/h2&gt;
+      &lt;div className="my-5 text-sm leading-6 text-slate-600"&gt;{children}&lt;/div&gt;
+      &lt;div className="flex justify-end gap-2"&gt;&lt;Button variant="secondary" onClick={onCancel}&gt;Cancel&lt;/Button&gt;&lt;Button variant="danger" disabled={busy} onClick={onConfirm}&gt;{busy ? <span class="branch-0 cbranch-no" title="branch not covered" >'Working…' </span>: confirmLabel}&lt;/Button&gt;&lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/div&gt;;
+}
+&nbsp;
+export function PasswordField({ value, onChange, required = true, autoComplete = 'current-password' }) {
+  const [visible, setVisible] = useState(false);
+  return &lt;span className="relative block"&gt;
+    &lt;input className={`${controlClass} pr-11`} type={visible ? 'text' : 'password'} value={value} onChange={onChange} required autoComplete={autoComplete} /&gt;
+    &lt;button className="absolute inset-y-0 right-3 text-slate-400" type="button" onClick={() =&gt; setVisible((shown) =&gt; !shown)} aria-label={visible ? 'Hide password' : 'Show password'}&gt;{visible ? &lt;EyeOff size={18} /&gt; : &lt;Eye size={18} /&gt;}&lt;/button&gt;
+  &lt;/span&gt;;
+}
+&nbsp;
+export function formatDate(value) {
+  return value ? new Date(value).toLocaleDateString('en-IN') : '—';
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-10-14T13:14:06.139Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

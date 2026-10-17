@@ -1,0 +1,435 @@
+/* =========================================================
+   ORIANAA CLUB — MEMBER LOGIN PAGE
+   Pixel-Matched to Figma Lounge & Frosted Glass Design
+   ========================================================= */
+
+:root {
+  --log-green: #0d4a39;
+  --log-green-deep: #08382b;
+  --log-green-hover: #125e49;
+  --log-gold: #e2ad32;
+  --log-gold-light: #f1d99c;
+  --log-serif: "Playfair Display", Georgia, serif;
+  --log-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ── PAGE CONTAINER ── */
+.login-page {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: calc(100vh - 76px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  font-family: var(--log-sans);
+  color: #ffffff;
+}
+
+/* ── BACKGROUND IMAGE ── */
+.login-page__bg {
+  position: absolute;
+  inset: -5%;
+  background-size: cover;
+  background-position: center left;
+  background-repeat: no-repeat;
+  z-index: 0;
+  will-change: transform;
+}
+
+/* ── SUBTLE VIGNETTE ── */
+.login-page__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 75% 50%,
+    rgba(8, 18, 14, 0.2) 0%,
+    rgba(8, 18, 14, 0.45) 70%,
+    rgba(5, 12, 10, 0.7) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ── AMBIENT GLOW PARTICLES ── */
+.login-ambient-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.login-ambient-particle {
+  position: absolute;
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: var(--log-gold-light);
+  box-shadow: 0 0 10px 2px rgba(226, 173, 50, 0.55);
+  opacity: 0.65;
+}
+
+/* ── SPLIT CONTAINER ── */
+.login-page__container {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  align-items: center;
+}
+
+.login-page__left-spacer {
+  /* Keeps the left patio umbrella, seating and evening sky completely clear and visible */
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ── RIGHT FROSTED GLASS PANEL ── */
+.login-form-panel {
+  position: relative;
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 72px 80px 48px;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  background: linear-gradient(
+    90deg,
+    rgba(10, 20, 16, 0.3) 0%,
+    rgba(10, 20, 16, 0.62) 30%,
+    rgba(10, 20, 16, 0.78) 100%
+  );
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.login-form-inner {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+.login-header {
+  margin-bottom: 44px;
+}
+
+.login-title {
+  margin: 0 0 10px;
+  font-family: var(--log-serif);
+  font-size: clamp(42px, 4.6vw, 60px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  line-height: 1.05;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+}
+
+.login-subtitle {
+  margin: 0;
+  font-family: var(--log-sans);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── SUCCESS ALERT ── */
+.login-alert-success {
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  background: rgba(13, 74, 57, 0.8);
+  border: 1px solid rgba(226, 173, 50, 0.5);
+  border-radius: 12px;
+  font-size: 14px;
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+/* ── FORM ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-label {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.login-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.55);
+}
+
+.login-input {
+  width: 100%;
+  padding: 10px 0 12px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-family: var(--log-sans);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+
+.login-input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 15px;
+  font-weight: 300;
+}
+
+.login-input--error {
+  border-bottom-color: #ef4444;
+}
+
+/* Animated Golden Focus Underline */
+.login-underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1.5px;
+  height: 2px;
+  background: var(--log-gold);
+  transform-origin: left;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(226, 173, 50, 0.6);
+}
+
+.login-toggle-password {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.login-toggle-password:hover {
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.login-error-msg {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #fca5a5;
+  letter-spacing: 0.01em;
+}
+
+.login-form-error {
+  margin: -24px 0 -12px;
+  color: #fca5a5;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── OPTIONS ROW (REMEMBER ME + FORGOT PASSWORD) ── */
+.login-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -6px;
+  margin-bottom: 8px;
+}
+
+/* Custom Checkbox */
+.login-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-checkbox-native {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.login-custom-checkbox {
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.login-custom-checkbox.is-checked {
+  background: var(--log-green);
+  border-color: var(--log-gold);
+  color: #ffffff;
+  box-shadow: 0 0 6px rgba(226, 173, 50, 0.4);
+}
+
+.login-custom-checkbox svg {
+  width: 12px;
+  height: 12px;
+}
+
+.login-remember-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.01em;
+}
+
+.login-forgot-link {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.login-forgot-link:hover {
+  color: var(--log-gold-light);
+  text-decoration: underline;
+}
+
+/* ── LOG IN SUBMIT BUTTON ── */
+.login-submit-btn {
+  width: 100%;
+  padding: 16px 28px;
+  border-radius: 999px;
+  background: var(--log-green);
+  color: #ffffff;
+  font-family: var(--log-sans);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  margin-top: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(13, 74, 57, 0.4);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-submit-btn:hover:not(:disabled) {
+  background: var(--log-green-hover);
+  border-color: rgba(226, 173, 50, 0.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 16px rgba(226, 173, 50, 0.3);
+}
+
+.login-submit-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.login-btn-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.login-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: logSpin 0.75s linear infinite;
+}
+
+@keyframes logSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── FOOTER REGISTER PROMPT ── */
+.login-footer-prompt {
+  margin-top: 36px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.login-register-link {
+  color: var(--log-gold-light);
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 6px;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.login-register-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+/* ── RESPONSIVE DESIGN (TABLET & MOBILE) ── */
+@media (max-width: 1024px) {
+  .login-page__container {
+    grid-template-columns: 0.7fr 1.3fr;
+  }
+
+  .login-form-panel {
+    padding: 60px 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    min-height: calc(100vh - 72px);
+  }
+
+  .login-page__container {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .login-page__left-spacer {
+    display: none;
+  }
+
+  .login-form-panel {
+    min-height: calc(100vh - 72px);
+    padding: 60px 24px;
+    background: rgba(10, 20, 16, 0.75);
+    border-left: none;
+  }
+
+  .login-title {
+    font-size: 38px;
+  }
+
+  .login-subtitle {
+    font-size: 15px;
+  }
+
+  .login-options-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+}

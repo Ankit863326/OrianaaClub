@@ -1,0 +1,9 @@
+# Do not commit installed packages, build output, or local environment values.
+node_modules
+dist
+.env
+.env.backup
+!.env.example
+.env.*
+!.env.example
+!.env.production.example

@@ -1,0 +1,9 @@
+OrianaaClub - Set your password
+
+Set Your Password
+
+Hi {{firstName}}, tap the button to set your OrianaaClub password.
+Set my password → {{link}}
+
+This link expires in {{expiry}}.
+If you didn't request this, you can safely ignore this email.

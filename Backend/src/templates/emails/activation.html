@@ -1,0 +1,45 @@
+<!-- Phase 1: Use an email-client-safe, table-based password setup message. -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set your OrianaaClub password</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f2f4f1;font-family:Arial,Helvetica,sans-serif;color:#18352a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#f2f4f1;padding:32px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e5e7e3;">
+            <tr>
+              <td align="center" style="padding:26px 20px;background-color:#123c2e;">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:29px;line-height:1.2;color:#d8bd72;">OrianaaClub</div>
+                <div style="padding-top:5px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f1ead7;">Luxury Membership</div>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:38px 34px 40px;">
+                <div aria-hidden="true" style="font-family:Georgia,'Times New Roman',serif;font-size:32px;line-height:1;color:#bd9a4b;">♛</div>
+                <h1 style="margin:16px 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.25;color:#18352a;">Set Your Password</h1>
+                <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#5d675f;">Hi {{firstName}}, tap the button to set your OrianaaClub password.</p>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" style="border-radius:8px;background-color:#123c2e;">
+                      <a href="{{link}}" style="display:inline-block;padding:16px 30px;border:1px solid #d8bd72;border-radius:8px;background-color:#123c2e;color:#e7cd83;font-size:16px;font-weight:bold;line-height:1.2;text-decoration:none;">Set my password →</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:24px 0 8px;font-size:13px;line-height:1.6;color:#5d675f;">This link expires in {{expiry}}.</p>
+                <p style="margin:0;font-size:13px;line-height:1.6;color:#5d675f;">If you didn't request this, you can safely ignore this email.</p>
+                <p style="margin:25px 0 7px;font-size:12px;line-height:1.6;color:#5d675f;">If the button doesn't work, copy and paste this link into your browser:</p>
+                <p style="margin:0;word-break:break-all;font-size:12px;line-height:1.6;color:#245a47;"><a href="{{link}}" style="color:#245a47;text-decoration:underline;">{{link}}</a></p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:16px 0 0;font-size:12px;line-height:1.6;text-align:center;color:#68736b;">OrianaaClub · Luxury Membership</p>
+          <div style="text-align:center;">{{supportEmail}}</div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
