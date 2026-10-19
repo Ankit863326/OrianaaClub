@@ -1,8 +1,9 @@
 // Phase 1: Keep the browser's API origin configurable without exposing secrets.
-const configuredApiUrl = import.meta.env.VITE_API_URL;
+const configuredApiUrl = import.meta.env.VITE_API_URL
+  || (import.meta.env.DEV ? 'http://localhost:5000/api' : undefined);
 
 if (!configuredApiUrl) {
-  throw new Error('VITE_API_URL must be configured for the current Vite mode.');
+  throw new Error('VITE_API_URL must be configured for production builds.');
 }
 
 function getApiBaseUrl() {

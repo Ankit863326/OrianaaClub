@@ -83,6 +83,7 @@
   text-align: center;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
   pointer-events: none;
+  bottom: 10%;
 }
 
 .home-hero__actions a {
@@ -856,7 +857,7 @@
 
 .home-enquiry__image {
   min-height: 390px;
-  background-image: url("https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=1200&q=90");
+  background-image: url("../assets/Luxury Resort Welcome Desk.png");
   background-position: center;
   background-size: cover;
 }

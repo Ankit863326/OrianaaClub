@@ -3,35 +3,35 @@ import { ArrowRight, ChevronLeft, ChevronRight, Leaf, Mountain, Trees, Waves } f
 import { AnimatePresence, LazyMotion, m as Motion, useReducedMotion } from "framer-motion";
 import { Button } from "./ui/button";
 // import beachImage from "../assets/beachh.jpg";
-import heroVideo from "../assets/Create_vegetarian_resort_video_20261009143554.mp4";
+import heroVideo from "../assets/OrianaaClub_promo_video_creation_20261019122757.mp4";
 import LuxuryContactDrawer from "./LuxuryContactDrawer";
 import "./HomePage.css";
 
 const destinations = [
   {
-    name: "Saptagiri Retreat",
-    place: "Pune, Maharashtra",
+    name: "Saptagiri Resorts",
+    place: "Yewalewadi, Pune Maharashtra",
     image:
       "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1000&q=85",
   },
   {
-    name: "Veda Hills Retreat",
-    place: "Coorg, Karnataka",
+    name: "Saptagiri Resorts",
+    place: "Igatpuri, Nashik Maharashtra",
     image:
       "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1000&q=85",
   },
-  {
-    name: "The Forest House",
-    place: "Wayanad, Kerala",
-    image:
-      "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Coastal Haven",
-    place: "Goa, India",
-    image:
-      "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=1000&q=85",
-  },
+  // {
+  //   name: "The Forest House",
+  //   place: "Wayanad, Kerala",
+  //   image:
+  //     "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1000&q=85",
+  // },
+  // {
+  //   name: "Coastal Haven",
+  //   place: "Goa, India",
+  //   image:
+  //     "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=1000&q=85",
+  // },
 ];
 
 const events = [
@@ -206,9 +206,9 @@ export default function HomePage() {
           transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
         >
           <p className="home-eyebrow">A more considered way to get away</p>
-          <h1 id="home-hero-title">The Orianaa Club</h1>
+          {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
           <p className="home-hero__summary">
-            A 25-year lifestyle membership bringing together stays, wellness,
+            A 25-year Lifestyle Membership bringing together stays, wellness,
             dining, celebrations and curated experiences. One invitation to a
             life less ordinary.
           </p>
@@ -237,7 +237,7 @@ export default function HomePage() {
           </p>
           <div className="home-inline-actions">
             <Button asChild>
-              <a className="home-button home-button--green" href="/resorts">Explore Resorts</a>
+              <a className="home-button home-button--green" href="/resorts">Explore Destination</a>
             </Button>
             <a className="home-text-link" href="/membership-benefits">
               About Membership <ArrowRight size={16} aria-hidden="true" />
@@ -256,8 +256,9 @@ export default function HomePage() {
               />
             ))}
             <div className="home-universe-gallery__caption">
-              <p className="home-eyebrow">The Orianaa collection</p>
+              <p className="home-eyebrow">Yewalewadi, Pune Maharashtra</p>
               <h3>Room to find your own away</h3>
+              <h4></h4>
             </div>
           </div>
           <div className="home-universe-gallery__thumbs" aria-label="Destinations in the collection">
@@ -413,7 +414,7 @@ export default function HomePage() {
       <section className="home-stories" id="stories">
         <div className="home-section-heading">
           <p className="home-eyebrow home-eyebrow--dark">In their own words</p>
-          <h2>Member stories</h2>
+          <h2>Stories</h2>
           <p>Trust is earned in years, not in words.</p>
         </div>
         <div className="home-story-grid">
@@ -453,7 +454,7 @@ export default function HomePage() {
           transition={{ duration: shouldReduceMotion ? 0 : 0.55 }}
         >
           <img
-            src="https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=1400&q=90"
+            src="https://images.unsplash.com/photo-1595014361820-91c39c0cf800?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
             alt="A family spending a quiet afternoon together"
           />
           <span className="home-benefits__image-note">Make time mean more</span>
@@ -474,13 +475,13 @@ export default function HomePage() {
           <div className="home-benefit-points">
             <article>
               <Leaf size={30} strokeWidth={1.5} aria-hidden="true" />
-              <h3>50% Redemption</h3>
-              <p>Make every point go further, with stays designed around you.</p>
+              <h3>Upto 50% point redemption</h3>
+              <p>25% Exclusive Member Discount on resort stays.</p>
             </article>
             <article>
               <Trees size={30} strokeWidth={1.5} aria-hidden="true" />
               <h3>Closer to the land</h3>
-              <p>Each resort is chosen for its character, setting and soul.</p>
+              <p>Gym and sports facilities. Healthy nature lifestyle with clean air near to nature resort. Spa and naturopathy centre.</p>
             </article>
           </div>
           <Button asChild>

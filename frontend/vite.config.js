@@ -24,11 +24,12 @@ function productionFallbackOrigin(siteUrl) {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const { VITE_SITE_URL: siteUrl } = loadEnv(mode, frontendDirectory, 'VITE_');
-  if (!siteUrl) throw new Error('VITE_SITE_URL must be configured for the current Vite mode.');
+  const fallbackSiteUrl = siteUrl || (command === 'serve' ? 'http://localhost:5173' : undefined);
+  if (!fallbackSiteUrl) throw new Error('VITE_SITE_URL must be configured for production builds.');
   return {
-    plugins: [react(), tailwindcss(), productionFallbackOrigin(siteUrl)],
+    plugins: [react(), tailwindcss(), productionFallbackOrigin(fallbackSiteUrl)],
     server: { port: 5173, strictPort: true },
     build: { sourcemap: false },
     resolve: {
