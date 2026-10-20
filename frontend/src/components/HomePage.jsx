@@ -9,13 +9,13 @@ import "./HomePage.css";
 
 const destinations = [
   {
-    name: "Saptagiri Resorts",
+    name: "Saptagiri Resort",
     place: "Yewalewadi, Pune Maharashtra",
     image:
       "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1000&q=85",
   },
   {
-    name: "Saptagiri Resorts",
+    name: "Saptagiri Resort",
     place: "Igatpuri, Nashik Maharashtra",
     image:
       "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1000&q=85",
