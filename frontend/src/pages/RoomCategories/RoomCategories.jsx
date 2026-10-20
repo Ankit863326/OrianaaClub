@@ -31,7 +31,6 @@ const roomCategories = [
       "King-size bed",
       "High-speed Wi-Fi",
       "Smart TV",
-      "Mini bar",
       "Luxury bathroom",
       "Nature-view balcony",
       "24×7 room service",
@@ -62,7 +61,7 @@ const roomCategories = [
       "Premium king-size bed",
       "High-speed Wi-Fi",
       "Smart TV",
-      "Mini bar",
+      
       "Luxury bathroom amenities",
       "Private balcony",
       "24×7 room service",
@@ -94,7 +93,7 @@ const roomCategories = [
       "Dedicated work desk",
       "High-speed Wi-Fi",
       "Smart TV",
-      "Mini bar",
+      
       "Premium bathroom",
       "Seating area",
       "24×7 room service",
@@ -125,7 +124,7 @@ const roomCategories = [
       "Premium king bed",
       "High-speed Wi-Fi",
       "Smart TV",
-      "Mini bar",
+      
       "Luxury bath amenities",
       "Private balcony",
       "24×7 room service",
@@ -157,7 +156,7 @@ const roomCategories = [
       "Family seating area",
       "Smart TV",
       "High-speed Wi-Fi",
-      "Mini bar",
+      
       "Spacious bathroom",
       "24×7 room service",
     ],
@@ -187,7 +186,7 @@ const roomCategories = [
       "Romantic seating area",
       "Private balcony",
       "Smart TV",
-      "Mini bar",
+      
       "Luxury bath",
       "Premium toiletries",
       "24×7 room service",
@@ -219,7 +218,7 @@ const roomCategories = [
       "Luxury king bed",
       "Spacious living area",
       "Smart TV",
-      "Mini bar",
+      
       "Premium bathroom",
       "24×7 room service",
     ],

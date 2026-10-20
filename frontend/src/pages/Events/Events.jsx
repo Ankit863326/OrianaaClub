@@ -225,7 +225,7 @@ export default function Events() {
         <div
           className="ev2-hero__bg"
           style={{
-            backgroundImage: `url("https://images.unsplash.com/photo-1519225421980-715cb0215aed?q=85&w=2400&auto=format&fit=crop")`,
+            backgroundImage: `url("https://images.unsplash.com/photo-1617184003170-4c9fc60cdb75?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D")`,
           }}
           aria-hidden="true"
         />
@@ -253,7 +253,7 @@ export default function Events() {
             >
               <span className="ev2-hero__tag">A world of privileges awaits.</span>
               <h1 className="ev2-hero__heading" id="ev2-hero-title">
-                Weddings & Milestones
+                Events & Celebrations
               </h1>
               <p className="ev2-hero__sub">A 25-year lifestyle membership</p>
               <p className="ev2-hero__desc">

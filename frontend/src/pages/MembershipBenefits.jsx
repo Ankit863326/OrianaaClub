@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 // ESLint's core unused-vars rule does not detect motion.* JSX member expressions.
 /* eslint-disable-next-line no-unused-vars */
 import { motion } from "framer-motion";
-import clubBg from "../assets/club-bg.jpg";
+import clubBg from "../assets/membership.png";
 import PlanCard, { GoldWaveWatermark } from "../components/PlanCard.jsx";
 import { getPlans } from "../lib/plansApi.js";
 import { mapPlanToCard } from "../lib/planCardData.js";
