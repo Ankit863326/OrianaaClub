@@ -9,13 +9,13 @@ import "./HomePage.css";
 
 const destinations = [
   {
-    name: "Saptagiri Resorts",
+    name: "Saptagiri Resort",
     place: "Yewalewadi, Pune Maharashtra",
     image:
       "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1000&q=85",
   },
   {
-    name: "Saptagiri Resorts",
+    name: "Saptagiri Resort",
     place: "Igatpuri, Nashik Maharashtra",
     image:
       "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1000&q=85",
@@ -454,7 +454,7 @@ export default function HomePage() {
           transition={{ duration: shouldReduceMotion ? 0 : 0.55 }}
         >
           <img
-            src="https://images.unsplash.com/photo-1595014361820-91c39c0cf800?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+            src="https://i.pinimg.com/1200x/ea/3a/02/ea3a023dfe2b94a9137b569ca4478e4a.jpg"
             alt="A family spending a quiet afternoon together"
           />
           <span className="home-benefits__image-note">Make time mean more</span>
