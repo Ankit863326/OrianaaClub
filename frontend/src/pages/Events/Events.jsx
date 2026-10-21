@@ -200,9 +200,7 @@ export default function Events() {
     return () => ctx?.revert();
   }, []);
 
-  const handleJoinContact = () => {
-    navigate("/#enquiry");
-  };
+
 
   const scrollToCatalogue = () => {
     catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -285,76 +283,6 @@ export default function Events() {
         </div>
       </section>
 
-      {/* ========================================================
-          JOIN THE ORIANAA CLUB — Two-column card section
-      ======================================================== */}
-      <section className="ev2-join">
-        <Motion.div
-          className="ev2-join__card"
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {/* Left: image */}
-          <div className="ev2-join__img-wrap">
-            <Motion.img
-              src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=85&w=1600&auto=format&fit=crop"
-              alt="Orianaa Club luxury room"
-              className="ev2-join__img"
-              initial={{ scale: 1.08 }}
-              whileInView={{ scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <div className="ev2-join__img-overlay" />
-          </div>
-
-          {/* Right: copy */}
-          <div className="ev2-join__copy">
-            <Motion.p
-              className="ev2-join__eyebrow"
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2, duration: 0.55 }}
-            >
-              <Sparkles size={12} /> Members Only
-            </Motion.p>
-            <Motion.h2
-              className="ev2-join__heading"
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-            >
-              Join The<br />Orianaa Club
-            </Motion.h2>
-            <Motion.p
-              className="ev2-join__desc"
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.42, duration: 0.6 }}
-            >
-              Join our circle for private invitations and stories from the Orianaa world.
-            </Motion.p>
-            <Motion.button
-              type="button"
-              className="ev2-join__btn"
-              onClick={handleJoinContact}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.55, duration: 0.55 }}
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              Contact Us
-            </Motion.button>
-          </div>
-        </Motion.div>
-      </section>
 
       {/* ========================================================
           EVENTS CATALOGUE — Full Grid
