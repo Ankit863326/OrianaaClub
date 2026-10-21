@@ -282,67 +282,62 @@ function ExperienceRow({ exp, index }) {
 
 /* ─── Main Component ─────────────────────────────────────── */
 const Experiences = () => {
+  const heroRef = useRef(null);
+
   useEffect(() => {
+    let isActive = true;
     let ctx;
     const initGsap = async () => {
-      const { default: gsap } = await import("gsap");
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger");
-      gsap.registerPlugin(ScrollTrigger);
+      try {
+        const { default: gsap } = await import("gsap");
+        const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+        if (!isActive) return;
+        gsap.registerPlugin(ScrollTrigger);
+        ScrollTrigger.config({ ignoreMobileResize: true });
 
-      ctx = gsap.context(() => {
-        /* Parallax hero bg */
-        gsap.to(".exp-hero__bg", {
-          yPercent: 30,
-          ease: "none",
-          scrollTrigger: {
-            trigger: ".exp-hero",
-            start: "top top",
-            end: "bottom top",
-            scrub: true,
-          },
-        });
-
-        /* Floating gold particles */
-        gsap.utils.toArray(".exp-particle").forEach((el, i) => {
-          gsap.to(el, {
-            y: -(30 + i * 14),
-            x: i % 2 === 0 ? 18 : -18,
-            opacity: 0,
-            duration: 2.2 + i * 0.35,
-            repeat: -1,
-            ease: "power1.inOut",
-            delay: i * 0.45,
+        ctx = gsap.context(() => {
+          /* Parallax hero bg */
+          gsap.to(".exp-hero__bg", {
+            yPercent: 18,
+            ease: "none",
+            scrollTrigger: {
+              trigger: heroRef.current || ".exp-hero",
+              start: "top top",
+              end: "bottom top",
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
           });
-        });
 
-        /* Row images subtle scale on scroll */
-        gsap.utils.toArray(".exp-row__image").forEach((img) => {
-          gsap.fromTo(
-            img,
-            { scale: 1.08 },
-            {
-              scale: 1.2,
-              ease: "none",
-              scrollTrigger: {
-                trigger: img,
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1.2,
-              },
-            }
-          );
-        });
-      });
+          /* Floating gold particles */
+          gsap.utils.toArray(".exp-particle").forEach((el, i) => {
+            gsap.to(el, {
+              y: -(30 + i * 14),
+              x: i % 2 === 0 ? 18 : -18,
+              opacity: 0,
+              duration: 2.2 + i * 0.35,
+              repeat: -1,
+              ease: "power1.inOut",
+              delay: i * 0.45,
+            });
+          });
+        }, heroRef);
+      } catch (e) {
+        console.warn("GSAP init failed:", e);
+      }
     };
     initGsap();
-    return () => ctx && ctx.revert();
+    return () => {
+      isActive = false;
+      ctx?.revert();
+    };
   }, []);
 
   return (
     <main className="exp-page">
 
       {/* ══ HERO ══════════════════════════════════════════════ */}
-      <section className="exp-hero">
+      <section className="exp-hero" ref={heroRef}>
         <div className="exp-hero__bg" />
         <div className="exp-hero__overlay" />
 

@@ -26,23 +26,27 @@ export default function MembershipBenefits() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
     let ctx;
     const initGsap = async () => {
       try {
         const { default: gsap } = await import("gsap");
         const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+        if (!isActive) return;
         gsap.registerPlugin(ScrollTrigger);
+        ScrollTrigger.config({ ignoreMobileResize: true });
 
         ctx = gsap.context(() => {
           // Parallax effect on hero background
           gsap.to(".mb-hero__bg", {
-            yPercent: 25,
+            yPercent: 18,
             ease: "none",
             scrollTrigger: {
-              trigger: ".mb-hero",
+              trigger: heroRef.current || ".mb-hero",
               start: "top top",
               end: "bottom top",
               scrub: true,
+              invalidateOnRefresh: true,
             },
           });
 
@@ -58,14 +62,17 @@ export default function MembershipBenefits() {
               delay: idx * 0.4,
             });
           });
-        });
+        }, heroRef);
       } catch (err) {
         console.warn("GSAP loading skipped:", err);
       }
     };
 
     initGsap();
-    return () => ctx && ctx.revert();
+    return () => {
+      isActive = false;
+      ctx?.revert();
+    };
   }, []);
 
   return (

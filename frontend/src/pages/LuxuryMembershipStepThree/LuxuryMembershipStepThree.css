@@ -55,8 +55,7 @@
   position: relative;
   font-family: 'Georgia', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: var(--color-dark-navy);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: clip;
   width: 100%;
 }
 

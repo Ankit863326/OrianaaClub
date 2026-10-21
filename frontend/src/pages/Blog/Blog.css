@@ -959,16 +959,38 @@
 }
 
 @media (max-width: 640px) {
-  .b2-cards-grid {
-    grid-template-columns: 1fr;
+  .b2-hero {
+    min-height: 500px;
+    height: 85svh;
   }
+
+  .b2-hero__bg {
+    background-size: cover;
+    background-position: center;
+  }
+
   .b2-hero__inner {
     box-sizing: border-box;
     flex-direction: column;
     align-items: flex-start;
-    padding-right: 1rem;
-    padding-left: 1rem;
+    padding: 85px 20px 40px;
+    gap: 1.5rem;
   }
+
+  .b2-hero__main-title {
+    font-size: clamp(1.9rem, 7.5vw, 2.6rem);
+    line-height: 1.1;
+  }
+
+  .b2-hero__sub {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .b2-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
   .b2-carousel-card {
     width: 290px;
     min-width: 290px;

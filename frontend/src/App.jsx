@@ -49,7 +49,7 @@ function SiteScrollMotion() {
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.04, rootMargin: '0px 0px -5% 0px' });
+    }, { threshold: 0.01, rootMargin: '0px 0px 80px 0px' });
 
     targets.forEach((target, index) => {
       target.style.setProperty('--site-reveal-order', index % 4);
@@ -88,12 +88,6 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [isPreloading]);
 
-  useEffect(() => {
-    document.documentElement.style.scrollBehavior = 'smooth';
-    return () => {
-      document.documentElement.style.scrollBehavior = 'auto';
-    };
-  }, []);
 
   return (
     <AuthProvider>
