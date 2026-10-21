@@ -154,17 +154,17 @@ export default function MembershipBenefits() {
           >
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--first">First 1,000 Members</span>
-              <p>Highest early-bird joining advantage — up to 2.50× multiplier in points.</p>
+               <p>Early Bird Offer</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--after">After 1,000 Members</span>
-              <p>Phase-two bonus points as initial member capacity fills.</p>
+               <p>Early Bird Offer</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--default">Default Points</span>
-              <p>Standard baseline points awarded for all subsequent members (1 Pt = ₹1).</p>
+              <p>Standard baseline points awarded for all subsequent members.</p>
             </div>
           </motion.div>
         </div>
