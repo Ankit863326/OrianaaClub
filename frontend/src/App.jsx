@@ -18,6 +18,7 @@ import Activate from './pages/Activate/Activate.jsx';
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import Dashboard from './pages/Dashboard/MemberDashboardPage.jsx';
+import NotFound from './pages/NotFound/NotFound.jsx';
 
 function SiteScrollMotion() {
   const location = useLocation();
@@ -123,6 +124,7 @@ function App() {
           <Route path="/luxury-membership" element={<MembershipAll />} />
           <Route path="/luxury-membership-step-2" element={<Navigate to="/luxury-membership?step=2" replace />} />
           <Route path="/luxury-membership-step-3" element={<Navigate to="/luxury-membership?step=3" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
         <BackToTop />
