@@ -510,10 +510,60 @@
   margin-top: 0.35rem;
 }
 
-.b2-carousel-arrows {
+/* Carousel wrapper with side arrows */
+.b2-carousel-wrapper {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0;
+}
+
+.b2-arrow-btn--side {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(13, 74, 57, 0.25);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  color: var(--b2-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.b2-arrow-btn--side:hover {
+  background: var(--b2-green);
+  color: #fff;
+  border-color: var(--b2-green);
+  box-shadow: 0 8px 28px rgba(13, 74, 57, 0.4);
+  transform: translateY(-50%) scale(1.08);
+}
+
+.b2-arrow-btn--side.b2-arrow-btn--primary {
+  background: var(--b2-green);
+  color: var(--b2-gold-light);
+  border-color: var(--b2-green);
+}
+
+.b2-arrow-btn--side.b2-arrow-btn--primary:hover {
+  background: var(--b2-green-deep);
+  color: var(--b2-gold-light);
+  box-shadow: 0 8px 28px rgba(13, 74, 57, 0.5);
+}
+
+.b2-arrow-btn--left {
+  left: -24px;
+}
+
+.b2-arrow-btn--right {
+  right: -24px;
 }
 
 .b2-arrow-btn {
@@ -994,6 +1044,19 @@
   .b2-carousel-card {
     width: 290px;
     min-width: 290px;
+  }
+
+  .b2-arrow-btn--side {
+    width: 36px;
+    height: 36px;
+  }
+
+  .b2-arrow-btn--left {
+    left: -6px;
+  }
+
+  .b2-arrow-btn--right {
+    right: -6px;
   }
 }
 
