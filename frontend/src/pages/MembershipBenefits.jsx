@@ -26,23 +26,27 @@ export default function MembershipBenefits() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
     let ctx;
     const initGsap = async () => {
       try {
         const { default: gsap } = await import("gsap");
         const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+        if (!isActive) return;
         gsap.registerPlugin(ScrollTrigger);
+        ScrollTrigger.config({ ignoreMobileResize: true });
 
         ctx = gsap.context(() => {
           // Parallax effect on hero background
           gsap.to(".mb-hero__bg", {
-            yPercent: 25,
+            yPercent: 18,
             ease: "none",
             scrollTrigger: {
-              trigger: ".mb-hero",
+              trigger: heroRef.current || ".mb-hero",
               start: "top top",
               end: "bottom top",
               scrub: true,
+              invalidateOnRefresh: true,
             },
           });
 
@@ -58,14 +62,17 @@ export default function MembershipBenefits() {
               delay: idx * 0.4,
             });
           });
-        });
+        }, heroRef);
       } catch (err) {
         console.warn("GSAP loading skipped:", err);
       }
     };
 
     initGsap();
-    return () => ctx && ctx.revert();
+    return () => {
+      isActive = false;
+      ctx?.revert();
+    };
   }, []);
 
   return (
@@ -154,17 +161,17 @@ export default function MembershipBenefits() {
           >
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--first">First 1,000 Members</span>
-              <p>Highest early-bird joining advantage — up to 2.50× multiplier in points.</p>
+               <p>Early Bird Offer</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--after">After 1,000 Members</span>
-              <p>Phase-two bonus points as initial member capacity fills.</p>
+               <p>Early Bird Offer</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--default">Default Points</span>
-              <p>Standard baseline points awarded for all subsequent members (1 Pt = ₹1).</p>
+              <p>Standard baseline points awarded for all subsequent members.</p>
             </div>
           </motion.div>
         </div>

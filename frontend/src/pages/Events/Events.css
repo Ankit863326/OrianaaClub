@@ -816,8 +816,38 @@
 }
 
 @media (max-width: 640px) {
+  .ev2-hero {
+    min-height: 500px;
+    height: 85svh;
+  }
+
+  .ev2-hero__bg {
+    background-size: cover;
+    background-position: center;
+  }
+
   .ev2-hero__inner {
-    padding-top: 6.5rem;
+    padding: 85px 20px 40px;
+  }
+
+  .ev2-hero__copy {
+    gap: 0.85rem;
+  }
+
+  .ev2-hero__title {
+    font-size: clamp(2rem, 8vw, 2.75rem);
+    line-height: 1.1;
+  }
+
+  .ev2-hero__sub {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .ev2-hero__actions .ev2-btn {
+    min-height: 44px;
+    padding: 0 20px;
+    font-size: 13.5px;
   }
 }
 .ev2-content-state{padding:28px;text-align:center;color:#b9a779;border:1px solid rgba(185,167,121,.25);background:rgba(10,12,12,.72);border-radius:8px}

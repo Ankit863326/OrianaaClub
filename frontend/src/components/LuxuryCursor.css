@@ -1,0 +1,300 @@
+/* ==========================================================================
+   Orianaa Club — Refined Luxury "OC" Monogram Cursor
+   Sleek, compact, non-intrusive luxury UX — never balloons or blocks content
+   ========================================================================== */
+
+/* Completely eliminate default system cursor across the entire website */
+@media (hover: hover) and (pointer: fine) {
+  html,
+  body,
+  *,
+  *::before,
+  *::after {
+    cursor: none !important;
+  }
+}
+
+/* Master container */
+.orianaa-cursor-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999999;
+  overflow: hidden;
+  contain: layout style;
+}
+
+/* Stardust canvas */
+.orianaa-cursor-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Orianaa "OC" Monogram Luxury Follower (Compact, Subtle & High-End)
+   ========================================================================== */
+.orianaa-cursor-follower {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  margin-top: -17px;
+  margin-left: -17px;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 1px solid rgba(212, 160, 23, 0.4);
+  background: radial-gradient(circle, rgba(212, 160, 23, 0.08) 0%, rgba(11, 73, 56, 0.06) 50%, transparent 80%);
+  box-shadow: 0 0 12px rgba(212, 160, 23, 0.2);
+  transition: width 0.22s ease-out,
+              height 0.22s ease-out,
+              margin 0.22s ease-out,
+              border-color 0.2s ease,
+              background 0.2s ease,
+              box-shadow 0.2s ease,
+              transform 0.08s linear;
+  will-change: transform;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Subtle gold ticks on ring (refined & understated) */
+.orianaa-cursor-follower::before,
+.orianaa-cursor-follower::after {
+  content: "";
+  position: absolute;
+  background: linear-gradient(135deg, #fff2d6, #d4a017);
+  pointer-events: none;
+  opacity: 0.65;
+  transition: opacity 0.2s ease, transform 0.22s ease-out;
+}
+
+.orianaa-cursor-follower::before {
+  top: -2.5px;
+  bottom: -2.5px;
+  width: 1px;
+  left: 50%;
+  transform: translateX(-50%) scaleY(0.35);
+}
+
+.orianaa-cursor-follower::after {
+  left: -2.5px;
+  right: -2.5px;
+  height: 1px;
+  top: 50%;
+  transform: translateY(-50%) scaleX(0.35);
+}
+
+/* The Iconic "OC" Orianaa Club Monogram */
+.orianaa-cursor-monogram {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff2d6;
+  opacity: 0.85;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(212, 160, 23, 0.7),
+               0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: transform 0.2s ease-out,
+              color 0.2s ease,
+              opacity 0.2s ease,
+              text-shadow 0.2s ease;
+}
+
+/* Follower State: Hovering Clickable Elements
+   REFINED: Stays compact (38px max, only +4px), never blocks content */
+.orianaa-cursor-follower.is-hovering {
+  width: 38px;
+  height: 38px;
+  margin-top: -19px;
+  margin-left: -19px;
+  border-color: rgba(255, 215, 0, 0.85);
+  background: radial-gradient(circle, rgba(212, 160, 23, 0.16) 0%, rgba(11, 73, 56, 0.12) 55%, transparent 80%);
+  box-shadow: 0 0 16px rgba(212, 160, 23, 0.45), inset 0 0 8px rgba(255, 242, 214, 0.25);
+}
+
+.orianaa-cursor-follower.is-hovering .orianaa-cursor-monogram {
+  color: #ffd978;
+  opacity: 1;
+  transform: scale(1.06);
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.85),
+               0 0 18px rgba(212, 160, 23, 0.5);
+}
+
+.orianaa-cursor-follower.is-hovering::before {
+  transform: translateX(-50%) scaleY(0.5) rotate(45deg);
+}
+.orianaa-cursor-follower.is-hovering::after {
+  transform: translateY(-50%) scaleX(0.5) rotate(45deg);
+}
+
+/* Follower State: Text Input */
+.orianaa-cursor-follower.is-text {
+  width: 18px;
+  height: 28px;
+  margin-top: -14px;
+  margin-left: -9px;
+  border-radius: 3px;
+  border: 1px dashed rgba(212, 160, 23, 0.6);
+  background: rgba(212, 160, 23, 0.05);
+  box-shadow: 0 0 10px rgba(212, 160, 23, 0.2);
+}
+
+.orianaa-cursor-follower.is-text .orianaa-cursor-monogram {
+  opacity: 0;
+  transform: scale(0.3);
+}
+.orianaa-cursor-follower.is-text::before,
+.orianaa-cursor-follower.is-text::after {
+  opacity: 0;
+}
+
+/* Follower State: Clicking */
+.orianaa-cursor-follower.is-clicking {
+  transform: scale(0.88);
+  border-color: #ffd978;
+  box-shadow: 0 0 20px rgba(212, 160, 23, 0.7), inset 0 0 12px rgba(255, 242, 214, 0.5);
+}
+
+.orianaa-cursor-follower.is-clicking .orianaa-cursor-monogram {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   Core Precision Point (Zero Latency Pinpoint Tip)
+   ========================================================================== */
+.orianaa-cursor-core {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  margin-left: -5px;
+  pointer-events: none;
+  will-change: transform;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+/* Precision 24K Gold Micro-Diamond Pinpoint */
+.orianaa-cursor-pinpoint {
+  width: 4.5px;
+  height: 4.5px;
+  transform: rotate(45deg);
+  background: #ffffff;
+  border: 1px solid #d4a017;
+  border-radius: 1px;
+  box-shadow: 0 0 6px #ffd978, 0 0 10px #d4a017;
+  pointer-events: none;
+  transition: transform 0.2s ease-out,
+              background 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+.orianaa-cursor-core.is-hovering .orianaa-cursor-pinpoint {
+  transform: rotate(45deg) scale(1.15);
+  background: #fff2d6;
+  box-shadow: 0 0 8px #ffffff, 0 0 14px #ffd978;
+}
+
+.orianaa-cursor-core.is-clicking .orianaa-cursor-pinpoint {
+  transform: rotate(90deg) scale(0.8);
+}
+
+/* Royal Luxury I-Beam for Text Inputs */
+.orianaa-cursor-ibeam {
+  position: absolute;
+  width: 1.5px;
+  height: 18px;
+  background: linear-gradient(180deg, #fff2d6, #d4a017, #fff2d6);
+  box-shadow: 0 0 8px rgba(212, 160, 23, 0.85);
+  border-radius: 1px;
+  opacity: 0;
+  transform: scaleY(0.4);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.orianaa-cursor-ibeam::before,
+.orianaa-cursor-ibeam::after {
+  content: "";
+  position: absolute;
+  left: -2.5px;
+  width: 6.5px;
+  height: 1px;
+  background: #fff2d6;
+  box-shadow: 0 0 4px #d4a017;
+}
+.orianaa-cursor-ibeam::before {
+  top: 0;
+}
+.orianaa-cursor-ibeam::after {
+  bottom: 0;
+}
+
+.orianaa-cursor-core.is-text .orianaa-cursor-pinpoint {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+.orianaa-cursor-core.is-text .orianaa-cursor-ibeam {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* ==========================================================================
+   Click Ripple Animation (Refined, Discreet)
+   ========================================================================== */
+.orianaa-cursor-ripple {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  margin-left: -9px;
+  border-radius: 50%;
+  border: 1px solid #ffd978;
+  pointer-events: none;
+  animation: orianaa-royal-ripple 0.5s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
+}
+
+@keyframes orianaa-royal-ripple {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+    box-shadow: 0 0 6px #ffd978;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+    box-shadow: 0 0 16px rgba(212, 160, 23, 0);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .orianaa-cursor-canvas {
+    display: none;
+  }
+  .orianaa-cursor-follower {
+    transition: none;
+  }
+  .orianaa-cursor-monogram {
+    transition: none;
+  }
+}
