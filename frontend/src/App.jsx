@@ -19,6 +19,7 @@ import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import Dashboard from './pages/Dashboard/MemberDashboardPage.jsx';
 import NotFound from './pages/NotFound/NotFound.jsx';
+import LuxuryCursor from './components/LuxuryCursor';
 
 function SiteScrollMotion() {
   const location = useLocation();
@@ -93,6 +94,7 @@ function App() {
   return (
     <AuthProvider>
     <Router>
+      <LuxuryCursor />
       <div style={{ width: '100%', backgroundColor: '#0B1220', color: 'white', overflowX: 'clip' }}>
         <Navbar />
         <SiteScrollMotion />

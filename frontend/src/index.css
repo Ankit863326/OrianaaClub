@@ -30,6 +30,16 @@
     }
   }
 
+  @media (hover: hover) and (pointer: fine) {
+    html,
+    body,
+    *,
+    *::before,
+    *::after {
+      cursor: none !important;
+    }
+  }
+
   body {
     background: #0B1220;
     color: #F8FAFC;
