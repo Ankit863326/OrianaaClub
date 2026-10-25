@@ -20,10 +20,10 @@ const membershipLinks = [
 ];
 
 const socialLinks = [
-  { label: "Instagram", href: "https://www.instagram.com/", Icon: FaInstagram },
+  { label: "Instagram", href: "https://www.instagram.com/saptagiriresorts?obrf=NjN3Z243MzBndHhs", Icon: FaInstagram },
   { label: "Facebook", href: "https://www.facebook.com/", Icon: FaFacebookF },
   { label: "YouTube", href: "https://www.youtube.com/", Icon: FaYoutube },
-  { label: "LinkedIn", href: "https://www.linkedin.com/", Icon: FaLinkedinIn },
+  { label: "LinkedIn", href: "https://www.linkedin.com/company/saptagiri-hospitality-lifestyle/posts/?feedView=all", Icon: FaLinkedinIn },
 ];
 
 export default function Footer() {
