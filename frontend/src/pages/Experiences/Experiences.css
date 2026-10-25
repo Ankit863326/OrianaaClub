@@ -19,7 +19,7 @@
   background: var(--exp-paper);
   color: var(--exp-ink);
   font-family: var(--exp-sans);
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@
 .exp-hero__bg {
   position: absolute;
   inset: -12%;
-  background-image: url("https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=2400&q=90");
+  background-image: url("../../assets/Golden Hour at Oriana Club.png");
   background-size: cover;
   background-position: center;
   will-change: transform;
@@ -449,18 +449,42 @@
    MOBILE
    ───────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .exp-hero__title {
-    font-size: clamp(2.25rem, 9vw, 3.25rem);
-    line-height: 1.05;
+  .exp-hero {
+    min-height: 520px;
+    height: 100svh;
   }
 
-  .exp-hero {
-    min-height: 620px;
+  .exp-hero__bg {
+    inset: -8%;
+    background-size: cover;
+    background-position: center;
   }
 
   .exp-hero__content {
-    width: calc(100% - 40px);
-    padding-bottom: 64px;
+    width: calc(100% - 32px);
+    padding-bottom: 48px;
+  }
+
+  .exp-hero__eyebrow {
+    font-size: 10px;
+    margin-bottom: 12px;
+  }
+
+  .exp-hero__title {
+    font-size: clamp(2rem, 8.5vw, 3rem);
+    line-height: 1.05;
+  }
+
+  .exp-hero__sub {
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 12px 0 20px;
+  }
+
+  .exp-hero__cta {
+    min-height: 44px;
+    padding: 0 22px;
+    font-size: 13.5px;
   }
 
   .exp-hero__scroll {

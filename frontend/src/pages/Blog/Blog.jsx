@@ -204,7 +204,7 @@ export default function Blog() {
   }, [activeCategory, searchQuery, stories]);
 
   const scrollToConsidered = () => {
-    consideredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleJoinContact = () => {
@@ -290,70 +290,6 @@ export default function Blog() {
       </section>
 
       {/* ========================================================
-          2. COLLECTION OF CONSIDERED MOMENTS — Matches Figma
-      ======================================================== */}
-      <section className="b2-considered" ref={consideredRef}>
-        <div className="b2-considered__inner">
-
-          {/* Left: Large Resort Pool Image */}
-          <Motion.div
-            className="b2-considered__img-wrap"
-            initial={{ opacity: 0, x: -40 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Motion.img
-              src="https://images.unsplash.com/photo-1540541338287-41700207dee6?q=85&w=1600&auto=format&fit=crop"
-              alt="Collection of Considered Moments resort pool"
-              className="b2-considered__img"
-              initial={{ scale: 1.08 }}
-              whileInView={{ scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <div className="b2-considered__img-shade" />
-          </Motion.div>
-
-          {/* Right: Stacked Title & Read More Button */}
-          <div className="b2-considered__copy">
-            <Motion.h2
-              className="b2-considered__heading"
-              initial={{ opacity: 0, y: 35 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <span className="b2-considered__dark-text">Collection</span>
-              <br />
-              <span className="b2-considered__dark-text">of</span>
-              <br />
-              <span className="b2-considered__gold-text">Considered</span>
-              <br />
-              <span className="b2-considered__gold-text">Moments</span>
-            </Motion.h2>
-
-            <Motion.button
-              type="button"
-              className="b2-considered__btn"
-              onClick={() => {
-                catalogueRef.current?.scrollIntoView({ behavior: "smooth" });
-              }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.25, duration: 0.6 }}
-              whileHover={{ scale: 1.04, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              Read More <ChevronRight size={15} style={{ marginLeft: 2 }} />
-            </Motion.button>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ========================================================
           3. 3 VERTICAL CARDS — "Slide to Explore" Draggable Slider
       ======================================================== */}
       <section className="b2-slide-section" ref={cardsRef}>
@@ -391,68 +327,7 @@ export default function Blog() {
         </div>
       </section>
 
-      {/* ========================================================
-          4. JOIN THE ORIANAA CLUB — Two-column Card (Figma Matched)
-      ======================================================== */}
-      <section className="b2-join">
-        <Motion.div
-          className="b2-join__card"
-          initial={{ opacity: 0, y: 45 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {/* Left: Resort Bedroom photo */}
-          <div className="b2-join__img-wrap">
-            <Motion.img
-              src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=85&w=1600&auto=format&fit=crop"
-              alt="Orianaa Club luxury room"
-              className="b2-join__img"
-              initial={{ scale: 1.08 }}
-              whileInView={{ scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <div className="b2-join__img-overlay" />
-          </div>
-
-          {/* Right: Text Copy & Button */}
-          <div className="b2-join__copy">
-            <Motion.h2
-              className="b2-join__heading"
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-            >
-              Join The<br />Orianaa Club
-            </Motion.h2>
-            <Motion.p
-              className="b2-join__desc"
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.32, duration: 0.6 }}
-            >
-              Join our circle for private invitations and stories from the Orianaa world.
-            </Motion.p>
-            <Motion.button
-              type="button"
-              className="b2-join__btn"
-              onClick={handleJoinContact}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.45, duration: 0.55 }}
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              Contact Us
-            </Motion.button>
-          </div>
-        </Motion.div>
-      </section>
-
+  
       {/* ========================================================
           5. ALL BLOGS CAROUSEL — With Left & Right Arrows
       ======================================================== */}
@@ -464,25 +339,7 @@ export default function Blog() {
               <p className="b2-carousel-sub">Discover all stories across our resort collection</p>
             </div>
 
-            {/* Carousel Navigation Arrows */}
-            <div className="b2-carousel-arrows">
-              <button
-                type="button"
-                className="b2-arrow-btn"
-                onClick={prevCarousel}
-                aria-label="Previous blog stories"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                type="button"
-                className="b2-arrow-btn b2-arrow-btn--primary"
-                onClick={nextCarousel}
-                aria-label="Next blog stories"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
+
           </div>
 
           {/* Search & Categories Filter */}
@@ -519,13 +376,23 @@ export default function Blog() {
             </div>
           </div>
 
-          {/* Carousel Track */}
+          {/* Carousel Track with Side Arrows */}
           {storiesLoading ? (
             <div className="b2-no-results" role="status">Loading stories…</div>
           ) : storiesError ? (
             <div className="b2-no-results" role="alert">{storiesError}</div>
           ) : allCarouselStories.length > 0 ? (
-            <div className="b2-carousel-viewport">
+            <div className="b2-carousel-wrapper">
+              <button
+                type="button"
+                className="b2-arrow-btn b2-arrow-btn--side b2-arrow-btn--left"
+                onClick={prevCarousel}
+                aria-label="Previous blog stories"
+              >
+                <ChevronLeft size={22} />
+              </button>
+
+              <div className="b2-carousel-viewport">
               <Motion.div
                 className="b2-carousel-track"
                 animate={{ x: -carouselIndex * 360 }}
@@ -554,6 +421,16 @@ export default function Blog() {
                   </Motion.article>
                 ))}
               </Motion.div>
+              </div>
+
+              <button
+                type="button"
+                className="b2-arrow-btn b2-arrow-btn--side b2-arrow-btn--right b2-arrow-btn--primary"
+                onClick={nextCarousel}
+                aria-label="Next blog stories"
+              >
+                <ChevronRight size={22} />
+              </button>
             </div>
           ) : (
             <div className="b2-no-results">
@@ -663,6 +540,68 @@ export default function Blog() {
         )}
       </AnimatePresence>
 
+{/* ========================================================
+          4. JOIN THE ORIANAA CLUB — Two-column Card (Figma Matched)
+      ======================================================== */}
+      <section className="b2-join">
+        <Motion.div
+          className="b2-join__card"
+          initial={{ opacity: 0, y: 45 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.25 }}
+          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {/* Left: Resort Bedroom photo */}
+          <div className="b2-join__img-wrap">
+            <Motion.img
+              src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=85&w=1600&auto=format&fit=crop"
+              alt="Orianaa Club luxury room"
+              className="b2-join__img"
+              initial={{ scale: 1.08 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+            />
+            <div className="b2-join__img-overlay" />
+          </div>
+
+          {/* Right: Text Copy & Button */}
+          <div className="b2-join__copy">
+            <Motion.h2
+              className="b2-join__heading"
+              initial={{ opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+            >
+              Join The<br />Orianaa Club
+            </Motion.h2>
+            <Motion.p
+              className="b2-join__desc"
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.32, duration: 0.6 }}
+            >
+              Join our circle for private invitations and stories from the Orianaa world.
+            </Motion.p>
+            <Motion.button
+              type="button"
+              className="b2-join__btn"
+              onClick={handleJoinContact}
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.45, duration: 0.55 }}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              Contact Us
+            </Motion.button>
+          </div>
+        </Motion.div>
+      </section>
     </main>
+    
   );
 }

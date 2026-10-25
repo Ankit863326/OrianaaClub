@@ -18,8 +18,13 @@ import Activate from './pages/Activate/Activate.jsx';
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import Dashboard from './pages/Dashboard/MemberDashboardPage.jsx';
+<<<<<<< HEAD
 import FamilyVerificationPage from './pages/Dashboard/FamilyVerificationPage.jsx';
 import FamilyCheckoutPage from './pages/Dashboard/FamilyCheckoutPage.jsx';
+=======
+import NotFound from './pages/NotFound/NotFound.jsx';
+import LuxuryCursor from './components/LuxuryCursor';
+>>>>>>> origin/main
 
 function SiteScrollMotion() {
   const location = useLocation();
@@ -51,7 +56,7 @@ function SiteScrollMotion() {
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.04, rootMargin: '0px 0px -5% 0px' });
+    }, { threshold: 0.01, rootMargin: '0px 0px 80px 0px' });
 
     targets.forEach((target, index) => {
       target.style.setProperty('--site-reveal-order', index % 4);
@@ -90,16 +95,11 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [isPreloading]);
 
-  useEffect(() => {
-    document.documentElement.style.scrollBehavior = 'smooth';
-    return () => {
-      document.documentElement.style.scrollBehavior = 'auto';
-    };
-  }, []);
 
   return (
     <AuthProvider>
     <Router>
+      <LuxuryCursor />
       <div style={{ width: '100%', backgroundColor: '#0B1220', color: 'white', overflowX: 'clip' }}>
         <Navbar />
         <SiteScrollMotion />
@@ -133,6 +133,7 @@ function App() {
           <Route path="/luxury-membership" element={<MembershipAll />} />
           <Route path="/luxury-membership-step-2" element={<Navigate to="/luxury-membership?step=2" replace />} />
           <Route path="/luxury-membership-step-3" element={<Navigate to="/luxury-membership?step=3" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
         <BackToTop />

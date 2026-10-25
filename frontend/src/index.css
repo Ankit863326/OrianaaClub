@@ -20,16 +20,31 @@
   }
 
   html {
-    scroll-behavior: smooth;
     scroll-padding-top: calc(var(--site-navbar-height) + 12px);
     font-family: var(--sans);
-    scrollbar-gutter: stable;
+  }
+
+  @media (min-width: 1025px) {
+    html {
+      scrollbar-gutter: stable;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    html,
+    body,
+    *,
+    *::before,
+    *::after {
+      cursor: none !important;
+    }
   }
 
   body {
     background: #0B1220;
     color: #F8FAFC;
-    overflow-x: hidden;
+    overflow-x: clip;
+    -webkit-overflow-scrolling: touch;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -236,6 +251,12 @@ main .blog-hero-content {
 .site-scroll-reveal.is-visible {
   opacity: 1;
   transform: translate3d(0, 0, 0);
+}
+
+@media (max-width: 1024px) {
+  .site-scroll-reveal {
+    will-change: auto;
+  }
 }
 
 @media (max-width: 1100px) {

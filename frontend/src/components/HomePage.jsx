@@ -9,29 +9,19 @@ import "./HomePage.css";
 
 const destinations = [
   {
-    name: "Saptagiri Resorts",
+    name: "Saptagiri Resort",
     place: "Yewalewadi, Pune Maharashtra",
+    headline: "Room to find your own away",
     image:
       "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1000&q=85",
   },
   {
-    name: "Saptagiri Resorts",
+    name: "Saptagiri Resort",
     place: "Igatpuri, Nashik Maharashtra",
+    headline: "Room to find your own away",
     image:
       "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1000&q=85",
   },
-  // {
-  //   name: "The Forest House",
-  //   place: "Wayanad, Kerala",
-  //   image:
-  //     "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1000&q=85",
-  // },
-  // {
-  //   name: "Coastal Haven",
-  //   place: "Goa, India",
-  //   image:
-  //     "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=1000&q=85",
-  // },
 ];
 
 const events = [
@@ -105,6 +95,7 @@ export default function HomePage() {
   const [eventDirection, setEventDirection] = useState(1);
   const [contactOpen, setContactOpen] = useState(false);
   const universeRef = useRef(null);
+  const universeScrollTriggerRef = useRef(null);
   const shouldReduceMotion = useReducedMotion();
   const event = events[activeEvent];
   const previousEvent = (activeEvent - 1 + events.length) % events.length;
@@ -115,6 +106,14 @@ export default function HomePage() {
     setActiveEvent((current) => (current + direction + events.length) % events.length);
   };
 
+  const handleThumbClick = (index) => {
+    const st = universeScrollTriggerRef.current;
+    if (st) {
+      const targetY = index === 0 ? st.start + 2 : st.start + (st.end - st.start) * 0.85;
+      window.scrollTo({ top: targetY, behavior: "smooth" });
+    }
+  };
+
   useLayoutEffect(() => {
     let isActive = true;
     let media;
@@ -123,57 +122,94 @@ export default function HomePage() {
       if (!isActive) return;
 
       const gsap = gsapModule.default;
-      gsap.registerPlugin(scrollTriggerModule.ScrollTrigger);
-      media = gsap.matchMedia();
-      media.add("(min-width: 1001px) and (prefers-reduced-motion: no-preference)", () => {
-        const context = gsap.context(() => {
-          const gallery = universeRef.current.querySelector(".home-universe-gallery");
-          const centerImages = gsap.utils.toArray("[data-universe-image]", gallery);
-          const thumbnails = gsap.utils.toArray("[data-universe-thumb]", gallery);
-          const indicators = gsap.utils.toArray(".home-universe-gallery__indicator", gallery);
+      const ScrollTrigger = scrollTriggerModule.ScrollTrigger;
+      gsap.registerPlugin(ScrollTrigger);
+      ScrollTrigger.config({ ignoreMobileResize: true });
 
-          gsap.set(centerImages.slice(1), { autoAlpha: 0, scale: 1.04 });
-          gsap.set(thumbnails.slice(1), { autoAlpha: 0.55, scale: 1 });
-          gsap.set(indicators, { scaleX: 0 });
-          gsap.set(indicators[0], { scaleX: 1 });
+      const setupGalleryAnimation = (isMobile) => {
+        const gallery = universeRef.current?.querySelector(".home-universe-gallery");
+        if (!gallery) return;
 
-          const timeline = gsap.timeline({
-            scrollTrigger: {
-              trigger: universeRef.current,
-              start: "top top+=78",
-              end: "+=120%",
-              pin: true,
-              pinSpacing: true,
-              scrub: 0.45,
-              anticipatePin: 1,
-              invalidateOnRefresh: true,
-            },
-          });
+        const centerImages = gsap.utils.toArray("[data-universe-image]", gallery);
+        const captions = gsap.utils.toArray("[data-universe-caption]", gallery);
+        const thumbnails = gsap.utils.toArray("[data-universe-thumb]", gallery);
+        const indicators = gsap.utils.toArray(".home-universe-gallery__indicator", gallery);
 
-          timeline.to(".home-universe-gallery__main-image:first-child", { scale: 1.06, duration: 0.8, ease: "none" }, 0);
+        gsap.set(centerImages[0], { autoAlpha: 1, scale: 1 });
+        gsap.set(centerImages.slice(1), { autoAlpha: 0, scale: 1.04 });
+        gsap.set(captions[0], { autoAlpha: 1, y: 0 });
+        gsap.set(captions.slice(1), { autoAlpha: 0, y: 10 });
+        gsap.set(thumbnails[0], { autoAlpha: 1, scale: 1.02 });
+        gsap.set(thumbnails.slice(1), { autoAlpha: 0.55, scale: 1 });
+        gsap.set(indicators, { scaleX: 0 });
+        gsap.set(indicators[0], { scaleX: 1 });
 
-          centerImages.slice(1).forEach((image, index) => {
-            const transitionStart = 0.2 + index * 0.24;
-            timeline.to(centerImages[index], { autoAlpha: 0, duration: 0.12, ease: "none" }, transitionStart);
+        const timeline = gsap.timeline({
+          scrollTrigger: {
+            id: isMobile ? "universe-mobile" : "universe-desktop",
+            trigger: universeRef.current,
+            start: "top top+=78",
+            end: isMobile ? "+=100%" : "+=120%",
+            pin: true,
+            pinSpacing: true,
+            scrub: isMobile ? 0.35 : 0.45,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+          },
+        });
+
+        universeScrollTriggerRef.current = timeline.scrollTrigger;
+
+        timeline.to(".home-universe-gallery__main-image:first-child", { scale: 1.06, duration: 0.8, ease: "none" }, 0);
+
+        centerImages.slice(1).forEach((image, index) => {
+          const transitionStart = 0.2 + index * 0.24;
+          timeline.to(centerImages[index], { autoAlpha: 0, duration: 0.12, ease: "none" }, transitionStart);
+          if (captions[index]) {
+            timeline.to(captions[index], { autoAlpha: 0, y: -10, duration: 0.12, ease: "none" }, transitionStart);
+          }
+          timeline.fromTo(
+            image,
+            { autoAlpha: 0, scale: 1.04 },
+            { autoAlpha: 1, scale: 1, duration: 0.12, ease: "none" },
+            transitionStart,
+          );
+          if (captions[index + 1]) {
             timeline.fromTo(
-              image,
-              { autoAlpha: 0, scale: 1.04 },
-              { autoAlpha: 1, scale: 1, duration: 0.12, ease: "none" },
+              captions[index + 1],
+              { autoAlpha: 0, y: 10 },
+              { autoAlpha: 1, y: 0, duration: 0.12, ease: "none" },
               transitionStart,
             );
-            timeline.to(thumbnails[index], { autoAlpha: 0.55, scale: 1, duration: 0.1, ease: "none" }, transitionStart);
-            timeline.to(indicators[index], { scaleX: 0, duration: 0.1, ease: "none" }, transitionStart);
-            timeline.to(thumbnails[index + 1], { autoAlpha: 1, scale: 1.02, duration: 0.1, ease: "none" }, transitionStart);
-            timeline.to(indicators[index + 1], { scaleX: 1, duration: 0.1, ease: "none" }, transitionStart);
-          });
-        }, universeRef);
+          }
+          timeline.to(thumbnails[index], { autoAlpha: 0.55, scale: 1, duration: 0.1, ease: "none" }, transitionStart);
+          timeline.to(indicators[index], { scaleX: 0, duration: 0.1, ease: "none" }, transitionStart);
+          timeline.to(thumbnails[index + 1], { autoAlpha: 1, scale: 1.02, duration: 0.1, ease: "none" }, transitionStart);
+          timeline.to(indicators[index + 1], { scaleX: 1, duration: 0.1, ease: "none" }, transitionStart);
+        });
+      };
 
-        return () => context.revert();
+      media = gsap.matchMedia();
+      media.add("(min-width: 1001px) and (prefers-reduced-motion: no-preference)", () => {
+        const context = gsap.context(() => setupGalleryAnimation(false), universeRef);
+        return () => {
+          universeScrollTriggerRef.current = null;
+          context.revert();
+        };
+      });
+
+      media.add("(max-width: 1000px) and (prefers-reduced-motion: no-preference)", () => {
+        const context = gsap.context(() => setupGalleryAnimation(true), universeRef);
+        return () => {
+          universeScrollTriggerRef.current = null;
+          context.revert();
+        };
       });
     });
 
     return () => {
       isActive = false;
+      universeScrollTriggerRef.current = null;
       media?.revert();
     };
   }, []);
@@ -246,26 +282,42 @@ export default function HomePage() {
         </div>
         <div className="home-universe-gallery" aria-label="Orianaa resort collection">
           <div className="home-universe-gallery__main">
-            {destinations.map((destination) => (
+            {destinations.map((destination, index) => (
               <img
                 className="home-universe-gallery__main-image"
-                key={destination.name}
+                key={destination.place || index}
                 src={destination.image}
-                alt={destination.name}
+                alt={`${destination.name} - ${destination.place}`}
                 data-universe-image
               />
             ))}
-            <div className="home-universe-gallery__caption">
-              <p className="home-eyebrow">Yewalewadi, Pune Maharashtra</p>
-              <h3>Room to find your own away</h3>
-              <h4></h4>
-            </div>
+            {destinations.map((destination, index) => (
+              <div
+                className="home-universe-gallery__caption"
+                key={`caption-${destination.place || index}`}
+                data-universe-caption
+              >
+                <p className="home-eyebrow">{destination.place}</p>
+                <h3>{destination.headline || "Room to find your own away"}</h3>
+              </div>
+            ))}
           </div>
           <div className="home-universe-gallery__thumbs" aria-label="Destinations in the collection">
-            {destinations.map((destination) => (
-              <figure className="home-universe-gallery__thumb" key={destination.name} data-universe-thumb>
-                <img src={destination.image} alt="" />
-                <figcaption>{destination.name}</figcaption>
+            {destinations.map((destination, index) => (
+              <figure
+                className="home-universe-gallery__thumb"
+                key={destination.place || index}
+                data-universe-thumb
+                onClick={() => handleThumbClick(index)}
+                role="button"
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+                aria-label={`View ${destination.name} at ${destination.place}`}
+              >
+                <img src={destination.image} alt={destination.place} />
+                <figcaption title={destination.place}>
+                  {destination.place.split(",")[0]} - {destination.name}
+                </figcaption>
                 <span className="home-universe-gallery__indicator" />
               </figure>
             ))}
@@ -287,7 +339,7 @@ export default function HomePage() {
             <Motion.a
               className="home-destination"
               href="/resorts"
-              key={destination.name}
+              key={destination.place || index}
               initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
@@ -454,7 +506,7 @@ export default function HomePage() {
           transition={{ duration: shouldReduceMotion ? 0 : 0.55 }}
         >
           <img
-            src="https://images.unsplash.com/photo-1595014361820-91c39c0cf800?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+            src="https://i.pinimg.com/1200x/ea/3a/02/ea3a023dfe2b94a9137b569ca4478e4a.jpg"
             alt="A family spending a quiet afternoon together"
           />
           <span className="home-benefits__image-note">Make time mean more</span>

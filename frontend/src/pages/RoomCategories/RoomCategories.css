@@ -912,6 +912,28 @@
 }
 
 @media (max-width: 680px) {
+  .destinations-hero {
+    min-height: 500px;
+    height: 85svh;
+    padding: 85px 20px 48px;
+  }
+
+  .destinations-hero__content {
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .destinations-hero__content h1 {
+    font-size: clamp(2rem, 8vw, 2.85rem);
+    line-height: 1.1;
+  }
+
+  .destinations-hero__cta {
+    min-width: 200px !important;
+    height: 48px !important;
+    font-size: 13.5px !important;
+  }
+
   .destinations-grid {
     grid-template-columns: 1fr;
   }

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 // ESLint's core unused-vars rule does not detect motion.* JSX member expressions.
 /* eslint-disable-next-line no-unused-vars */
 import { motion } from "framer-motion";
-import clubBg from "../assets/club-bg.jpg";
+import clubBg from "../assets/membership.png";
 import PlanCard, { GoldWaveWatermark } from "../components/PlanCard.jsx";
 import { getPlans } from "../lib/plansApi.js";
 import { mapPlanToCard } from "../lib/planCardData.js";
@@ -26,23 +26,27 @@ export default function MembershipBenefits() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
     let ctx;
     const initGsap = async () => {
       try {
         const { default: gsap } = await import("gsap");
         const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+        if (!isActive) return;
         gsap.registerPlugin(ScrollTrigger);
+        ScrollTrigger.config({ ignoreMobileResize: true });
 
         ctx = gsap.context(() => {
           // Parallax effect on hero background
           gsap.to(".mb-hero__bg", {
-            yPercent: 25,
+            yPercent: 18,
             ease: "none",
             scrollTrigger: {
-              trigger: ".mb-hero",
+              trigger: heroRef.current || ".mb-hero",
               start: "top top",
               end: "bottom top",
               scrub: true,
+              invalidateOnRefresh: true,
             },
           });
 
@@ -58,14 +62,17 @@ export default function MembershipBenefits() {
               delay: idx * 0.4,
             });
           });
-        });
+        }, heroRef);
       } catch (err) {
         console.warn("GSAP loading skipped:", err);
       }
     };
 
     initGsap();
-    return () => ctx && ctx.revert();
+    return () => {
+      isActive = false;
+      ctx?.revert();
+    };
   }, []);
 
   return (
@@ -121,98 +128,6 @@ export default function MembershipBenefits() {
         </div>
       </section>
 
-      {/* ══ FEATURE ROW 1 (Text Left, Lake Image Right) ═══════ */}
-      <section className="mb-feature-section">
-        <div className="mb-feature-container">
-          <motion.div
-            className="mb-feature-content"
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-70px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <p className="mb-feature-eyebrow">The Secret of Privileges</p>
-            <h2 className="mb-feature-heading">
-              A world of
-              <br />
-              privileges awaits.
-            </h2>
-            <p className="mb-feature-text">
-              From access to an extraordinary network to refined private dining and exclusive wellness, step into a club crafted for discerning families and leaders.
-            </p>
-            <Link to="/luxury-membership" className="mb-feature-btn">
-              Buy Membership
-            </Link>
-          </motion.div>
-
-          <motion.div
-            className="mb-feature-media"
-            initial={{ opacity: 0, x: 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-70px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="mb-feature-image-wrapper">
-              <img
-                src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=85"
-                alt="Breathtaking mountain lake view"
-                className="mb-feature-img"
-              />
-              <GoldWaveWatermark className="mb-feature-wave" />
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ══ FEATURE ROW 2 (Stacked Images Left, Text Right) ═══ */}
-      <section className="mb-feature-section mb-feature-section--alt">
-        <div className="mb-feature-container mb-feature-container--reverse">
-          <motion.div
-            className="mb-feature-media mb-stacked-media"
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-70px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="mb-stacked-image mb-stacked-image--back">
-              <img
-                src="https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1000&q=85"
-                alt="Scenic resort landscape back"
-                className="mb-feature-img"
-              />
-            </div>
-            <div className="mb-stacked-image mb-stacked-image--front">
-              <img
-                src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85"
-                alt="Scenic resort landscape front"
-                className="mb-feature-img"
-              />
-              <GoldWaveWatermark className="mb-feature-wave" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="mb-feature-content"
-            initial={{ opacity: 0, x: 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-70px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <p className="mb-feature-eyebrow">The Art of Living</p>
-            <h2 className="mb-feature-heading">
-              A world of
-              <br />
-              privileges awaits.
-            </h2>
-            <p className="mb-feature-text">
-              Discover curated spaces designed to elevate every moment with absolute privacy, bespoke services, and timeless hospitality.
-            </p>
-            <Link to="/luxury-membership" className="mb-feature-btn">
-              Buy Membership
-            </Link>
-          </motion.div>
-        </div>
-      </section>
 
       {/* ══ MEMBERSHIP PLANS ══════════════════════════════════ */}
       <section className="mb-plans-section" id="membership-plans">
@@ -246,17 +161,17 @@ export default function MembershipBenefits() {
           >
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--first">First 1,000 Members</span>
-              <p>Highest early-bird joining advantage — up to 2.50× multiplier in points.</p>
+               <p>Early Bird Offer</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--after">After 1,000 Members</span>
-              <p>Phase-two bonus points as initial member capacity fills.</p>
+               <p>Early Bird Offer</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--default">Default Points</span>
-              <p>Standard baseline points awarded for all subsequent members (1 Pt = ₹1).</p>
+              <p>Standard baseline points awarded for all subsequent members.</p>
             </div>
           </motion.div>
         </div>

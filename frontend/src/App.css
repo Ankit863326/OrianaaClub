@@ -1,9 +1,5 @@
 /* OrianaaClub Premium Homepage Styles */
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
 
 /* Custom animations */
 @keyframes fadeInUp {
