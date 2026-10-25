@@ -30,6 +30,11 @@ export const getMembershipCheckoutQuote = asyncHandler(async (request, response)
   response.json({ success: true, data, message: 'Membership payment details loaded.' });
 });
 
+export const getFamilyPriceBreakdown = asyncHandler(async (request, response) => {
+  const data = await memberService.getFamilyPriceBreakdown(request.validated.query.planId);
+  response.json({ success: true, data, message: 'Family prices loaded.' });
+});
+
 export const listFamily = asyncHandler(async (request, response) => {
   const data = await memberService.listFamilyMembers(request.user._id);
   response.json({ success: true, data, message: 'Family members loaded.' });

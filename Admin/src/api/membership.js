@@ -14,6 +14,19 @@ export const membershipApi = {
   updatePlan: (id, body) => data(api.patch(`/admin/membership-plans/${id}`, body)),
   members: (filters = {}) => data(api.get(`/admin/memberships${query(filters)}`)),
   member: (id) => data(api.get(`/admin/memberships/${id}/details`)),
+  familyTree: (memberNo) => data(api.get(`/admin/memberships/family-tree/${encodeURIComponent(memberNo)}`)),
+  approvalQueue: (filters = {}) => data(api.get(`/admin/membership-approval-queue${query(filters)}`)),
+  approveMembership: (id) => data(api.post(`/admin/memberships/${encodeURIComponent(id)}/approve`, {})),
+  familyVerificationQueue: () => data(api.get('/admin/family-verifications')),
+  familyVerification: (familyId) => data(api.get(`/admin/family-verifications/${encodeURIComponent(familyId)}`)),
+  familyVerificationDocument: (token) => api.get('/admin/family-verifications/documents', {
+    params: { token },
+    responseType: 'blob',
+  }),
+  decideFamilyVerification: (familyId, decision, reason = '') => data(api.patch(
+    `/admin/family-verifications/${encodeURIComponent(familyId)}/${decision}`,
+    { reason },
+  )),
   resendActivation: async (userId) => {
     const response = await api.post(`/admin/members/${encodeURIComponent(userId)}/resend-activation`, {});
     return { ...response.data.data, message: response.data.message };

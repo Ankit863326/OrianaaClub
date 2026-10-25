@@ -2,6 +2,7 @@
 import mongoose from 'mongoose';
 import { connectDatabase, safeErrorMessage } from '../src/config/db.js';
 import Plan from '../src/models/Plan.js';
+import { getSettings } from '../src/models/Setting.js';
 
 const planDefinitions = [
   {
@@ -105,17 +106,19 @@ function legacyPointsTiers(benefits) {
 
 async function seedPlans() {
   await connectDatabase();
+  const settings = await getSettings();
+  const gstPercent = settings.familyMembership.gstPct;
 
   for (const [index, definition] of planDefinitions.entries()) {
     const points = definition.benefits.map(({ points: value, label }) => ({ amount: value, label }));
     const price = definition.price;
-    const gst = Math.round(price * 18) / 100;
+    const gst = Math.round(price * gstPercent) / 100;
     const setFields = {
       ...definition,
       id: definition.slug,
       title: definition.name,
       numericPrice: price,
-      gstPercent: 18,
+      gstPercent,
       legacyCheckoutPayable: price + gst,
       cohorts: points,
       benefitsTitle: definition.name,
@@ -124,17 +127,16 @@ async function seedPlans() {
       termYears: 25,
       displayOrder: index + 1,
       sortOrder: index + 1,
-      maxFamilyMembers: 4,
       isActive: true,
       isFeatured: definition.slug === 'platinum-crest',
       displayPrice: `₹${price.toLocaleString('en-IN')}`,
-      familyRules: ['Up to 4 additional family profiles during application.'],
     };
 
     await Plan.updateOne(
       { slug: definition.slug },
       {
         $set: setFields,
+        $unset: { maxFamilyMembers: '', familyRules: '' },
         $setOnInsert: {
           planFee: price,
           gst,

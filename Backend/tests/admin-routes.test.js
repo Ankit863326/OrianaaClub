@@ -3,9 +3,11 @@ import { createAdmin, createMember, createPlan } from './helpers/factories.js';
 import { createApp } from './helpers/createApp.js';
 import AuditLog from '../src/models/AuditLog.js';
 import Membership from '../src/models/Membership.js';
+import FamilyMember from '../src/models/FamilyMember.js';
+import Verification from '../src/models/Verification.js';
 import Payment from '../src/models/Payment.js';
-import PointsTransaction from '../src/models/PointsTransaction.js';
 import User from '../src/models/User.js';
+import MembershipDraft from '../src/models/MembershipDraft.js';
 
 const app = createApp();
 
@@ -97,8 +99,144 @@ describe('admin member and plan routes', () => {
     const admin = await createAdmin();
     const settings = await adminRequest(admin, 'get', '/api/admin/membership-settings');
     expect(settings.status).toBe(200);
+    expect(settings.body.data).toHaveProperty('receiptHsnSac');
     expect(settings.body.data).not.toHaveProperty('cancellationPolicy');
+    const updated = await adminRequest(admin, 'patch', '/api/admin/membership-settings')
+      .send({ gstRate: 18.5 });
+    expect(updated.status).toBe(200);
+    expect(await AuditLog.findOne({ action: 'membership_settings.update', entityType: 'membership_settings' }))
+      .toMatchObject({
+        before: expect.objectContaining({ gstRate: 18 }),
+        after: expect.objectContaining({ gstRate: 18.5 }),
+      });
+    const familyMembership = settings.body.data.familyMembership;
+    const updatedConfig = await adminRequest(admin, 'patch', '/api/admin/membership-settings')
+      .send({ familyMembership: { ...familyMembership, gstPct: 19 } });
+    expect(updatedConfig.status).toBe(200);
+    expect(updatedConfig.body.data.familyMembership.gstPct).toBe(19);
+    const configAudit = await AuditLog.findOne({
+      action: 'membership_settings.update',
+      entityType: 'membership_settings',
+    }).sort({ createdAt: -1 }).lean();
+    expect(configAudit.before.familyMembership.gstPct).toBe(18);
+    expect(configAudit.after.familyMembership.gstPct).toBe(19);
     expect((await adminRequest(admin, 'get', '/api/admin/refund-rules')).status).toBe(404);
+  });
+
+  test('lists paid approvals and approves a membership through the transactional route', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan({ slug: 'approval-route-plan' });
+    const member = await createMember({
+      membership: {
+        plan: plan._id,
+        status: 'pending_approval',
+        tier: 'founder-legacy',
+        baseAmount: 1000,
+        gstAmount: 180,
+        totalPaid: 1180,
+        paymentConfirmedAt: new Date(),
+        approvalDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const queue = await adminRequest(admin, 'get', '/api/admin/membership-approval-queue');
+    expect(queue.status).toBe(200);
+    expect(queue.body.data.items.map((item) => item._id)).toContain(String(member.membership._id));
+    const approved = await adminRequest(admin, 'post', `/api/admin/memberships/${member.membership._id}/approve`);
+    expect(approved.status).toBe(200);
+    expect(approved.body.data.membership).toMatchObject({ status: 'active', approvalSeq: 1 });
+  });
+
+  test('loads the family tree by member number only for an administrator', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const member = await createMember({
+      profile: { fullName: 'Family Tree Primary' },
+      membership: {
+        plan: plan._id,
+        memberNo: '4242',
+        memberType: 'primary',
+        status: 'active',
+      },
+    });
+
+    const spouse = await FamilyMember.create({
+      membership: member.membership._id,
+      name: 'Family Tree Spouse',
+      relation: 'wife',
+      memberType: 'spouse',
+      status: 'active',
+      memberNo: '4242-S',
+    });
+    await Membership.create({
+      user: member.user._id,
+      plan: plan._id,
+      status: 'active',
+      memberType: 'spouse',
+      linkedTo: member.membership._id,
+      familyMember: spouse._id,
+      memberNo: '4242-S',
+    });
+    await FamilyMember.create({
+      membership: member.membership._id,
+      name: 'Family Tree GM',
+      relation: 'nominee',
+      memberType: 'nominee_gm',
+      isNominee: true,
+      nomineeRole: 'GM',
+      status: 'active',
+      approvedAt: new Date(),
+      memberNo: '4242-GM',
+      emailConfirmedAt: new Date(),
+    });
+
+    const response = await adminRequest(admin, 'get', '/api/admin/memberships/family-tree/4242');
+    expect(response.status).toBe(200);
+    expect(response.body.data.primary.name).toBe('Family Tree Primary');
+    expect(response.body.data.family).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Family Tree Spouse', relation: 'wife' }),
+    ]));
+    const members = await adminRequest(admin, 'get', '/api/admin/memberships?search=4242');
+    expect(members.status).toBe(200);
+    expect(members.body.data.items.map((item) => item.memberType)).toEqual(
+      expect.arrayContaining(['primary', 'spouse', 'nominee_gm']),
+    );
+    expect((await request(app).get('/api/admin/memberships/family-tree/4242')
+      .set('Cookie', member.cookie)).status).toBe(403);
+  });
+
+  test('serves family verification review details only to an administrator', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const primary = await createMember({ membership: { plan: plan._id, status: 'active' } });
+    const family = await FamilyMember.create({
+      membership: primary.membership._id,
+      name: 'Verification Applicant',
+      relation: 'wife',
+      memberType: 'spouse',
+      status: 'active',
+    });
+    await Verification.create({
+      memberId: family._id,
+      status: 'pending',
+      relation: 'wife',
+    });
+
+    const detail = await adminRequest(admin, 'get', `/api/admin/family-verifications/${family._id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.member.name).toBe('Verification Applicant');
+    expect((await request(app).get(`/api/admin/family-verifications/${family._id}`)
+      .set('Cookie', primary.cookie)).status).toBe(403);
+
+    const nominee = await FamilyMember.create({
+      membership: primary.membership._id,
+      name: 'Email-only nominee',
+      relation: 'nominee',
+      memberType: 'nominee',
+      isNominee: true,
+    });
+    const nomineeDetail = await adminRequest(admin, 'get', `/api/admin/family-verifications/${nominee._id}`);
+    expect(nomineeDetail.status).toBe(404);
   });
 
   test('invites an administrator and lists the pending admin without exposing a password', async () => {
@@ -128,9 +266,10 @@ describe('admin points, content, enquiry and reports routes', () => {
     expect((await adminRequest(admin, 'post', '/api/admin/points/debit').send({
       membershipId, amount: 2, category: 'adjustment', reason: 'Correction',
     })).status).toBe(200);
-    expect((await adminRequest(admin, 'post', '/api/admin/points/bulk-credit').send({
+    const bulkCredit = await adminRequest(admin, 'post', '/api/admin/points/bulk-credit').send({
       membershipIds: [membershipId], amount: 3, reason: 'Campaign',
-    })).status).toBe(200);
+    });
+    expect(bulkCredit.status).toBe(200);
     expect((await adminRequest(admin, 'get', `/api/admin/members/${member.user._id}/points`)).status).toBe(200);
     expect(await AuditLog.countDocuments({ entityType: 'membership' })).toBe(3);
   });
@@ -185,6 +324,80 @@ describe('admin points, content, enquiry and reports routes', () => {
   });
 });
 
+describe('admin draft member routes', () => {
+  test('supports help requests, contact edits, payment resolution, password setup and activation', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan({ title: 'Draft Resolution Plan' });
+    const member = await createMember({
+      email: 'draft-resolution@example.invalid',
+      status: 'pending',
+      passwordHash: undefined,
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    const payment = await Payment.create({
+      user: member.user._id,
+      membership: member.membership._id,
+      plan: plan._id,
+      method: 'bank_transfer',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+    });
+    const draft = await MembershipDraft.create({
+      email: member.user.email,
+      firstName: member.user.firstName,
+      tokenHash: 'c'.repeat(64),
+      expiresAt: new Date(Date.now() + 60_000),
+      status: 'payment_pending',
+      currentStep: 6,
+      user: member.user._id,
+      membership: member.membership._id,
+      plan: plan._id,
+      payment: payment._id,
+    });
+
+    const help = await request(app).post('/api/membership/request-help')
+      .send({ email: 'help-only@example.invalid' });
+    expect(help.status).toBe(202);
+    expect(await MembershipDraft.findOne({ email: 'help-only@example.invalid' }))
+      .toMatchObject({ needsHelp: true, currentStep: 6 });
+
+    const listed = await adminRequest(admin, 'get', '/api/admin/drafts?status=payment_pending&search=draft-resolution');
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.items[0]).toMatchObject({
+      _id: String(draft._id),
+      paymentStatus: 'pending',
+      currentStep: 6,
+    });
+    expect(await AuditLog.findOne({ action: 'draft_member.list' })).toMatchObject({
+      admin: admin.user._id,
+      entityId: 'draft_collection',
+    });
+
+    expect((await adminRequest(admin, 'patch', `/api/admin/drafts/${draft._id}`)
+      .send({ email: 'draft-updated@example.invalid', phone: '9000000099' })).status).toBe(200);
+    const paid = await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/mark-paid`)
+      .send({ transactionId: 'BANK-REF-123', note: 'Confirmed at bank' });
+    expect(paid.status).toBe(200);
+    expect(await Payment.findById(payment._id).lean()).toMatchObject({
+      status: 'paid',
+      reference: 'BANK-REF-123',
+    });
+
+    expect((await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/resend-link`)).status).toBe(200);
+    const password = await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/set-temp-password`);
+    expect(password.status).toBe(200);
+    expect(password.body.data.temporaryPassword).toMatch(/^TempA1[a-f\d]{24}$/);
+    expect((await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/activate`)).status).toBe(200);
+    expect((await User.findById(member.user._id)).status).toBe('active');
+    expect(await AuditLog.countDocuments({ entityType: 'membership_draft' })).toBeGreaterThanOrEqual(5);
+
+    expect((await adminRequest(admin, 'delete', `/api/admin/drafts/${draft._id}`)).status).toBe(200);
+    expect(await MembershipDraft.findById(draft._id)).toBeNull();
+  });
+});
+
 describe('admin payments routes', () => {
   test('approves and rejects bank transfers and rejects a duplicate UTR', async () => {
     await Payment.init();
@@ -210,7 +423,7 @@ describe('admin payments routes', () => {
     expect((await adminRequest(admin, 'get', `/api/admin/payments/${payment._id}`)).status).toBe(200);
   });
 
-  test('refunds a Razorpay payment with optional points reversal', async () => {
+  test('blocks membership payment refunds', async () => {
     const admin = await createAdmin();
     const plan = await createPlan();
     const member = await createMember({
@@ -223,22 +436,9 @@ describe('admin payments routes', () => {
     });
     const withoutReversal = await adminRequest(admin, 'post', `/api/admin/payments/${payment._id}/refund`)
       .send({ amount: 1000, reason: 'Partial refund' });
-    expect(withoutReversal.status).toBe(200);
-
-    await PointsTransaction.create({
-      user: member.user._id, membership: member.membership._id, type: 'credit',
-      amount: 5, category: 'membership_award', reason: 'Award', balanceAfter: 5,
-      idempotencyKey: 'refund-award',
-    });
-    const second = await Payment.create({
-      user: member.user._id, membership: member.membership._id, plan: plan._id,
-      method: 'razorpay', status: 'paid', baseAmount: 10000, gstAmount: 1800,
-      totalAmount: 11800, razorpayPaymentId: 'payment_refund_2', invoiceNumber: 'INV-TEST-2',
-    });
-    const withReversal = await adminRequest(admin, 'post', `/api/admin/payments/${second._id}/refund`)
-      .send({ amount: 11800, reason: 'Full refund', reversePoints: true });
-    expect(withReversal.status).toBe(200);
-    expect((await Membership.findById(member.membership._id)).pointsBalance).toBe(0);
-    expect(globalThis.__orianaRazorpayClient.payments.refund).toHaveBeenCalledTimes(2);
+    expect(withoutReversal.status).toBe(409);
+    expect(withoutReversal.body.message).toContain('non-refundable');
+    expect((await Payment.findById(payment._id)).status).toBe('paid');
+    expect(globalThis.__orianaRazorpayClient.payments.refund).not.toHaveBeenCalled();
   });
 });

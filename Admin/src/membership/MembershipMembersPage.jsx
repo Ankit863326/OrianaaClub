@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client.js';
 import {
   Button,
@@ -13,9 +13,24 @@ import {
 } from '../components/ui.jsx';
 import MembershipStatusChip from './MembershipStatusChip.jsx';
 import { membershipMembersApi } from './memberApi.js';
-import { formatMemberCode, formatMembershipDate, formatPts } from './formatters.js';
+import { formatMemberCode } from './formatters.js';
 
-const initialFilters = { search: '', tier: '', status: '', documentsPending: '' };
+const initialFilters = { search: '', tier: '', status: '', memberType: '', ratePhase: '', aadhaarPending: '' };
+
+function relationshipLabel(member) {
+  const formatted = member.primaryMemberNo ? formatMemberCode(member.primaryMemberNo) : '';
+  const primary = formatted ? (formatted.startsWith('OC-') ? formatted : `OC-${formatted}`) : 'primary member';
+  switch (member.memberType) {
+    case 'spouse': return `Spouse of ${primary}`;
+    case 'child': return `Child of ${primary}`;
+    case 'father': return `Father of ${primary}`;
+    case 'mother': return `Mother of ${primary}`;
+    case 'nominee_gm': return `GM nominee of ${primary}`;
+    case 'nominee_hr': return `HR nominee of ${primary}`;
+    case 'nominee': return `Nominee of ${primary}`;
+    default: return 'Primary';
+  }
+}
 
 export default function MembershipMembersPage() {
   const navigate = useNavigate();
@@ -54,7 +69,7 @@ export default function MembershipMembersPage() {
     <PageHeading eyebrow="MEMBERSHIP" title="Members" description="Search and manage membership records." />
     {error && <Toast kind="error" onDismiss={() => setError('')}>{error}</Toast>}
     <Panel className="mb-5">
-      <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5" onSubmit={(event) => {
+      <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6" onSubmit={(event) => {
         event.preventDefault();
         load(1);
       }}>
@@ -72,21 +87,36 @@ export default function MembershipMembersPage() {
             {(data?.tiers || []).map((tier) => <option key={tier._id} value={tier._id}>{tier.name || tier.title}</option>)}
           </select>
         </FormField>
+        <FormField label="Member type">
+          <select className={controlClass} value={filters.memberType} onChange={(event) => setFilters({ ...filters, memberType: event.target.value })}>
+            <option value="">All member types</option>
+            {['primary', 'spouse', 'child', 'father', 'mother', 'nominee_gm', 'nominee_hr', 'nominee'].map((type) => (
+              <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>
+            ))}
+          </select>
+        </FormField>
         <FormField label="Status">
           <select className={controlClass} value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
             <option value="">All statuses</option>
-            {['pending_payment', 'pending_verification', 'active', 'expired', 'cancelled'].map((status) => (
+            {['draft', 'profile_only', 'payment_pending', 'pending_payment', 'pending_verification', 'pending_approval', 'active', 'expired', 'cancelled'].map((status) => (
               <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>
             ))}
           </select>
         </FormField>
-        <FormField label="Documents">
-          <select className={controlClass} value={filters.documentsPending} onChange={(event) => setFilters({ ...filters, documentsPending: event.target.value })}>
-            <option value="">All documents</option>
-            <option value="true">Documents pending</option>
+        <FormField label="Points rate">
+          <select className={controlClass} value={filters.ratePhase} onChange={(event) => setFilters({ ...filters, ratePhase: event.target.value })}>
+            <option value="">All rates</option>
+            <option value="early_bird">Early bird</option>
+            <option value="default">Default</option>
           </select>
         </FormField>
-        <div className="flex gap-2 sm:col-span-2 lg:col-span-5">
+        <FormField label="Aadhaar">
+          <select className={controlClass} value={filters.aadhaarPending} onChange={(event) => setFilters({ ...filters, aadhaarPending: event.target.value })}>
+            <option value="">All Aadhaar statuses</option>
+            <option value="true">Pending verification</option>
+          </select>
+        </FormField>
+        <div className="flex gap-2 sm:col-span-2 lg:col-span-6">
           <Button type="submit" disabled={loading}>Search</Button>
           <Button type="button" variant="secondary" disabled={loading} onClick={() => {
             setFilters(initialFilters);
@@ -100,14 +130,15 @@ export default function MembershipMembersPage() {
     {data && <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft">
       <table className="w-full min-w-[900px] border-collapse text-left text-sm">
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>{['Member code', 'Name', 'Tier', 'Status', 'Points balance', 'Points expiry', 'Membership expiry'].map((label) => (
+          <tr>{['Member code', 'Name', 'Relationship', 'Tier', 'Status', 'Approval sequence', 'Points rate', 'Aadhaar status', 'Family tree'].map((label) => (
             <th key={label} className="px-4 py-3 font-semibold">{label}</th>
           ))}</tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {data.items.map((member) => {
             const name = member.profile?.fullName || member.user?.firstName || '—';
-            const code = member.memberCode ? formatMemberCode(member.memberCode) : '—';
+            const displayCode = member.memberNo || member.memberCode;
+            const code = displayCode ? formatMemberCode(displayCode) : '—';
             return <tr
               key={member._id}
               className="cursor-pointer hover:bg-slate-50/70 focus-within:bg-slate-50/70"
@@ -122,14 +153,26 @@ export default function MembershipMembersPage() {
             >
               <td className="px-4 py-3.5 text-slate-700">{code}</td>
               <td className="px-4 py-3.5 text-slate-700">{name}</td>
+              <td className="px-4 py-3.5"><span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">{relationshipLabel(member)}</span></td>
               <td className="px-4 py-3.5 text-slate-700">{member.plan?.name || member.plan?.title || '—'}</td>
               <td className="px-4 py-3.5"><MembershipStatusChip status={member.status} /></td>
-              <td className="px-4 py-3.5 text-slate-700">{formatPts(member.pointsBalance)}</td>
-              <td className="px-4 py-3.5 text-slate-700">{formatMembershipDate(member.pointsExpireAt)}</td>
-              <td className="px-4 py-3.5 text-slate-700">{formatMembershipDate(member.membershipExpireAt)}</td>
+              <td className="px-4 py-3.5 text-slate-700">{member.approvalSeq ?? '—'}</td>
+              <td className="px-4 py-3.5 text-slate-700">{String(member.memberType || '').startsWith('nominee')
+                ? 'No points'
+                : `${Number(member.pointsMultiplier || 0).toLocaleString('en-IN')}x ${member.ratePhase === 'early_bird' ? 'early bird' : 'default'}`}</td>
+              <td className="px-4 py-3.5 capitalize text-slate-700">{String(member.aadhaarStatus || 'not_added').replaceAll('_', ' ')}</td>
+              <td className="px-4 py-3.5">
+                {member.memberNo
+                  ? <Link
+                    className="font-semibold text-forest underline"
+                    to={`/membership/family-tree/${encodeURIComponent(member.memberNo)}`}
+                    onClick={(event) => event.stopPropagation()}
+                  >Open</Link>
+                  : '—'}
+              </td>
             </tr>;
           })}
-          {!data.items.length && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="7">No memberships found.</td></tr>}
+          {!data.items.length && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="9">No memberships found.</td></tr>}
         </tbody>
       </table>
     </div>}

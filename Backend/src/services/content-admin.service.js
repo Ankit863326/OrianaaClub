@@ -5,6 +5,7 @@ import EmailLog from '../models/EmailLog.js';
 import Enquiry from '../models/Enquiry.js';
 import Event from '../models/Event.js';
 import Membership from '../models/Membership.js';
+import FamilyMember from '../models/FamilyMember.js';
 import mongoose from 'mongoose';
 import Payment from '../models/Payment.js';
 import PointsTransaction from '../models/PointsTransaction.js';
@@ -252,6 +253,7 @@ export async function setAdminStatus(id, status, actorId) {
 export async function listAuditLogs(query) {
   const { page, limit, skip } = pageArgs(query);
   const filter = { ...dateFilter(query.from, query.to) };
+  const filterClauses = [];
   if (query.admin) filter.admin = query.admin;
   if (query.actor) {
     const escapedActor = query.actor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -268,15 +270,68 @@ export async function listAuditLogs(query) {
     if (/^[a-f\d]{24}$/i.test(query.actor)) {
       actorMatches.push({ actorId: query.actor });
     }
-    filter.$or = actorMatches;
+    filterClauses.push({ $or: actorMatches });
   }
-  if (query.action) filter.action = query.action;
+  if (query.action) filter.action = new RegExp(query.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   if (query.entityType) filter.entityType = query.entityType;
+  if (query.memberNo) {
+    const normalizedMemberNo = query.memberNo.trim().replace(/^OC-/i, '').replace(/\s/g, '');
+    const membership = await Membership.findOne({ memberNo: normalizedMemberNo }).select('_id linkedTo familyMember memberNo memberType').lean();
+    const familyMember = await FamilyMember.findOne({ memberNo: normalizedMemberNo }).select('_id membership memberNo').lean();
+    const primaryId = membership?.memberType === 'primary'
+      ? membership._id
+      : membership?.linkedTo || familyMember?.membership;
+    const linkedMemberships = primaryId
+      ? await Membership.find({
+        $or: [{ _id: primaryId }, { linkedTo: primaryId }],
+      }).select('_id familyMember memberNo').lean()
+      : membership ? [membership] : [];
+    const familyIds = linkedMemberships.map((item) => item.familyMember).filter(Boolean);
+    const familyProfiles = primaryId
+      ? await FamilyMember.find({ membership: primaryId }).select('_id memberNo').lean()
+      : familyMember ? [familyMember] : [];
+    const memberNos = new Set([
+      query.memberNo,
+      ...linkedMemberships.map((item) => item.memberNo).filter(Boolean),
+      ...familyProfiles.map((item) => item.memberNo).filter(Boolean),
+    ]);
+    const entityIds = new Set([
+      ...linkedMemberships.map((item) => String(item._id)),
+      ...familyIds.map(String),
+      ...familyProfiles.map((item) => String(item._id)),
+    ]);
+    filterClauses.push({ $or: [
+      { memberNo: { $in: [...memberNos] } },
+      { entityId: { $in: [...entityIds] } },
+    ] });
+  }
+  if (filterClauses.length) filter.$and = [...(filter.$and || []), ...filterClauses];
   const [items, total] = await Promise.all([
     AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('admin', 'firstName email').lean(),
     AuditLog.countDocuments(filter),
   ]);
-  return pageResult(items, total, page, limit);
+  const membershipIds = [...new Set(items.filter((item) => item.entityType === 'membership').map((item) => item.entityId))];
+  const familyIds = [...new Set(items
+    .filter((item) => ['family_member', 'family_verification'].includes(item.entityType))
+    .map((item) => item.entityId))];
+  const [memberships, familyMembers] = await Promise.all([
+    membershipIds.length ? Membership.find({ _id: { $in: membershipIds } }).select('_id memberNo').lean() : [],
+    familyIds.length ? FamilyMember.find({ _id: { $in: familyIds } }).select('_id memberNo membership').lean() : [],
+  ]);
+  const directCodes = new Map(memberships.map((item) => [String(item._id), item.memberNo || '']));
+  const familyCodes = new Map(familyMembers.map((item) => [String(item._id), item]));
+  const ownerIds = [...new Set(familyMembers.map((item) => String(item.membership)))];
+  const owners = ownerIds.length ? await Membership.find({ _id: { $in: ownerIds } }).select('_id memberNo').lean() : [];
+  const ownerCodes = new Map(owners.map((item) => [String(item._id), item.memberNo || '']));
+  const enriched = items.map((item) => ({
+    ...item,
+    memberNo: item.memberNo
+      || directCodes.get(String(item.entityId))
+      || familyCodes.get(String(item.entityId))?.memberNo
+      || ownerCodes.get(String(familyCodes.get(String(item.entityId))?.membership))
+      || '',
+  }));
+  return pageResult(enriched, total, page, limit);
 }
 
 export async function listEmailLogs(query) {

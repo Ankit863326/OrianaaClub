@@ -162,7 +162,9 @@ export async function awardMembershipPoints(membershipId) {
 export async function getMemberPoints(userId, options = {}) {
   const membership = await Membership.findOne({
     user: userId,
-    status: { $in: ['draft', 'pending_payment', 'active', 'expired'] },
+    memberType: 'primary',
+    linkedTo: null,
+    status: { $in: ['draft', 'profile_only', 'pending_payment', 'payment_pending', 'pending_verification', 'pending_approval', 'active', 'expired'] },
   }).sort({ createdAt: -1 }).populate('plan').lean();
   if (!membership) {
     return {
@@ -173,8 +175,13 @@ export async function getMemberPoints(userId, options = {}) {
   }
   if (membership.status !== 'active') {
     return {
-      balance: membership.pointsBalance || 0,
-      membership,
+      balance: null,
+      membership: {
+        id: String(membership._id),
+        status: membership.status,
+        tier: membership.plan?.name || membership.plan?.title || '',
+        memberNo: membership.memberNo || '',
+      },
       history: { items: [], page: 1, limit: 20, total: 0, pages: 0 },
     };
   }
@@ -182,7 +189,19 @@ export async function getMemberPoints(userId, options = {}) {
     getBalance(membership._id),
     getHistory(membership._id, options),
   ]);
-  return { balance, membership, history };
+  return {
+    balance,
+    membership: {
+      id: String(membership._id),
+      status: membership.status,
+      tier: membership.plan?.name || membership.plan?.title || '',
+      memberNo: membership.memberNo || '',
+    },
+    history: {
+      ...history,
+      items: history.items.map(({ expiresAt, pointsExpireAt, earlyBird, earlyBirdApplied, approvalSeq, multiplier, phase, ...item }) => item),
+    },
+  };
 }
 
 export async function getActiveMemberPoints(userId, options = {}) {

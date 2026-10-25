@@ -16,6 +16,13 @@ const data = (request) => request.then((response) => response.data.data);
 export const adminApi = {
   dashboard: () => data(api.get('/admin/dashboard')),
   members: (filters = {}) => data(api.get(`/admin/members${query(filters)}`)),
+  drafts: (filters = {}) => data(api.get(`/admin/drafts${query(filters)}`)),
+  resendDraftLink: (id) => data(api.post(`/admin/drafts/${encodeURIComponent(id)}/resend-link`, {})),
+  markDraftPaid: (id, body) => data(api.post(`/admin/drafts/${encodeURIComponent(id)}/mark-paid`, body)),
+  setDraftTemporaryPassword: (id) => data(api.post(`/admin/drafts/${encodeURIComponent(id)}/set-temp-password`, {})),
+  updateDraft: (id, body) => data(api.patch(`/admin/drafts/${encodeURIComponent(id)}`, body)),
+  activateDraftMember: (id) => data(api.post(`/admin/drafts/${encodeURIComponent(id)}/activate`, {})),
+  deleteDraft: (id) => data(api.delete(`/admin/drafts/${encodeURIComponent(id)}`)),
   member: (id) => data(api.get(`/admin/members/${encodeURIComponent(id)}`)),
   createMember: (body) => data(api.post('/admin/members', body)),
   updateMember: (id, body) => data(api.patch(`/admin/members/${encodeURIComponent(id)}`, body)),

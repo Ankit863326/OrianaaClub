@@ -80,6 +80,7 @@ export const auditQuerySchema = pagination.extend({
   admin: objectId.optional(),
   actor: z.string().trim().max(100).optional(),
   action: z.string().trim().max(80).optional(),
+  memberNo: z.string().trim().max(40).optional(),
   entityType: z.string().trim().max(80).optional(),
   from: optionalDate,
   to: optionalDate,

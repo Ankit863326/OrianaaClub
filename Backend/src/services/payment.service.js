@@ -15,13 +15,14 @@ import { getSettings } from '../models/Setting.js';
 import { generateMemberCode, getMembershipMemberCode } from '../utils/memberCode.js';
 import User from '../models/User.js';
 import Plan from '../models/Plan.js';
-import { awardMembershipPoints } from './points.service.js';
 import { sendMail } from './mail.service.js';
 import { getPayableAmount, paiseToRupees, rupeesToPaise } from '../utils/money.js';
 import ApiError from '../utils/ApiError.js';
 import { razorpayClient } from '../config/razorpay.js';
-import { debitActiveMembership } from './points.service.js';
 import { env } from '../config/env.js';
+import { requireCurrentTermsConsent } from './terms.service.js';
+import Verification from '../models/Verification.js';
+import { calculateMemberPrice } from './pricing.service.js';
 
 const activeMembershipBlockedMessage = 'You already have an active membership. Renewal or upgrade opens when your points are fully used or expired.';
 const renewableMembershipMessage = 'Your points are fully used (or expired). You can renew or upgrade your plan.';
@@ -60,10 +61,18 @@ function paymentSignature(orderId, paymentId) {
 }
 
 async function verifyMembershipPaymentAmount(payment, transactionAmount = payment.totalAmount) {
-  if (payment.planModel !== 'MembershipPlan') {
-    throw new ApiError(409, 'This order is not a membership-plan payment.');
+  const PlanModel = payment.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
+  const planExists = await PlanModel.exists({ _id: payment.plan });
+  if (payment.familyMember) {
+    if (
+      !planExists
+      || rupeesToPaise(payment.amount) !== payment.baseAmount
+      || payment.baseAmount + payment.gstAmount !== payment.totalAmount
+    ) {
+      throw new ApiError(400, 'The family payment does not match its saved GST invoice.');
+    }
+    return;
   }
-  const planExists = await MembershipPlan.exists({ _id: payment.plan });
   let expected;
   try {
     expected = getPayableAmount({ price: payment.amount }, {
@@ -97,6 +106,7 @@ function webhookSignatureMatches(rawBody, supplied) {
 }
 
 export async function createRazorpayOrder(userId, membershipId, method) {
+  await requireCurrentTermsConsent(userId);
   requirePaymentConfiguration();
   const membership = await Membership.findOne({
     _id: membershipId,
@@ -132,7 +142,11 @@ export async function createRazorpayOrder(userId, membershipId, method) {
   return { orderId: order.id, keyId: env.razorpayKeyId };
 }
 
-export async function verifyRazorpayPayment(userId, { razorpay_order_id, razorpay_payment_id, razorpay_signature }) {
+export async function verifyRazorpayPayment(
+  userId,
+  { razorpay_order_id, razorpay_payment_id, razorpay_signature },
+  { familyMemberId } = {},
+) {
   requirePaymentConfiguration();
   const payment = await Payment.findOne({
     razorpayOrderId: razorpay_order_id,
@@ -140,6 +154,12 @@ export async function verifyRazorpayPayment(userId, { razorpay_order_id, razorpa
     method: { $in: ['upi', 'card', 'razorpay'] },
   });
   if (!payment) throw new ApiError(404, 'Payment order was not found.');
+  if (familyMemberId && String(payment.familyMember || '') !== String(familyMemberId)) {
+    throw new ApiError(404, 'Family payment order was not found.');
+  }
+  if (!familyMemberId && payment.familyMember) {
+    throw new ApiError(409, 'This family payment must be confirmed from its family checkout.');
+  }
 
   if (!signaturesMatch(paymentSignature(razorpay_order_id, razorpay_payment_id), razorpay_signature)) {
     throw new ApiError(400, 'The payment verification failed. Please try again.');
@@ -166,6 +186,7 @@ export async function verifyRazorpayPayment(userId, { razorpay_order_id, razorpa
   const result = await finalizePayment(payment._id, {
     razorpayPaymentId: razorpay_payment_id,
     razorpaySignature: razorpay_signature,
+    markPaid: true,
   });
   return { status: result.status, membershipId: String(result.membership) };
 }
@@ -238,10 +259,16 @@ async function incrementCounter(name, session) {
   return counter.value;
 }
 
+function paiseToWholeRupees(paise) {
+  if (!Number.isSafeInteger(paise) || paise < 0) {
+    throw new ApiError(409, 'The saved payment amount is invalid.');
+  }
+  return Number((BigInt(paise) + 50n) / 100n);
+}
+
 export async function finalizePayment(paymentId, options = {}) {
   const session = await mongoose.startSession();
   let result;
-  let shouldAward = false;
   try {
     await session.withTransaction(async () => {
       const payment = await Payment.findById(paymentId).session(session);
@@ -249,123 +276,145 @@ export async function finalizePayment(paymentId, options = {}) {
       const membership = await Membership.findOne({
         _id: payment.membership,
         user: payment.user,
-        status: { $in: ['draft', 'pending_payment', 'pending_verification', 'active'] },
+        status: { $in: ['draft', 'pending_payment', 'payment_pending', 'pending_verification', 'pending_approval', 'active'] },
       }).session(session);
       if (!membership) throw new ApiError(409, 'The payment does not match an eligible membership.');
+      if (String(membership.familyMember || '') !== String(payment.familyMember || '')) {
+        throw new ApiError(409, 'The payment family profile does not match its membership.');
+      }
 
-      const adminOfflinePlanPayment = payment.planModel === 'Plan'
-        && ['bank_transfer', 'cheque', 'rtgs'].includes(payment.method);
       if (payment.status === 'refunded' || payment.status === 'partially_refunded') {
-        result = payment;
-        return;
+        throw new ApiError(409, 'Refunded payments cannot confirm a membership.');
       }
-      if (payment.status === 'paid') {
-        if (adminOfflinePlanPayment && membership.status === 'pending_verification') {
-          const identity = await IdentityVerification.findOne({
-            user: payment.user,
-            status: 'verified',
-          }).select('_id').session(session).lean();
-          if (identity) {
-            const sequence = await getNextMemberNumber(session);
-            const now = new Date();
-            const endDate = membership.endDate || new Date(now);
-            if (!membership.endDate) endDate.setUTCFullYear(endDate.getUTCFullYear() + 25);
-            membership.status = 'active';
-            membership.memberNumber = String(sequence);
-            membership.memberCode = generateMemberCode(sequence);
-            membership.startDate ||= now;
-            membership.endDate ||= endDate;
-            await membership.save({ session });
-            shouldAward = true;
-          }
-        }
-        result = payment;
-        return;
+      if (!['created', 'pending', 'pending_verification', 'confirmed', 'paid'].includes(payment.status)) {
+        throw new ApiError(409, 'This payment is no longer available for confirmation.');
       }
-
-      const identity = adminOfflinePlanPayment
-        ? await IdentityVerification.findOne({
-          user: payment.user,
-          status: 'verified',
-        }).select('_id').session(session).lean()
-        : true;
-      const holdForIdentityVerification = adminOfflinePlanPayment && !identity;
-      let nextMemberNumber = membership.memberNumber;
-      let nextMemberCode = getMembershipMemberCode(membership);
+      if (
+        payment.status !== 'confirmed'
+        && payment.status !== 'paid'
+        && payment.method === 'razorpay'
+        && !options.razorpayPaymentId
+      ) {
+        throw new ApiError(409, 'A verified Razorpay payment is required before confirmation.');
+      }
       let invoiceNumber = payment.invoiceNumber;
-      if (membership.status !== 'active' && !holdForIdentityVerification) {
-        const sequence = await getNextMemberNumber(session);
-        nextMemberNumber = String(sequence);
-        nextMemberCode = generateMemberCode(sequence);
-      }
       if (!invoiceNumber) {
         const year = new Date().getUTCFullYear();
         const invoiceSequence = await incrementCounter(`invoice-${year}`, session);
         invoiceNumber = `INV-${year}-${String(invoiceSequence).padStart(6, '0')}`;
       }
-
       const now = new Date();
-      const endDate = membership.endDate || new Date(now);
-      if (!membership.endDate) endDate.setUTCFullYear(endDate.getUTCFullYear() + 25);
-      if (!nextMemberCode && nextMemberNumber) {
-        nextMemberCode = generateMemberCode(nextMemberNumber);
+      if (!['pending_approval', 'active'].includes(membership.status)) {
+        const settings = await getSettings({ forceRefresh: true });
+        let familyMember = null;
+        if (membership.familyMember) {
+          familyMember = await FamilyMember.findOne({
+            _id: membership.familyMember,
+            membership: membership.linkedTo,
+            status: 'payment_pending',
+            isNominee: false,
+          }).session(session);
+          const primary = await Membership.findOne({
+            _id: membership.linkedTo,
+            user: membership.user,
+            memberType: 'primary',
+            status: 'active',
+          }).session(session);
+          const VerificationModel = await Verification.findOne({
+            memberId: membership.familyMember,
+            status: 'verified',
+          }).session(session);
+          if (!familyMember || !primary || !VerificationModel) {
+            throw new ApiError(409, 'The verified family profile or active primary membership is no longer eligible.');
+          }
+          const PlanModel = membership.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
+          const plan = await PlanModel.findById(membership.plan).session(session).lean();
+          if (!plan) throw new ApiError(409, 'The family membership plan could not be found.');
+          const quote = await calculateMemberPrice({
+            plan,
+            member: familyMember,
+            memberType: membership.memberType,
+            parentSide: membership.parentSide,
+            dob: membership.dob,
+            purchaseDate: now,
+            linkedPrimary: primary,
+            session,
+            settings,
+          });
+          if (
+            rupeesToPaise(quote.baseAmount) !== payment.baseAmount
+            || rupeesToPaise(quote.gstAmount) !== payment.gstAmount
+            || rupeesToPaise(quote.totalPayable) !== payment.totalAmount
+          ) {
+            throw new ApiError(409, 'The family membership price or eligibility changed before payment confirmation.');
+          }
+        }
+        membership.baseAmount = paiseToWholeRupees(payment.baseAmount);
+        membership.gstAmount = paiseToWholeRupees(payment.gstAmount);
+        membership.totalPaid = paiseToWholeRupees(payment.totalAmount);
+        membership.paymentConfirmedAt = now;
+        const requiresIdentityVerification = options.requireIdentityVerification === true
+          && !membership.familyMember;
+        membership.approvalDueAt = requiresIdentityVerification
+          ? null
+          : new Date(now.getTime() + settings.familyMembership.reviewTargets.approvalHours * 60 * 60 * 1000);
+        membership.status = requiresIdentityVerification ? 'pending_verification' : 'pending_approval';
+        await membership.save({ session });
+        if (familyMember) {
+          familyMember.status = 'pending_approval';
+          familyMember.baseAmount = membership.baseAmount;
+          familyMember.gstAmount = membership.gstAmount;
+          familyMember.totalPaid = membership.totalPaid;
+          familyMember.paymentConfirmedAt = now;
+          familyMember.approvalDueAt = membership.approvalDueAt;
+          familyMember.approvalOverdueAt = null;
+          familyMember.approvalOverdueNotifiedAt = null;
+          await familyMember.save({ session });
+          await AuditLog.create([{
+            actorType: 'member',
+            actorId: payment.user,
+            action: 'family.membership.payment.confirm',
+            entityType: 'family_member',
+            entityId: String(familyMember._id),
+            summary: 'Family membership payment confirmed and sent for admin approval.',
+            before: { status: 'payment_pending' },
+            after: {
+              status: 'pending_approval',
+              baseAmount: familyMember.baseAmount,
+              gstAmount: familyMember.gstAmount,
+              totalPaid: familyMember.totalPaid,
+              approvalDueAt: familyMember.approvalDueAt,
+            },
+          }], { session });
+        }
       }
-      membership.status = holdForIdentityVerification ? 'pending_verification' : 'active';
-      if (!holdForIdentityVerification) {
-        membership.memberNumber = nextMemberNumber;
-        membership.memberCode = nextMemberCode;
-        membership.startDate ||= now;
-        membership.endDate ||= endDate;
-      }
-      await membership.save({ session });
-
-      payment.status = 'paid';
+      payment.status = payment.status === 'paid'
+        || options.adminId
+        || (options.markPaid === true && env.nodeEnv !== 'production')
+        ? 'paid'
+        : 'confirmed';
       payment.invoiceNumber = invoiceNumber;
+      const settings = await getSettings({ forceRefresh: true });
+      payment.invoiceGstin ||= settings.receiptGstin || settings.gstin || '';
+      payment.invoiceHsnSac ||= settings.receiptHsnSac || '';
       payment.verifiedAt = payment.verifiedAt || now;
+      payment.confirmedAt ||= now;
+      if (!payment.receiptNumber) {
+        const year = payment.confirmedAt.getUTCFullYear();
+        const sequence = await incrementCounter(`receipt-${year}`, session);
+        payment.receiptNumber = `OC-R-${year}-${String(sequence).padStart(6, '0')}`;
+      }
       if (options.adminId) payment.verifiedBy = options.adminId;
       if (options.razorpayPaymentId) payment.razorpayPaymentId = options.razorpayPaymentId;
       if (options.razorpaySignature) payment.razorpaySignature = options.razorpaySignature;
+      if (options.eventId) payment.razorpayEventIds.addToSet(options.eventId);
       await payment.save({ session });
       result = payment;
-      shouldAward = !holdForIdentityVerification;
     });
   } finally {
     await session.endSession();
   }
 
-  if (result?.status === 'paid') {
-    const membership = await Membership.findById(result.membership).select('status').lean();
-    if (membership?.status === 'active') await awardMembershipPoints(result.membership);
-  } else if (result?.status === 'refunded' || result?.status === 'partially_refunded') {
-    await awardMembershipPoints(result.membership);
-  }
-  if (shouldAward) {
-    try {
-      const [user, plan] = await Promise.all([
-        User.findById(result.user).select('firstName email'),
-        Plan.findById(result.plan).select('title'),
-      ]);
-      if (user) {
-        await sendMail({
-          to: user.email,
-          subject: 'Your Orianaa Club membership is active',
-          template: 'payment-success',
-          data: {
-            firstName: user.firstName,
-            planName: plan?.title || 'Orianaa Club',
-            memberId: getMembershipMemberCode(await Membership.findById(result.membership)
-              .select('memberCode memberNumber').lean()),
-            invoiceNumber: result.invoiceNumber,
-            baseAmount: paiseToRupees(result.baseAmount).toLocaleString('en-IN'),
-            gstAmount: paiseToRupees(result.gstAmount).toLocaleString('en-IN'),
-            totalAmount: paiseToRupees(result.totalAmount).toLocaleString('en-IN'),
-          },
-        });
-      }
-    } catch {
-      console.error('[payment] Membership activation email could not be sent.');
-    }
-  }
   return result;
 }
 
@@ -407,70 +456,9 @@ export async function rejectBankTransfer(paymentId, adminId, reason) {
   return payment;
 }
 
-export async function refundPayment(paymentId, adminId, { amount, reason, reversePoints }) {
-  const payment = await Payment.findById(paymentId);
-  if (!payment || !['paid', 'partially_refunded'].includes(payment.status)) {
-    throw new ApiError(409, 'Only paid payments can be refunded.');
-  }
-  if (payment.planModel === 'MembershipPlan') {
-    throw new ApiError(409, 'Membership fees are not refundable.');
-  }
-  if (payment.method !== 'razorpay' || !payment.razorpayPaymentId || !razorpayClient) {
-    throw new ApiError(409, 'This payment cannot be refunded through Razorpay.');
-  }
-  if (!Number.isSafeInteger(amount) || amount < 1) {
-    throw new ApiError(400, 'Refund amount must be a positive integer in paise.');
-  }
-  const alreadyRefunded = payment.refunds.reduce((sum, refund) => sum + refund.amount, 0);
-  if (alreadyRefunded + amount > payment.totalAmount) {
-    throw new ApiError(409, 'Refund amount exceeds the remaining paid balance.');
-  }
-
-  if (reversePoints) {
-    const awards = await (await import('../models/PointsTransaction.js')).default.aggregate([
-      { $match: { membership: payment.membership, category: 'membership_award', type: 'credit' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-    const awardPoints = awards[0]?.total || 0;
-    if (awardPoints > 0) {
-      const MembershipModel = (await import('../models/Membership.js')).default;
-      const membership = await MembershipModel.findById(payment.membership).select('pointsBalance');
-      if (!membership || membership.pointsBalance < awardPoints) {
-        throw new ApiError(409, 'The member does not have enough points to reverse the membership award.');
-      }
-    }
-  }
-
-  const refund = await razorpayClient.payments.refund(payment.razorpayPaymentId, {
-    amount,
-    notes: { reason: reason.slice(0, 255), invoice: payment.invoiceNumber },
-  });
-  payment.refunds.push({
-    amount,
-    razorpayRefundId: refund.id,
-    reason,
-    createdBy: adminId,
-  });
-  payment.status = alreadyRefunded + amount === payment.totalAmount ? 'refunded' : 'partially_refunded';
-  await payment.save();
-  if (reversePoints) {
-    const awards = await (await import('../models/PointsTransaction.js')).default.aggregate([
-      { $match: { membership: payment.membership, category: 'membership_award', type: 'credit' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-    const awardPoints = awards[0]?.total || 0;
-    if (awardPoints > 0) {
-      await debitActiveMembership({
-        membershipId: payment.membership,
-        amount: awardPoints,
-        category: 'refund',
-        reason: `Reverse membership points after refund: ${reason}`,
-        createdBy: adminId,
-        reference: payment.invoiceNumber,
-      });
-    }
-  }
-  return payment;
+export async function refundPayment(paymentId) {
+  if (!await Payment.exists({ _id: paymentId })) throw new ApiError(404, 'Payment was not found.');
+  throw new ApiError(409, 'Membership payments are non-refundable.');
 }
 
 function addUtcYears(date, years) {
@@ -541,7 +529,8 @@ async function createMembershipPayment(userId, membership, plan, method, rtgsDet
   };
 }
 
-export async function createMembershipRazorpayOrder(userId, paymentId) {
+export async function createMembershipRazorpayOrder(userId, paymentId, { familyMemberId } = {}) {
+  await requireCurrentTermsConsent(userId);
   requirePaymentConfiguration();
   const payment = await Payment.findOne({
     _id: paymentId,
@@ -549,8 +538,14 @@ export async function createMembershipRazorpayOrder(userId, paymentId) {
     method: 'razorpay',
     status: { $in: ['pending', 'created'] },
   });
-  if (!payment || payment.planModel !== 'MembershipPlan') {
+  if (!payment) {
     throw new ApiError(404, 'Pending membership payment was not found.');
+  }
+  if (familyMemberId && String(payment.familyMember || '') !== String(familyMemberId)) {
+    throw new ApiError(404, 'Family payment order was not found.');
+  }
+  if (!familyMemberId && payment.familyMember) {
+    throw new ApiError(409, 'This family payment must be opened from its family checkout.');
   }
   await verifyMembershipPaymentAmount(payment);
   if (payment.razorpayOrderId) {
@@ -566,10 +561,11 @@ export async function createMembershipRazorpayOrder(userId, paymentId) {
   const membership = await Membership.findOne({
     _id: payment.membership,
     user: userId,
-    status: 'pending_payment',
+    status: { $in: ['pending_payment', 'payment_pending'] },
   });
   if (!membership) throw new ApiError(409, 'The membership is not awaiting payment.');
-  const plan = await MembershipPlan.findById(payment.plan);
+  const PlanModel = payment.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
+  const plan = await PlanModel.findById(payment.plan);
   if (!plan) throw new ApiError(404, 'Membership plan was not found.');
 
   const order = await razorpayClient.orders.create({
@@ -620,7 +616,7 @@ export async function listMemberPayments(userId) {
     .lean();
   return payments.map((payment) => ({
     ...payment,
-    canDownloadReceipt: payment.status === 'confirmed',
+    canDownloadReceipt: ['confirmed', 'paid'].includes(payment.status),
   }));
 }
 
@@ -655,6 +651,7 @@ async function createPendingMembership(userId, plan, { companyDetails, previousM
 export async function purchaseMembership(userId, {
   planId, paymentMethod, companyDetails, rtgsDetails,
 }) {
+  await requireCurrentTermsConsent(userId);
   const blockingMembership = await Membership.findOne({
     user: userId,
     status: { $in: ['active', 'pending_payment', 'pending_verification'] },
@@ -894,130 +891,15 @@ async function activateMembershipInTransaction(
 }
 
 export async function activateMembership(membershipId, paymentId, options = {}) {
-  const settings = await getSettings();
-  const session = await mongoose.startSession();
-  let paymentResult;
-  let membershipResult;
-  let awaitingVerification = false;
-  try {
-    await session.withTransaction(async () => {
-      const payment = await Payment.findOne({
-        _id: paymentId,
-        membership: membershipId,
-      }).session(session);
-      if (!payment) throw new ApiError(404, 'Payment was not found.');
-      const membership = await Membership.findOne({
-        _id: membershipId,
-        user: payment.user,
-      }).session(session);
-      if (!membership) throw new ApiError(404, 'Membership was not found for this payment.');
-      const plan = await MembershipPlan.findById(membership.plan).session(session);
-      if (!plan) throw new ApiError(409, 'The membership plan for this payment was not found.');
-      const identityVerification = await IdentityVerification.findOne({ user: membership.user })
-        .session(session)
-        .select('status')
-        .lean();
-      const identityVerified = identityVerification?.status === 'verified';
-      const eligibilityVerified = !plan.requiresVerification || membership.eligibilityVerified;
-
-      if (!['created', 'pending', 'confirmed'].includes(payment.status)) {
-        throw new ApiError(409, 'This payment is no longer available for confirmation.');
-      }
-      if (payment.status !== 'confirmed') {
-        if (payment.method === 'razorpay' && !options.razorpayPaymentId) {
-          throw new ApiError(409, 'A verified Razorpay payment is required before activation.');
-        }
-        if (payment.method !== 'razorpay' && !options.adminId) {
-          throw new ApiError(403, 'An administrator must confirm offline payment before activation.');
-        }
-      }
-
-      if (options.approveVerification && payment.status === 'confirmed' && membership.status === 'active') {
-        membershipResult = membership;
-      } else if (options.approveVerification) {
-        if (
-          payment.status !== 'confirmed'
-          || membership.status !== 'pending_verification'
-          || !plan.requiresVerification
-          || membership.verificationDocs.length === 0
-        ) {
-          throw new ApiError(409, 'A confirmed payment and uploaded verification proof are required.');
-        }
-        membership.eligibilityVerified = true;
-        membership.eligibilityVerifiedBy = options.adminId || null;
-        membership.eligibilityVerifiedAt = new Date();
-        await membership.save({ session });
-        if (identityVerified) {
-          membershipResult = await activateMembershipInTransaction(
-            session,
-            membership,
-            plan,
-            settings,
-            'pending_verification',
-          );
-        } else {
-          awaitingVerification = true;
-          membershipResult = membership;
-        }
-      } else if (payment.status === 'confirmed' && membership.status === 'active') {
-        membershipResult = membership;
-      } else if (payment.status === 'confirmed' && membership.status === 'pending_verification') {
-        if (identityVerified && eligibilityVerified) {
-          membershipResult = await activateMembershipInTransaction(
-            session,
-            membership,
-            plan,
-            settings,
-            'pending_verification',
-          );
-        } else {
-          awaitingVerification = true;
-          membershipResult = membership;
-        }
-      } else if (membership.status !== 'pending_payment') {
-        throw new ApiError(409, 'The payment does not match a pending membership.');
-      } else if (!identityVerified || !eligibilityVerified) {
-        const transition = await Membership.updateOne(
-          { _id: membership._id, status: 'pending_payment' },
-          { $set: { status: 'pending_verification' } },
-          { session },
-        );
-        if (transition.modifiedCount !== 1) {
-          throw new ApiError(409, 'Membership verification is already pending.');
-        }
-        membershipResult = await Membership.findById(membership._id).session(session);
-        awaitingVerification = true;
-      } else {
-        membershipResult = await activateMembershipInTransaction(session, membership, plan, settings);
-      }
-
-      if (payment.status !== 'confirmed') {
-        payment.status = 'confirmed';
-        payment.verifiedAt = new Date();
-      }
-      payment.confirmedAt ||= payment.verifiedAt || new Date();
-      if (!payment.receiptNumber) {
-        const receiptYear = payment.confirmedAt.getUTCFullYear();
-        const receiptSequence = await incrementCounter(`receipt-${receiptYear}`, session);
-        payment.receiptNumber = `OC-R-${receiptYear}-${String(receiptSequence).padStart(6, '0')}`;
-      }
-      if (options.adminId) {
-        payment.verifiedBy = options.adminId;
-        payment.confirmedBy = options.adminId;
-      }
-      if (options.razorpayPaymentId) payment.razorpayPaymentId = options.razorpayPaymentId;
-      if (options.razorpaySignature) payment.razorpaySignature = options.razorpaySignature;
-      if (options.eventId) payment.razorpayEventIds.addToSet(options.eventId);
-      await payment.save({ session });
-      paymentResult = payment;
-    });
-  } finally {
-    await session.endSession();
-  }
+  const payment = await Payment.findOne({ _id: paymentId, membership: membershipId }).select('_id');
+  if (!payment) throw new ApiError(404, 'Payment was not found.');
+  const paymentResult = await finalizePayment(payment._id, options);
+  const membershipResult = await Membership.findById(membershipId);
+  if (!membershipResult) throw new ApiError(404, 'Membership was not found for this payment.');
   return {
     payment: paymentResult,
     membership: membershipResult,
-    status: awaitingVerification ? 'pending_verification' : membershipResult?.status,
+    status: membershipResult.status,
   };
 }
 
@@ -1139,7 +1021,10 @@ export async function recordOfflineMembershipPayment(adminId, {
     }).select('_id');
     if (!existingPayment) throw new ApiError(409, 'This RTGS UTR has already been used.');
   }
-  const membership = await Membership.findOne({ _id: membershipId, status: 'pending_payment' });
+  const membership = await Membership.findOne({
+    _id: membershipId,
+    status: { $in: ['pending_payment', 'payment_pending'] },
+  });
   if (!membership) throw new ApiError(404, 'Pending membership was not found.');
   const plan = await MembershipPlan.findById(membership.plan);
   if (!plan) throw new ApiError(404, 'Membership plan was not found.');
@@ -1226,7 +1111,7 @@ export async function confirmOfflineMembershipPayment(paymentId, adminId) {
 export async function approveMembershipVerification(membershipId, adminId) {
   const payment = await Payment.findOne({
     membership: membershipId,
-    status: 'confirmed',
+    status: { $in: ['confirmed', 'paid'] },
   }).sort({ createdAt: -1 });
   if (!payment) throw new ApiError(409, 'A confirmed membership payment is required.');
   const result = await activateMembership(membershipId, payment._id, {

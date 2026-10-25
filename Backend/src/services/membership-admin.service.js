@@ -1,6 +1,8 @@
 import FamilyMember from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
 import IdentityVerification from '../models/IdentityVerification.js';
+import Verification from '../models/Verification.js';
+import PointsLedger from '../models/PointsLedger.js';
 import MembershipPlan from '../models/MembershipPlan.js';
 import Plan from '../models/Plan.js';
 import Payment from '../models/Payment.js';
@@ -19,6 +21,112 @@ function pagination(query) {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
   return { page, limit, skip: (page - 1) * limit };
+}
+
+function familyMemberType(member) {
+  if (member.isNominee || member.memberType?.startsWith('nominee')) {
+    const role = String(member.nomineeRole || '').toUpperCase();
+    return role === 'GM' ? 'nominee_gm' : role === 'HR' ? 'nominee_hr' : 'nominee';
+  }
+  const relation = String(member.relation || member.relationship || '').toLowerCase();
+  if (relation.includes('wife') || relation.includes('husband') || relation === 'spouse') return 'spouse';
+  if (relation.includes('father')) return 'father';
+  if (relation.includes('mother')) return 'mother';
+  if (relation.includes('son') || relation.includes('daughter') || relation === 'child') return 'child';
+  return member.memberType || (member.type === 'child' ? 'child' : 'spouse');
+}
+
+async function listFamilyNominees(query) {
+  const { page, limit, skip } = pagination(query);
+  const filter = { isNominee: true, status: { $ne: 'removed' } };
+  if (query.memberType === 'nominee_gm') filter.nomineeRole = /^GM$/i;
+  if (query.memberType === 'nominee_hr') filter.nomineeRole = /^HR$/i;
+  if (query.memberType === 'nominee') filter.nomineeRole = { $nin: [/^GM$/i, /^HR$/i] };
+  if (query.status) filter.status = query.status;
+  if (query.aadhaarPending) return {
+    items: [], page, limit, total: 0, pages: 0, tiers: await MembershipPlan.find().select('name').lean(),
+  };
+  if (query.search) {
+    const search = query.search.trim();
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const [exactMembership, exactFamily, matchingProfiles] = await Promise.all([
+      Membership.findOne({ memberNo: search }).select('_id linkedTo').lean(),
+      FamilyMember.findOne({ memberNo: search }).select('_id membership').lean(),
+      FamilyMember.find({
+        isNominee: true,
+        $or: [{ name: new RegExp(escaped, 'i') }, { fullName: new RegExp(escaped, 'i') }],
+      }).select('_id').lean(),
+    ]);
+    const ownerId = exactMembership?.linkedTo || exactMembership?._id || exactFamily?.membership;
+    const familyIds = [...matchingProfiles.map((member) => member._id), ...(exactFamily ? [exactFamily._id] : [])];
+    const searchTerms = [
+      ...(ownerId ? [{ membership: ownerId }] : []),
+      ...(familyIds.length ? [{ _id: { $in: familyIds } }] : []),
+    ];
+    filter.$or = searchTerms.length ? searchTerms : [{ _id: { $in: [] } }];
+  }
+  if (query.tier) {
+    const membershipPlans = await MembershipPlan.find().select('_id name').lean();
+    const matchingPlanIds = membershipPlans.filter((plan) => (
+      String(plan._id) === query.tier
+      || String(plan.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') === query.tier.toLowerCase()
+    )).map((plan) => plan._id);
+    const catalogPlan = /^[a-f\d]{24}$/i.test(query.tier)
+      ? null
+      : await Plan.findOne({ slug: query.tier.toLowerCase() }).select('_id').lean();
+    const tierOwnerIds = await Membership.find({
+      $or: [
+        ...(matchingPlanIds.length ? [{ plan: { $in: matchingPlanIds }, planModel: 'MembershipPlan' }] : []),
+        ...(catalogPlan ? [{ plan: catalogPlan._id, planModel: 'Plan' }] : []),
+      ],
+    }).distinct('_id');
+    filter.membership = { $in: tierOwnerIds };
+  }
+  if (query.ratePhase) filter._id = { $in: [] };
+  const [nominees, total, tiers] = await Promise.all([
+    FamilyMember.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: 'membership',
+        populate: [
+          { path: 'plan', select: 'name title price' },
+          { path: 'user', select: 'firstName email status' },
+        ],
+      })
+      .lean(),
+    FamilyMember.countDocuments(filter),
+    MembershipPlan.find().select('name').lean(),
+  ]);
+  const users = nominees.map((item) => item.membership?.user?._id).filter(Boolean);
+  const profiles = users.length ? await Profile.find({ user: { $in: users } }).select('user fullName').lean() : [];
+  const profileByUser = new Map(profiles.map((profile) => [String(profile.user), profile]));
+  return {
+    items: nominees.map((item) => ({
+      _id: item._id,
+      memberNo: item.memberNo || '',
+      memberCode: '',
+      memberType: familyMemberType(item),
+      status: item.status || 'pending_approval',
+      approvalSeq: item.approvalSeq ?? null,
+      pointsBalance: 0,
+      pointsMultiplier: null,
+      ratePhase: null,
+      aadhaarStatus: 'not_applicable',
+      primaryMemberNo: item.membership?.memberNo || '',
+      nomineeRole: item.nomineeRole || '',
+      user: item.membership?.user || null,
+      plan: item.membership?.plan || null,
+      profile: profileByUser.get(String(item.membership?.user?._id)) || null,
+      familyProfile: item,
+    })),
+    page,
+    limit,
+    total,
+    pages: Math.ceil(total / limit),
+    tiers,
+  };
 }
 
 export async function listMembershipPlans() {
@@ -69,12 +177,12 @@ export async function getMembershipSettings() {
     gstin: settings.gstin || '',
     pointsValidityYears: settings.pointsValidityYears,
     membershipValidityYears: settings.membershipValidityYears,
-    maxFamilyMembers: settings.maxFamilyMembers,
-    childAgeLimit: settings.childAgeLimit,
     earlyBirdLimit: settings.earlyBirdLimit,
+    familyMembership: settings.familyMembership,
     receiptCompanyName: settings.receiptCompanyName || 'Orianaa by Saptagiri Hospitality & Lifestyle Pvt. Ltd.',
     receiptAddress: settings.receiptAddress || '',
     receiptGstin: settings.receiptGstin || '',
+    receiptHsnSac: settings.receiptHsnSac || '',
     receiptFooterNote: settings.receiptFooterNote || '',
   };
 }
@@ -88,10 +196,37 @@ export async function updateMembershipSettings(values) {
 }
 
 export async function listMemberships(query) {
+  if (query.memberType?.startsWith('nominee')) return listFamilyNominees(query);
   const { page, limit, skip } = pagination(query);
+  const familyNumberSearch = /^\d+(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/i.test(String(query.search || '').trim());
   const filter = {};
+  const filterClauses = [];
   const userFilter = {};
   if (query.status) filter.status = query.status;
+  if (query.memberType && !query.memberType.startsWith('nominee')) filter.memberType = query.memberType;
+  if (query.ratePhase) {
+    const phases = await PointsLedger.find({ phase: query.ratePhase }).distinct('memberId');
+    const legacy = await Membership.find(query.ratePhase === 'early_bird'
+      ? { $or: [{ earlyBird: true }, { earlyBirdApplied: true }] }
+      : { earlyBird: { $ne: true }, earlyBirdApplied: { $ne: true } }).distinct('_id');
+    filterClauses.push({ _id: { $in: [...new Set([...phases, ...legacy].map(String))] } });
+  }
+  if (query.aadhaarPending) {
+    const [pendingIdentityUsers, pendingFamilyVerifications] = await Promise.all([
+      IdentityVerification.find({ status: 'pending' }).distinct('user'),
+      Verification.find({ status: 'pending' }).distinct('memberId'),
+    ]);
+    const pendingFamilyMemberships = pendingFamilyVerifications.length
+      ? await Membership.find({ familyMember: { $in: pendingFamilyVerifications } }).distinct('_id')
+      : [];
+    const pendingMemberships = await Membership.find({
+      $or: [
+        { user: { $in: pendingIdentityUsers } },
+        { _id: { $in: pendingFamilyMemberships } },
+      ],
+    }).distinct('_id');
+    filter._id = { $in: pendingMemberships };
+  }
   if (query.documentsPending) {
     const verifiedUsers = await IdentityVerification.find({ status: 'verified' }).distinct('user');
     userFilter.$nin = verifiedUsers;
@@ -120,28 +255,88 @@ export async function listMemberships(query) {
           ? [{ plan: { $in: membershipPlanIds }, planModel: 'MembershipPlan' }]
           : []),
       ];
-      if (planFilters.length) filter.$or = planFilters;
+      if (planFilters.length) filterClauses.push({ $or: planFilters });
       else filter._id = { $in: [] };
     }
   }
   if (query.search) {
     const matches = await findMemberMatches(query.search);
-    filter._id = { $in: matches.memberships.map((membership) => membership._id) };
+    const exactMember = await Membership.findOne({ memberNo: query.search }).select('_id linkedTo familyMember').lean();
+    const exactFamily = await FamilyMember.findOne({ memberNo: query.search }).select('_id membership').lean();
+    const anchorIds = [
+      ...matches.memberships.map((membership) => membership._id),
+      ...(exactMember ? [exactMember._id] : []),
+    ];
+    const anchor = exactMember?.linkedTo
+      ? await Membership.findById(exactMember.linkedTo).select('_id').lean()
+      : exactFamily?.membership
+        ? await Membership.findById(exactFamily.membership).select('_id').lean()
+        : null;
+    const primaryIds = new Set([
+      ...anchorIds.map(String),
+      ...(anchor ? [String(anchor._id)] : []),
+    ]);
+    if (primaryIds.size) {
+      const primaryObjectIds = [...primaryIds];
+      const familyProfiles = await FamilyMember.find({ membership: { $in: primaryObjectIds } }).select('_id').lean();
+      const linkedMemberships = await Membership.find({
+        $or: [
+          { _id: { $in: primaryObjectIds } },
+          { linkedTo: { $in: primaryObjectIds } },
+          { familyMember: { $in: familyProfiles.map((item) => item._id) } },
+        ],
+      }).distinct('_id');
+      filterClauses.push({ _id: { $in: linkedMemberships } });
+    } else {
+      filterClauses.push({ _id: { $in: [] } });
+    }
   }
+  if (filterClauses.length) filter.$and = filterClauses;
+  let membershipsQuery = Membership.find(filter)
+    .sort({ createdAt: -1 })
+    .populate('plan', 'name title price sortOrder')
+    .populate('user', 'firstName email status activationEmailStatus activationEmailSentAt');
+  if (!familyNumberSearch) membershipsQuery = membershipsQuery.skip(skip).limit(limit);
   const [memberships, total, plans] = await Promise.all([
-    Membership.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('plan', 'name title price sortOrder')
-      .populate('user', 'firstName email status activationEmailStatus activationEmailSentAt')
-      .lean(),
+    membershipsQuery.lean(),
     Membership.countDocuments(filter),
     MembershipPlan.find().select('name').lean(),
   ]);
   const ids = memberships.map((membership) => membership.user?._id).filter(Boolean);
-  const profiles = await Profile.find({ user: { $in: ids } }).select('user fullName mobile').lean();
+  const familyIds = memberships.map((membership) => membership.familyMember).filter(Boolean);
+  const primaryPageIds = memberships.filter((membership) => membership.memberType === 'primary').map((membership) => membership._id);
+  const [profiles, familyProfiles, identityRows, familyVerifications, ledgerRows, settings] = await Promise.all([
+    Profile.find({ user: { $in: ids } }).select('user fullName mobile').lean(),
+    (familyIds.length || primaryPageIds.length) ? FamilyMember.find({
+      $or: [
+        ...(familyIds.length ? [{ _id: { $in: familyIds } }] : []),
+        ...(primaryPageIds.length ? [{ membership: { $in: primaryPageIds }, isNominee: true, status: { $ne: 'removed' } }] : []),
+      ],
+    }).select('name fullName relation relationship nomineeRole isNominee memberType parentSide memberNo status approvalSeq discountPct baseAmount gstAmount totalPaid membership').lean() : [],
+    ids.length ? IdentityVerification.find({ user: { $in: ids } }).select('user status').lean() : [],
+    familyIds.length ? Verification.find({ memberId: { $in: familyIds } }).select('memberId status').lean() : [],
+    PointsLedger.find({ memberId: { $in: memberships.map((item) => item._id) } })
+      .sort({ creditedAt: -1 }).select('memberId phase multiplier').lean(),
+    getSettings(),
+  ]);
   const profileByUser = new Map(profiles.map((profile) => [String(profile.user), profile]));
+  const familyById = new Map(familyProfiles.map((profile) => [String(profile._id), profile]));
+  const identityByUser = new Map(identityRows.map((record) => [String(record.user), record.status]));
+  const verificationByMember = new Map(familyVerifications.map((record) => [String(record.memberId), record.status]));
+  const ledgerByMember = new Map();
+  for (const row of ledgerRows) {
+    if (!ledgerByMember.has(String(row.memberId))) ledgerByMember.set(String(row.memberId), row);
+  }
+  const primaryCodes = new Map();
+  const linkedIds = [...new Set(memberships.map((item) => item.linkedTo).filter(Boolean).map(String))];
+  if (linkedIds.length) {
+    const linked = await Membership.find({ _id: { $in: linkedIds } }).select('_id memberNo').lean();
+    linked.forEach((item) => primaryCodes.set(String(item._id), item.memberNo));
+  }
+  const primaryCodesForFamily = memberships
+    .filter((item) => item.memberType === 'primary')
+    .map((item) => [String(item._id), item.memberNo]);
+  primaryCodesForFamily.forEach(([id, code]) => primaryCodes.set(id, code));
   const items = memberships.map((membership) => ({
     ...membership,
     applicationState: membership.user?.status === 'active' ? 'Active'
@@ -154,14 +349,189 @@ export async function listMemberships(query) {
       ? formatMemberCode(getMembershipMemberCode(membership))
       : '',
     profile: profileByUser.get(String(membership.user?._id)) || null,
+    memberType: membership.memberType || 'primary',
+    familyProfile: familyById.get(String(membership.familyMember)) || null,
+    primaryMemberNo: primaryCodes.get(String(membership.linkedTo || membership._id)) || '',
+    aadhaarStatus: membership.familyMember
+      ? verificationByMember.get(String(membership.familyMember)) || 'not_added'
+      : identityByUser.get(String(membership.user?._id)) || 'not_added',
+    ratePhase: membership.memberType?.startsWith('nominee')
+      ? null
+      : ledgerByMember.get(String(membership._id))?.phase
+        || (membership.earlyBird || membership.earlyBirdApplied ? 'early_bird' : 'default'),
+    pointsMultiplier: membership.memberType?.startsWith('nominee')
+      ? null
+      : ledgerByMember.get(String(membership._id))?.multiplier
+        ?? (membership.earlyBird || membership.earlyBirdApplied
+          ? settings.familyMembership?.multipliers?.earlyBird
+          : settings.familyMembership?.multipliers?.default),
+      parentSide: familyById.get(String(membership.familyMember))?.parentSide || membership.parentSide || null,
   }));
+  const representedFamilyIds = new Set(memberships.map((membership) => String(membership.familyMember || '')).filter(Boolean));
+  const primaryById = new Map(memberships.map((membership) => [String(membership._id), membership]));
+  const nomineeItems = familyProfiles
+    .filter((profile) => profile.isNominee && !representedFamilyIds.has(String(profile._id)))
+    .filter((profile) => !query.memberType || !query.memberType.startsWith('nominee')
+      || familyMemberType(profile) === query.memberType)
+    .map((profile) => {
+      const owner = primaryById.get(String(profile.membership));
+      if (!owner) return null;
+      return {
+        _id: profile._id,
+        memberNo: profile.memberNo || '',
+        memberCode: '',
+        memberType: familyMemberType(profile),
+        status: profile.status || 'pending_approval',
+        approvalSeq: profile.approvalSeq ?? null,
+        pointsBalance: 0,
+        pointsMultiplier: null,
+        ratePhase: null,
+        aadhaarStatus: 'not_applicable',
+        primaryMemberNo: owner.memberNo || '',
+        nomineeRole: profile.nomineeRole || '',
+        user: owner.user,
+        plan: owner.plan,
+        profile: profileByUser.get(String(owner.user?._id)) || null,
+        familyProfile: profile,
+      };
+    }).filter(Boolean);
+  const listedItems = query.memberType?.startsWith('nominee')
+    ? nomineeItems
+    : [...items, ...nomineeItems];
   return {
-    items,
-    page,
+    items: listedItems,
+    page: familyNumberSearch ? 1 : page,
     limit,
-    total,
-    pages: Math.ceil(total / limit),
+    total: total + nomineeItems.length,
+    pages: familyNumberSearch ? 1 : Math.ceil((total + nomineeItems.length) / limit),
     tiers: plans,
+  };
+}
+
+export async function getFamilyTree(memberNo) {
+  const exactMembership = await Membership.findOne({ memberNo }).lean();
+  const exactProfile = exactMembership
+    ? null
+    : await FamilyMember.findOne({ memberNo }).select('membership').lean();
+  const primaryId = exactMembership?.memberType === 'primary'
+    ? exactMembership._id
+    : exactMembership?.linkedTo || exactProfile?.membership || exactMembership?._id;
+  const primary = primaryId ? await Membership.findById(primaryId)
+    .populate('plan', 'name title slug')
+    .populate('user', 'firstName email')
+    .lean() : null;
+  if (!primary || primary.memberType && primary.memberType !== 'primary') {
+    throw new ApiError(404, 'Family membership was not found.');
+  }
+
+  const [profile, familyProfiles, linkedMemberships, settings] = await Promise.all([
+    Profile.findOne({ user: primary.user?._id }).select('fullName').lean(),
+    FamilyMember.find({ membership: primary._id, isPrimary: { $ne: true }, status: { $ne: 'removed' } })
+      .sort({ createdAt: 1, _id: 1 }).lean(),
+    Membership.find({ $or: [{ _id: primary._id }, { linkedTo: primary._id }] }).populate('plan', 'name title').lean(),
+    getSettings(),
+  ]);
+  const profileIds = familyProfiles.map((item) => item._id);
+  const [verifications, points, identity] = await Promise.all([
+    profileIds.length ? Verification.find({ memberId: { $in: profileIds } }).select('memberId status').lean() : [],
+    PointsLedger.find({ memberId: { $in: linkedMemberships.map((item) => item._id) } })
+      .sort({ creditedAt: -1 }).lean(),
+    IdentityVerification.findOne({ user: primary.user?._id }).select('status').lean(),
+  ]);
+  const membershipByProfile = new Map(linkedMemberships.filter((item) => item.familyMember)
+    .map((item) => [String(item.familyMember), item]));
+  const verificationByProfile = new Map(verifications.map((item) => [String(item.memberId), item.status]));
+  const latestLedger = new Map();
+  for (const entry of points) {
+    if (!latestLedger.has(String(entry.memberId))) latestLedger.set(String(entry.memberId), entry);
+  }
+  const memberView = (membership, familyProfile = null) => {
+    const ledger = latestLedger.get(String(membership._id));
+    const nominee = String(membership.memberType || '').startsWith('nominee')
+      || Boolean(familyProfile?.isNominee);
+    return {
+      id: String(membership._id),
+      familyProfileId: familyProfile ? String(familyProfile._id) : null,
+      name: familyProfile?.name || familyProfile?.fullName || profile?.fullName || membership.user?.firstName || 'Member',
+      relation: familyProfile?.relation || familyProfile?.relationship || membership.memberType || 'primary',
+      memberNo: membership.memberNo || familyProfile?.memberNo || '',
+      memberType: membership.memberType || 'primary',
+      status: membership.status,
+      discountPct: membership.discountPct || 0,
+      baseAmount: membership.baseAmount || 0,
+      gstAmount: membership.gstAmount || 0,
+      totalPaid: membership.totalPaid || 0,
+      approvalSeq: membership.approvalSeq,
+      ratePhase: nominee ? null : ledger?.phase || (membership.earlyBird ? 'early_bird' : 'default'),
+      points: nominee ? null : ledger?.points || membership.pointsBalance || 0,
+      aadhaarStatus: familyProfile
+        ? verificationByProfile.get(String(familyProfile._id)) || 'not_added'
+        : identity?.status || 'not_added',
+      nominee,
+      nomineeRole: familyProfile?.nomineeRole || membership.nomineeRole || '',
+      parentSide: familyProfile?.parentSide || membership.parentSide || null,
+      ledger: nominee ? [] : points.filter((entry) => String(entry.memberId) === String(membership._id)),
+    };
+  };
+  const primaryView = memberView(primary);
+  const family = familyProfiles.map((item) => {
+    const membership = membershipByProfile.get(String(item._id));
+    if (membership) return memberView(membership, item);
+    return {
+      id: String(item._id),
+      familyProfileId: String(item._id),
+      name: item.name || item.fullName || 'Family member',
+      relation: item.relation || item.relationship || item.memberType || 'family',
+      memberNo: item.memberNo || '',
+      memberType: familyMemberType(item),
+      status: item.status === 'active' && !item.isNominee ? 'profile_only' : item.status || 'profile_only',
+      discountPct: item.discountPct || 0,
+      baseAmount: item.baseAmount || 0,
+      gstAmount: item.gstAmount || 0,
+      totalPaid: item.totalPaid || 0,
+      approvalSeq: item.approvalSeq || null,
+      ratePhase: null,
+      points: null,
+      aadhaarStatus: verificationByProfile.get(String(item._id)) || 'not_added',
+      nominee: Boolean(item.isNominee),
+      nomineeRole: item.nomineeRole || '',
+      parentSide: item.parentSide || null,
+      ledger: [],
+    };
+  });
+  const nominees = family.filter((item) => item.nominee || item.memberType?.startsWith('nominee'));
+  const members = family.filter((item) => !nominees.includes(item));
+  const limits = settings.familyMembership?.limits || {};
+  const normalizedTier = String(primary.tier || primary.plan?.slug || primary.plan?.name || '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const tierConfig = settings.familyMembership?.tiers?.find((tier) => tier.tier === normalizedTier
+    || (tier.tier === 'corporate' && normalizedTier.includes('corporate')));
+  const openSlots = [];
+  const countType = (types) => members.filter((item) => types.includes(item.memberType)).length;
+  if (tierConfig?.familyEnabled !== false) {
+    const spouseMax = Number(limits.spouse ?? 1);
+    for (let slot = countType(['spouse']); slot < spouseMax; slot += 1) openSlots.push({ key: `spouse-${slot}`, label: 'Spouse', discountPct: settings.familyMembership?.discounts?.spouse ?? 50 });
+    const perSide = Number(limits.parentsPerSide ?? 2);
+    for (const side of ['member', 'spouse']) {
+      const parentCount = members.filter((item) => ['father', 'mother'].includes(item.memberType)
+        && (item.parentSide || 'member') === side).length;
+      for (let slot = parentCount; slot < perSide; slot += 1) {
+        openSlots.push({
+          key: `parent-${side}-${slot}`,
+          label: `${side === 'spouse' ? 'Spouse’s' : 'Member’s'} parent`,
+          discountPct: settings.familyMembership?.discounts?.parent ?? 50,
+        });
+      }
+    }
+    if (limits.children === null) {
+      openSlots.push({ key: 'children', label: 'Children', discountPct: settings.familyMembership?.discounts?.child ?? 75 });
+    }
+  }
+  return {
+    primary: primaryView,
+    family: members,
+    nominees,
+    openSlots,
   };
 }
 

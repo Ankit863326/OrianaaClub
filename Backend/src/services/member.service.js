@@ -10,10 +10,25 @@ import { getSettings } from '../models/Setting.js';
 import Payment from '../models/Payment.js';
 import Profile from '../models/Profile.js';
 import ApiError from '../utils/ApiError.js';
+import { invalidateVerificationAfterProfileChange } from './family-verification.service.js';
 import { getPayableAmount } from '../utils/money.js';
 import { publicMediaDirectory } from '../utils/uploadDirectories.js';
+import { calculateFamilyPriceQuotes } from './pricing.service.js';
+import {
+  normalizeFamilyProfile,
+  validateFamilyProfileSet,
+} from './family-profile-rules.service.js';
 
-const visibleMembershipStatuses = ['draft', 'pending_payment', 'pending_verification', 'active'];
+const visibleMembershipStatuses = [
+  'draft',
+  'profile_only',
+  'pending_payment',
+  'payment_pending',
+  'pending_verification',
+  'pending_approval',
+  'active',
+  'expired',
+];
 
 async function savePhoto(file) {
   if (!file) return '';
@@ -46,8 +61,21 @@ async function discardNewPhoto(photoUrl, originalError) {
 }
 
 async function currentMembership(userId) {
-  return Membership.findOne({ user: userId, status: { $in: visibleMembershipStatuses } })
+  return Membership.findOne({
+    user: userId,
+    memberType: 'primary',
+    linkedTo: null,
+    status: { $in: visibleMembershipStatuses },
+  })
     .populate('plan');
+}
+
+function memberSafeObject(value) {
+  if (Array.isArray(value)) return value.map(memberSafeObject);
+  if (!value || typeof value !== 'object' || value instanceof Date) return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !/expire|expiry|earlybird|approvalseq|multiplier/i.test(key))
+    .map(([key, nested]) => [key, memberSafeObject(nested)]));
 }
 
 export async function getMemberOverview(user) {
@@ -61,8 +89,8 @@ export async function getMemberOverview(user) {
 
   return {
     profile,
-    membership: membership?.toObject() || null,
-    family,
+    membership: membership ? memberSafeObject(membership.toObject()) : null,
+    family: memberSafeObject(family),
   };
 }
 
@@ -94,7 +122,12 @@ export async function saveDraftPlan(userId, planId) {
   }
   if (!plan) throw new ApiError(404, 'Membership plan was not found.');
 
-  const existing = await Membership.findOne({ user: userId, status: { $in: visibleMembershipStatuses } });
+  const existing = await Membership.findOne({
+    user: userId,
+    memberType: 'primary',
+    linkedTo: null,
+    status: { $in: visibleMembershipStatuses },
+  });
   if (existing?.status === 'active') {
     throw new ApiError(409, 'Your active membership plan cannot be changed.');
   }
@@ -175,6 +208,13 @@ export async function getMembershipCheckoutQuote(planId) {
   };
 }
 
+export async function getFamilyPriceBreakdown(planId) {
+  let plan = await Plan.findOne({ _id: planId, isActive: true }).lean();
+  if (!plan) plan = await MembershipPlan.findOne({ _id: planId, isActive: true }).lean();
+  if (!plan) throw new ApiError(404, 'Membership plan was not found.');
+  return calculateFamilyPriceQuotes(plan);
+}
+
 export async function getPaymentMembership(userId, membershipId) {
   const membership = await Membership.findOne({ _id: membershipId, user: userId }).populate('plan');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
@@ -246,22 +286,6 @@ async function requireDraftMembership(userId) {
   return membership;
 }
 
-async function ensureFamilyCapacity(membership, excludingId = null) {
-  const settings = membership.planModel === 'MembershipPlan' ? await getSettings() : null;
-  const limit = Math.max(0, Number(
-    membership.plan?.maxFamilyMembers ?? settings?.maxFamilyMembers ?? 0,
-  ));
-  const currentCount = await FamilyMember.countDocuments({
-    membership: membership._id,
-    ...(excludingId ? { _id: { $ne: excludingId } } : {}),
-  });
-  if (currentCount >= limit) {
-    throw new ApiError(409, limit === 0
-      ? 'This plan does not include additional family members.'
-      : `This plan allows up to ${limit} family members.`);
-  }
-}
-
 export async function listFamilyMembers(userId) {
   const membership = await requireEditableMembership(userId);
   return FamilyMember.find({ membership: membership._id }).sort({ createdAt: 1 }).lean();
@@ -269,10 +293,15 @@ export async function listFamilyMembers(userId) {
 
 export async function addFamilyMember(userId, values, photo) {
   const membership = await requireDraftMembership(userId);
-  await ensureFamilyCapacity(membership);
+  const currentMembers = await FamilyMember.find({ membership: membership._id }).lean();
+  const profileValues = normalizeFamilyProfile(values);
+  await validateFamilyProfileSet({
+    plan: membership.plan,
+    members: [...currentMembers, profileValues],
+  });
   const photoUrl = await savePhoto(photo);
   try {
-    return await FamilyMember.create({ ...values, photoUrl, membership: membership._id });
+    return await FamilyMember.create({ ...profileValues, photoUrl, membership: membership._id });
   } catch (error) {
     if (photo) await discardNewPhoto(photoUrl, error);
     throw error;
@@ -285,14 +314,25 @@ export async function updateFamilyMember(userId, memberId, values, photo) {
   if (!member) throw new ApiError(404, 'Family member was not found.');
 
   const previousPhotoUrl = member.photoUrl;
+  const before = member.toObject();
+  const profileValues = normalizeFamilyProfile(values);
+  const currentMembers = await FamilyMember.find({
+    membership: membership._id,
+    _id: { $ne: member._id },
+  }).lean();
+  await validateFamilyProfileSet({
+    plan: membership.plan,
+    members: [...currentMembers, profileValues],
+  });
   const photoUrl = photo ? await savePhoto(photo) : previousPhotoUrl;
-  Object.assign(member, values, { photoUrl });
+  Object.assign(member, profileValues, { photoUrl });
   try {
     await member.save();
   } catch (error) {
     if (photo) await discardNewPhoto(photoUrl, error);
     throw error;
   }
+  await invalidateVerificationAfterProfileChange(member, before, userId, 'member');
   if (photo && previousPhotoUrl) await removeUploadedPhoto(previousPhotoUrl);
   return member;
 }

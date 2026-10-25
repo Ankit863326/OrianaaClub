@@ -82,7 +82,6 @@ const planFields = z.object({
     fromMember: z.coerce.number().int().positive(),
     toMember: z.coerce.number().int().positive().nullable().optional(),
   })).max(30),
-  maxFamilyMembers: z.coerce.number().int().nonnegative().max(100),
   isActive: z.boolean(),
   isFeatured: z.boolean(),
   sortOrder: z.coerce.number().int().nonnegative().max(10000),

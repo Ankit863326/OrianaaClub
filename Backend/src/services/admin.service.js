@@ -30,11 +30,19 @@ export async function listMembers(query) {
   const membershipFilter = {};
   if (query.status) membershipFilter.status = query.status;
   if (query.plan) {
-    const plan = mongoose.isValidObjectId(query.plan)
-      ? await MembershipPlan.findById(query.plan).select('_id')
-      : null;
-    membershipFilter.planModel = 'MembershipPlan';
-    membershipFilter.plan = plan?._id || { $in: [] };
+    const [legacyPlan, membershipPlan] = mongoose.isValidObjectId(query.plan)
+      ? await Promise.all([
+        Plan.findById(query.plan).select('_id'),
+        MembershipPlan.findById(query.plan).select('_id'),
+      ])
+      : await Promise.all([
+        Plan.findOne({ $or: [{ slug: query.plan }, { id: query.plan }] }).select('_id'),
+        MembershipPlan.findOne({ name: query.plan }).select('_id'),
+      ]);
+    const planMatches = [];
+    if (legacyPlan) planMatches.push({ planModel: 'Plan', plan: legacyPlan._id });
+    if (membershipPlan) planMatches.push({ planModel: 'MembershipPlan', plan: membershipPlan._id });
+    membershipFilter.$or = planMatches.length ? planMatches : [{ _id: { $in: [] } }];
   }
   if (query.search) {
     const matches = await findMemberMatches(query.search);
@@ -64,8 +72,10 @@ export async function listMembers(query) {
   const [profiles, memberships] = await Promise.all([
     Profile.find({ user: { $in: ids } }).lean(),
     Membership.find({
-      $or: [{ user: { $in: ids } }, { customer: { $in: ids } }],
-      ...membershipFilter,
+      $and: [
+        { $or: [{ user: { $in: ids } }, { customer: { $in: ids } }] },
+        membershipFilter,
+      ],
     }).sort({ createdAt: -1 }).populate('plan', 'name title slug').lean(),
   ]);
   const profileByUser = new Map(profiles.map((profile) => [String(profile.user), profile]));
@@ -81,7 +91,11 @@ export async function listMembers(query) {
         ...user,
         profile: profileByUser.get(String(user._id)) || null,
         membership: membership
-          ? { ...membership, displayMemberCode: getMembershipMemberCode(membership) }
+          ? {
+            ...membership,
+            memberType: membership.memberType || 'primary',
+            displayMemberCode: getMembershipMemberCode(membership),
+          }
           : null,
       };
     }),
@@ -255,7 +269,7 @@ export async function recordManualPayment({
     verifiedBy: adminId,
     note,
   });
-  return finalizePayment(payment._id, { adminId });
+  return finalizePayment(payment._id, { adminId, requireIdentityVerification: true });
 }
 
 export async function listPlans(query) {

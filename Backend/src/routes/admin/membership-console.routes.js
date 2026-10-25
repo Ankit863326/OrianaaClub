@@ -3,7 +3,9 @@ import * as controller from '../../controllers/admin/membership-admin.controller
 import validate from '../../middleware/validate.js';
 import {
   adminBillParamsSchema,
+  approvalQueueQuerySchema,
   cancelAdminBillSchema,
+  familyTreeParamsSchema,
   membershipBillsQuerySchema,
   membershipIdParamsSchema,
   membershipPlanIdParamsSchema,
@@ -37,7 +39,18 @@ router.patch('/settings', validate(membershipSettingsPatchSchema), controller.up
 router.get('/membership-settings', controller.getSettings);
 router.patch('/membership-settings', validate(membershipSettingsPatchSchema), controller.updateSettings);
 router.get('/memberships', validate(membershipSearchQuerySchema, 'query'), controller.listMemberships);
+router.get(
+  '/memberships/family-tree/:memberNo',
+  validate(familyTreeParamsSchema, 'params'),
+  controller.familyTree,
+);
 router.get('/membership-queue', validate(queueQuerySchema, 'query'), controller.queue);
+router.get('/membership-approval-queue', validate(approvalQueueQuerySchema, 'query'), controller.approvalQueue);
+router.post(
+  '/memberships/:id/approve',
+  validate(membershipIdParamsSchema, 'params'),
+  controller.approveMembership,
+);
 router.get('/membership-reports', controller.reports);
 router.get(
   '/reports/membership',

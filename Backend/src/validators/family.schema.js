@@ -9,6 +9,13 @@ export const familyMemberSchema = z.object({
   relation: z.string().trim().min(1).max(40),
   dateOfBirth: z.coerce.date().optional(),
   phone: z.string().trim().max(40).optional().default(''),
+  email: z.string().trim().email().max(254).optional().or(z.literal('')),
+  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).optional(),
+  address: z.string().trim().max(1000).optional().default(''),
+  workEmail: z.string().trim().email().max(254).optional().or(z.literal('')),
+  nomineeRole: z.string().trim().max(80).optional().default(''),
+  designation: z.string().trim().max(120).optional().default(''),
+  parentSide: z.enum(['member', 'spouse']).optional(),
 });
 export const adminFamilyMemberSchema = familyMemberSchema.extend({
   linkedUser: objectId.nullable().optional(),

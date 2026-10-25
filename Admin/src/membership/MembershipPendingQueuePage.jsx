@@ -19,7 +19,7 @@ import { formatINR, formatMemberCode } from './formatters.js';
 import useAutoRefresh from '../hooks/useAutoRefresh.js';
 
 const pageSize = 20;
-const initialPages = { verification: 1, payments: 1, family: 1 };
+const initialPages = { verification: 1, payments: 1, family: 1, approval: 1 };
 
 function membershipId(value) {
   return String(value?._id || value || '');
@@ -53,10 +53,12 @@ export default function MembershipPendingQueuePage() {
       setError('');
     }
     try {
-      const [verification, payments, family] = await Promise.all([
+      const [verification, payments, family, approval, familyVerifications] = await Promise.all([
         membershipApi.members({ status: 'pending_verification', page: nextPages.verification, limit: pageSize }),
         membershipApi.payments({ status: 'pending', page: nextPages.payments, limit: pageSize }),
         membershipApi.familyRequests({ page: nextPages.family, limit: pageSize }),
+        membershipApi.approvalQueue({ page: nextPages.approval, limit: pageSize }),
+        membershipApi.familyVerificationQueue(),
       ]);
       const paymentMemberships = [...new Set(payments.items.map((payment) => membershipId(payment.membership)).filter(Boolean))];
       const paymentDetails = await Promise.all(paymentMemberships.map(async (id) => (
@@ -72,6 +74,12 @@ export default function MembershipPendingQueuePage() {
           })),
         },
         family,
+        approval: {
+          ...approval,
+          ...approval.pagination,
+          items: approval.items || [],
+        },
+        familyVerifications,
       });
       setPages(nextPages);
     } catch (failure) {
@@ -112,6 +120,9 @@ export default function MembershipPendingQueuePage() {
       } else if (confirmation.type === 'confirm-payment') {
         await membershipApi.confirmPayment(confirmation.row._id);
         setNotice('Payment confirmed.');
+      } else if (confirmation.type === 'approve-membership') {
+        const result = await membershipApi.approveMembership(confirmation.row._id);
+        setNotice(`Membership approved${result.approvalSeq ? ` (approval sequence ${result.approvalSeq})` : ''}.`);
       } else if (confirmation.type === 'approve-family' || confirmation.type === 'reject-family') {
         await membershipApi.decideFamilyRequest(
           confirmation.row._id,
@@ -133,14 +144,15 @@ export default function MembershipPendingQueuePage() {
   }
 
   const counts = data ? [
-    data.verification.total || 0,
+    (data.verification.total || 0) + (data.familyVerifications.length || 0),
     data.payments.total || 0,
     data.family.total || 0,
+    data.approval.total || 0,
   ] : [];
   const nothingPending = data && counts.every((count) => count === 0);
 
   return <section>
-    <PageHeading eyebrow="MEMBERSHIP" title="Pending Queue" description="Review membership verification, payments, and family requests." />
+    <PageHeading eyebrow="MEMBERSHIP" title="Pending Queue" description="Review verification, payments, family requests, and paid memberships awaiting approval." />
     {error && <Toast kind="error" onDismiss={() => setError('')}>{error}</Toast>}
     {notice && <Toast onDismiss={() => setNotice('')}>{notice}</Toast>}
     {!data && loading && <LoadingState />}
@@ -150,11 +162,11 @@ export default function MembershipPendingQueuePage() {
       {nothingPending && <Panel className="mb-5 text-center text-sm text-slate-500">Nothing pending.</Panel>}
       <div className="grid gap-5">
         <Panel>
-          <h2 className="mb-4 font-display text-xl">Pending verification <Badge>{data.verification.total || 0}</Badge></h2>
+          <h2 className="mb-4 font-display text-xl">Pending verification <Badge>{(data.verification.total || 0) + data.familyVerifications.length}</Badge></h2>
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full min-w-[900px] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>{['Member', 'Member code', 'Tier', 'Submitted', 'Actions'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                <tr>{['Member', 'Member code', 'Tier', 'Submitted', 'Due', 'Actions'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.verification.items.map((row) => <tr key={row._id}>
@@ -162,16 +174,70 @@ export default function MembershipPendingQueuePage() {
                   <td className="px-4 py-3.5 text-slate-700">{formatMemberCode(row.memberCode)}</td>
                   <td className="px-4 py-3.5 text-slate-700">{row.plan?.name || row.plan?.title || '—'}</td>
                   <td className="px-4 py-3.5 text-slate-700">{formatDate(row.updatedAt || row.createdAt)}</td>
+                  <td className="px-4 py-3.5 text-slate-700">
+                    {row.approvalDueAt && new Date(row.approvalDueAt) <= new Date()
+                      ? <span className="font-semibold text-red-700">Overdue</span>
+                      : 'Due within 1 working day'}
+                  </td>
                   <td className="px-4 py-3.5"><div className="flex gap-2">
-                    <Button disabled={busy} onClick={() => requestAction({ type: 'approve-verification', row })}>Approve</Button>
+                    <Link className="inline-flex min-h-11 items-center rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white hover:bg-forest/90" to={`/membership/members/${encodeURIComponent(row._id)}`}>Review</Link>
                     <Button variant="danger" disabled={busy} onClick={() => requestAction({ type: 'reject-verification', row })}>Reject</Button>
                   </div></td>
                 </tr>)}
-                {!data.verification.items.length && <tr><td className="px-4 py-8 text-center text-slate-500" colSpan="5">Nothing pending.</td></tr>}
+                {data.familyVerifications.map((row) => <tr key={`verification-${row.memberId}`}>
+                  <td className="px-4 py-3.5 text-slate-700">{row.memberName || 'Family member'} · {row.relation}</td>
+                  <td className="px-4 py-3.5 text-slate-700">—</td>
+                  <td className="px-4 py-3.5 text-slate-700">Family verification</td>
+                  <td className="px-4 py-3.5 text-slate-700">{formatDate(row.submittedAt)}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{row.overdue ? <span className="font-semibold text-red-700">Overdue</span> : 'Due within 1 working day'}</td>
+                  <td className="px-4 py-3.5">
+                    <Link className="inline-flex min-h-11 items-center rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white hover:bg-forest/90" to={`/membership/family-verifications/${encodeURIComponent(row.memberId)}`}>Review</Link>
+                  </td>
+                </tr>)}
+                {!data.verification.items.length && !data.familyVerifications.length && <tr><td className="px-4 py-8 text-center text-slate-500" colSpan="6">Nothing pending.</td></tr>}
               </tbody>
             </table>
           </div>
           <Pagination info={data.verification} onPage={(page) => load({ ...pages, verification: page })} />
+        </Panel>
+
+        <Panel>
+          <h2 className="mb-4 font-display text-xl">Pending membership approval <Badge>{data.approval.total || 0}</Badge></h2>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full min-w-[1150px] border-collapse text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>{['Member', 'Member code', 'Tier', 'Type', 'Amount paid', 'Paid date', 'Due', 'Action'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.approval.items.map((row) => <tr key={row._id}>
+                  <td className="px-4 py-3.5 text-slate-700">{memberLink(row._id, row.memberName || row.user?.firstName || row.user?.email || 'Member')}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{row.memberCode || row.memberNo || '—'}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{row.plan?.name || row.plan?.title || row.tier || '—'}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{String(row.memberType || 'primary').replaceAll('_', ' ')}</td>
+                  <td className="px-4 py-3.5 text-slate-700">
+                    <span className="block">Base {formatINR(row.amountPaid?.baseAmount ?? row.baseAmount)}</span>
+                    <span className="block">GST {formatINR(row.amountPaid?.gstAmount ?? row.gstAmount)}</span>
+                    <strong className="block">Total {formatINR(row.amountPaid?.totalPaid ?? row.totalPaid)}</strong>
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-700">{formatDate(row.paymentConfirmedAt)}</td>
+                  <td className="px-4 py-3.5">{row.overdue
+                    ? <span className="font-semibold text-red-700">Overdue</span>
+                    : 'Due within 24 hours'}</td>
+                  <td className="px-4 py-3.5">
+                    <div className="grid justify-items-start gap-1">
+                      <Button
+                        disabled={busy || !row.nomineesConfirmed}
+                        onClick={() => requestAction({ type: 'approve-membership', row })}
+                      >Approve</Button>
+                      {!row.nomineesConfirmed && <span className="font-semibold text-amber-800">Nominee not confirmed</span>}
+                    </div>
+                  </td>
+                </tr>)}
+                {!data.approval.items.length && <tr><td className="px-4 py-8 text-center text-slate-500" colSpan="8">Nothing pending.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <Pagination info={data.approval} onPage={(page) => load({ ...pages, approval: page })} />
         </Panel>
 
         <Panel>
@@ -239,6 +305,7 @@ export default function MembershipPendingQueuePage() {
         'approve-verification': 'Approve membership verification?',
         'reject-verification': 'Reject membership verification?',
         'confirm-payment': 'Confirm this payment?',
+        'approve-membership': 'Approve this paid membership?',
         'approve-family': 'Approve this family request?',
         'reject-family': 'Reject this family request?',
       }[confirmation.type]}
@@ -249,6 +316,8 @@ export default function MembershipPendingQueuePage() {
     >
       {confirmation.type === 'confirm-payment'
         ? <p>Confirm payment for {confirmation.row.method || 'this method'}. Cheques must be cleared before confirmation.</p>
+        : confirmation.type === 'approve-membership'
+          ? <p>This will activate the membership, assign its approval sequence, and credit points. The action is recorded in the audit log.</p>
         : (confirmation.type === 'reject-verification' || confirmation.type === 'reject-family')
           ? <FormField label="Required rejection reason">
             <textarea className={controlClass} rows="3" maxLength="1000" required value={reason} onChange={(event) => setReason(event.target.value)} />

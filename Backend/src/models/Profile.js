@@ -9,6 +9,7 @@ const profileSchema = new mongoose.Schema({
   mobile: { type: String, required: true, trim: true, maxlength: 20 },
   dob: { type: Date, required: true },
   interestArea: { type: String, required: true, trim: true, maxlength: 100 },
+  address: { type: String, default: '', trim: true, maxlength: 1000 },
   agreePromo: { type: Boolean, default: false },
   photoUrl: { type: String, default: '' },
 }, { timestamps: true });

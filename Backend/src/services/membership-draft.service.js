@@ -17,11 +17,17 @@ import { encryptIdentityValue, hashIdentityValue } from '../utils/identityDocume
 import { identityDocumentPath } from '../utils/identityDocumentStorage.js';
 import { validateIdentityNumber } from '../utils/identityDocumentValidation.js';
 import { profileSchema } from '../validators/member.schema.js';
-import { finalizePayment } from './payment.service.js';
+import { activateMembership } from './payment.service.js';
 import { sendMail } from './mail.service.js';
 import { requestDraftPasswordLink as requestPaidDraftPasswordLink } from './auth.service.js';
 import { razorpayClient } from '../config/razorpay.js';
 import { publicMediaDirectory } from '../utils/uploadDirectories.js';
+import { requireCurrentTermsConsent } from './terms.service.js';
+import { calculateFamilyPriceQuotes } from './pricing.service.js';
+import {
+  normalizeFamilyProfile,
+  validateFamilyProfileSet,
+} from './family-profile-rules.service.js';
 
 const maskEmail = (email) => {
   const at = email.lastIndexOf('@');
@@ -37,14 +43,32 @@ function safeEqualHex(left, right) {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+export async function deleteMembershipDraftArtifacts(draft) {
+  await deletePrivateDocuments(draft.identity?.documents || []);
+  await Promise.all([
+    removePublicPhoto(draft.profile?.photoUrl),
+    ...(draft.family || []).map((member) => removePublicPhoto(member.photoUrl)),
+  ]);
+}
+
 function draftExpiry() {
   return new Date(Date.now() + env.draftRetentionDays * 24 * 60 * 60 * 1000);
 }
 
+async function saveDraftAtStep(draft, currentStep) {
+  if (draft.status === 'failed') draft.status = 'draft';
+  draft.currentStep = currentStep;
+  await draft.save();
+  return draft;
+}
+
 function publicDraft(draft) {
   return {
+    id: String(draft._id),
     email: draft.email,
     status: draft.status,
+    currentStep: draft.currentStep,
+    needsHelp: Boolean(draft.needsHelp),
     paymentMethod: draft.paymentMethod || '',
     firstName: draft.firstName,
     profile: draft.profile || {},
@@ -67,7 +91,43 @@ function publicDraft(draft) {
 }
 
 export async function requestPasswordLink(draft, email) {
-  return requestPaidDraftPasswordLink(draft, email);
+  try {
+    const result = await requestPaidDraftPasswordLink(draft, email);
+    if (result.sent) {
+      draft.status = 'password_pending';
+      draft.lastEmailError = '';
+      await saveDraftAtStep(draft, 6);
+    }
+    return result;
+  } catch (error) {
+    draft.lastEmailError = `${error?.name || 'Error'}: ${error?.code || 'Password-link delivery failed.'}`;
+    await draft.save();
+    console.error(
+      `[membership-draft] Password-link delivery failed: ${error?.name || 'Error'} `
+      + `${error?.code || 'unknown'}.`,
+    );
+    throw error;
+  }
+}
+
+export async function requestMembershipHelp(email) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const draft = await MembershipDraft.findOneAndUpdate(
+    { email: normalizedEmail },
+    {
+      $set: { needsHelp: true },
+      $setOnInsert: {
+        email: normalizedEmail,
+        firstName: normalizedEmail.split('@')[0].slice(0, 50) || 'Member',
+        tokenHash: tokenHash(randomBytes(32).toString('hex')),
+        expiresAt: draftExpiry(),
+        status: 'draft',
+        currentStep: 6,
+      },
+    },
+    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+  );
+  return { requested: true, email: maskEmail(draft.email) };
 }
 
 async function findActiveUser(email) {
@@ -97,6 +157,9 @@ async function sendDraftOtp(draft, { enforceCooldown = true } = {}) {
   draft.otpSentAt = now;
   draft.otpAttempts = 0;
   await draft.save();
+  if (env.nodeEnv !== 'production') {
+    console.log(`[mail:dev] Verification code for ${maskEmail(draft.email)}: ${code}`);
+  }
   try {
     await sendMail({
       to: draft.email,
@@ -109,10 +172,19 @@ async function sendDraftOtp(draft, { enforceCooldown = true } = {}) {
       },
     });
   } catch (error) {
+    const message = String(error?.message || 'No error message was provided.');
+    const safeMessage = env.smtpPass ? message.split(env.smtpPass).join('[redacted]') : message;
+    const rawCode = String(error?.code || 'unknown');
+    const safeCode = env.smtpPass ? rawCode.split(env.smtpPass).join('[redacted]') : rawCode;
+    console.error(
+      `[membership-draft] Verification-code delivery failed: code=${safeCode} message=${safeMessage}`,
+    );
     draft.otpHash = '';
     draft.otpSalt = '';
     draft.otpExpiresAt = null;
     draft.otpSentAt = null;
+    draft.lastEmailError = `${error?.name || 'Error'}: ${error?.code || 'Email delivery failed.'}`;
+    draft.status = 'failed';
     await draft.save();
     throw error;
   }
@@ -123,24 +195,29 @@ export async function startMembershipDraft({ firstName, email, profile }, curren
   await findActiveUser(normalizedEmail);
   const submitted = await MembershipDraft.findOne({
     email: normalizedEmail,
-    status: { $in: ['payment_submitted', 'paid'] },
+    status: { $in: ['payment_pending', 'paid', 'password_pending', 'active', 'payment_submitted'] },
   }).select('_id');
   if (submitted) {
     return { resume: false, submitted: true, email: maskEmail(normalizedEmail) };
   }
 
   let token;
-  let draft = await MembershipDraft.findOne({ email: normalizedEmail, status: 'draft' })
+  let draft = await MembershipDraft.findOne({
+    email: normalizedEmail,
+    status: { $in: ['draft', 'failed', 'abandoned'] },
+  })
     .select('+tokenHash');
   if (draft?.expiresAt <= new Date()) {
-    draft.status = 'abandoned';
+    draft.status = 'failed';
     await draft.save();
     draft = null;
   }
   if (draft) {
+    draft.status = 'draft';
+    draft.lastEmailError = '';
     draft.firstName = firstName.trim();
     if (profile) draft.profile = { ...draft.profile, ...profile, email: normalizedEmail };
-    await draft.save();
+    await saveDraftAtStep(draft, 1);
   } else {
     token = randomBytes(32).toString('hex');
     try {
@@ -150,15 +227,21 @@ export async function startMembershipDraft({ firstName, email, profile }, curren
         tokenHash: tokenHash(token),
         expiresAt: draftExpiry(),
         profile: { ...profile, email: normalizedEmail },
+        currentStep: 1,
       });
     } catch (error) {
       if (error.code !== 11000) throw error;
-      draft = await MembershipDraft.findOne({ email: normalizedEmail, status: 'draft' });
+      draft = await MembershipDraft.findOne({
+        email: normalizedEmail,
+        status: { $in: ['draft', 'failed', 'abandoned'] },
+      });
       if (!draft) throw error;
       token = randomBytes(32).toString('hex');
       draft.tokenHash = tokenHash(token);
       draft.expiresAt = draftExpiry();
-      await draft.save();
+      draft.status = 'draft';
+      draft.lastEmailError = '';
+      await saveDraftAtStep(draft, 1);
     }
   }
 
@@ -171,7 +254,6 @@ export async function startMembershipDraft({ firstName, email, profile }, curren
       await sendDraftOtp(draft);
     } catch (error) {
       if (!(error instanceof ApiError && error.statusCode === 429)) {
-        console.error('[membership-draft] Email verification delivery failed.');
         throw new ApiError(503, 'We could not send the verification code. Please try again shortly.');
       }
       const remaining = Math.max(
@@ -181,7 +263,7 @@ export async function startMembershipDraft({ firstName, email, profile }, curren
       );
       if (token) {
         draft.tokenHash = tokenHash(token);
-        await draft.save();
+        await saveDraftAtStep(draft, 1);
       }
       return {
         token,
@@ -195,7 +277,7 @@ export async function startMembershipDraft({ firstName, email, profile }, curren
   }
   if (token) {
     draft.tokenHash = tokenHash(token);
-    await draft.save();
+    await saveDraftAtStep(draft, 1);
   }
 
   return {
@@ -226,7 +308,7 @@ export async function verifyMembershipDraftOtp(draft, code) {
   draft.otpHash = '';
   draft.otpSalt = '';
   draft.otpExpiresAt = null;
-  await draft.save();
+  await saveDraftAtStep(draft, 1);
   return publicDraft(draft);
 }
 
@@ -236,7 +318,6 @@ export async function resendMembershipDraftOtp(draft) {
     await sendDraftOtp(draft);
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    console.error('[membership-draft] Email verification delivery failed.');
     throw new ApiError(503, 'We could not send the verification code. Please try again shortly.');
   }
   return { message: 'If this application can receive a code, one has been sent.' };
@@ -273,7 +354,7 @@ export async function saveMembershipDraftProfile(draft, values, photo) {
   const photoUrl = photo ? await savePublicPhoto(photo) : previousPhoto;
   draft.firstName = parsed.data.fullName.trim().split(/\s+/)[0];
   draft.profile = { ...parsed.data, email: draft.email, photoUrl };
-  await draft.save();
+  await saveDraftAtStep(draft, 1);
   if (photo && previousPhoto) await removePublicPhoto(previousPhoto);
   return draft.profile;
 }
@@ -332,7 +413,7 @@ export async function saveMembershipDraftIdentity(draft, values, uploadedDocumen
     })),
   };
   try {
-    await draft.save();
+    await saveDraftAtStep(draft, 1);
   } catch (error) {
     await deletePrivateDocuments(uploadedDocuments);
     throw error;
@@ -357,27 +438,33 @@ export async function discardUncommittedIdentityDocuments(documents = []) {
 
 export async function saveMembershipDraftFamily(draft, values) {
   if (!draft.emailVerifiedAt) throw new ApiError(403, 'Verify your email before continuing.');
-  draft.family = values.map((item) => ({
+  const family = values.map((item) => ({
     id: item.id || randomUUID(),
-    fullName: item.fullName,
-    gender: item.gender,
-    relationship: item.relationship,
-    dob: item.dob,
+    ...normalizeFamilyProfile(item),
     photoUrl: item.photoUrl || '',
   }));
-  await draft.save();
+  const plan = await MembershipPlan.findOne({ _id: draft.plan, isActive: true }).lean();
+  await validateFamilyProfileSet({ plan, members: family });
+  draft.family = family;
+  await saveDraftAtStep(draft, 3);
   return draft.family;
 }
 
 export async function addMembershipDraftFamily(draft, values, photo) {
   if (!draft.emailVerifiedAt) throw new ApiError(403, 'Verify your email before continuing.');
+  const plan = await MembershipPlan.findOne({ _id: draft.plan, isActive: true }).lean();
+  const profileValues = normalizeFamilyProfile(values);
+  await validateFamilyProfileSet({
+    plan,
+    members: [...draft.family.map((member) => member.toObject()), profileValues],
+  });
   const photoUrl = await savePublicPhoto(photo);
   draft.family.push({
     id: randomUUID(),
-    ...values,
+    ...profileValues,
     photoUrl,
   });
-  await draft.save();
+  await saveDraftAtStep(draft, 3);
   const member = draft.family[draft.family.length - 1];
   return { ...member.toObject(), _id: member.id };
 }
@@ -385,10 +472,16 @@ export async function addMembershipDraftFamily(draft, values, photo) {
 export async function updateMembershipDraftFamily(draft, familyId, values, photo) {
   const member = draft.family.find((item) => item.id === familyId);
   if (!member) throw new ApiError(404, 'Family member was not found.');
+  const profileValues = normalizeFamilyProfile(values);
+  const plan = await MembershipPlan.findOne({ _id: draft.plan, isActive: true }).lean();
+  const family = draft.family
+    .filter((item) => item.id !== familyId)
+    .map((item) => item.toObject());
+  await validateFamilyProfileSet({ plan, members: [...family, profileValues] });
   const oldPhoto = member.photoUrl;
-  Object.assign(member, values);
+  Object.assign(member, profileValues);
   if (photo) member.photoUrl = await savePublicPhoto(photo);
-  await draft.save();
+  await saveDraftAtStep(draft, 3);
   if (photo && oldPhoto) await removePublicPhoto(oldPhoto);
   return { ...member.toObject(), _id: member.id };
 }
@@ -397,7 +490,7 @@ export async function deleteMembershipDraftFamily(draft, familyId) {
   const member = draft.family.find((item) => item.id === familyId);
   if (!member) throw new ApiError(404, 'Family member was not found.');
   draft.family = draft.family.filter((item) => item.id !== familyId);
-  await draft.save();
+  await saveDraftAtStep(draft, 3);
   await removePublicPhoto(member.photoUrl);
   return draft.family;
 }
@@ -407,7 +500,7 @@ export async function saveMembershipDraftPlan(draft, planId) {
   const plan = await MembershipPlan.findOne({ _id: planId, isActive: true });
   if (!plan) throw new ApiError(404, 'Membership plan was not found.');
   draft.plan = plan._id;
-  await draft.save();
+  await saveDraftAtStep(draft, 2);
   return plan;
 }
 
@@ -421,6 +514,7 @@ export async function getMembershipDraftQuote(draft, planId) {
     rate: settings.gstRate,
     label: settings.gstLabel,
   });
+  await saveDraftAtStep(draft, 4);
   return {
     planId: String(plan._id),
     planFee: breakdown.baseAmount,
@@ -431,6 +525,13 @@ export async function getMembershipDraftQuote(draft, planId) {
     total: breakdown.totalAmount,
     currency: breakdown.currency,
   };
+}
+
+export async function getMembershipDraftFamilyPriceBreakdown(draft, planId) {
+  if (!draft.emailVerifiedAt) throw new ApiError(403, 'Verify your email before continuing.');
+  const plan = await MembershipPlan.findOne({ _id: planId, isActive: true }).lean();
+  if (!plan) throw new ApiError(404, 'Membership plan was not found.');
+  return calculateFamilyPriceQuotes(plan);
 }
 
 async function persistPriceSnapshot(draft, plan) {
@@ -466,7 +567,7 @@ async function createRazorpayDraftOrder(draft, plan, amount) {
   });
   draft.razorpayOrderId = order.id;
   draft.paymentMethod = 'razorpay';
-  await draft.save();
+  await saveDraftAtStep(draft, 5);
   return {
     orderId: order.id,
     keyId: env.razorpayKeyId,
@@ -590,10 +691,20 @@ async function convertDraftToAccount(draft, {
         gender: family.gender,
         relationship: family.relationship,
         relation: family.relationship,
-        dob: family.dob,
-        dateOfBirth: family.dob,
+        dob: family.dob || null,
+        dateOfBirth: family.dob || null,
         photoUrl: family.photoUrl || '',
         photo: family.photoUrl || '',
+        memberType: family.memberType,
+        isNominee: family.isNominee,
+        nomineeRole: family.nomineeRole || '',
+        designation: family.designation || '',
+        email: family.email || '',
+        workEmail: family.workEmail || '',
+        phone: family.phone || '',
+        parentSide: family.parentSide || null,
+        anniversaryDate: family.anniversaryDate || null,
+        wantsOwnMembership: family.wantsOwnMembership || false,
       } },
       { upsert: true },
     );
@@ -621,14 +732,18 @@ async function convertDraftToAccount(draft, {
   draft.membership = membership._id;
   draft.payment = payment._id;
   draft.paymentMethod = method;
-  draft.status = 'payment_submitted';
+  draft.status = 'payment_pending';
+  draft.currentStep = 6;
   draft.convertedAt = new Date();
   draft.identity.documents = [];
   await draft.save();
   if (method === 'razorpay') {
-    await finalizePayment(payment._id, { razorpayPaymentId });
+    await activateMembership(membership._id, payment._id, {
+      razorpayPaymentId,
+      markPaid: env.nodeEnv !== 'production',
+    });
     draft.status = 'paid';
-    await draft.save();
+    await saveDraftAtStep(draft, 6);
   }
   return {
     userId: String(user._id),
@@ -648,7 +763,9 @@ async function convertDraftToAccount(draft, {
 }
 
 export async function submitMembershipDraftPayment(draft, { paymentMethod, rtgsDetails, companyDetails }) {
-  if (draft.status !== 'draft') throw new ApiError(409, 'This membership application has already been submitted.');
+  await requireCurrentTermsConsent(draft._id);
+  if (!['draft', 'failed'].includes(draft.status)) throw new ApiError(409, 'This membership application has already been submitted.');
+  draft.status = 'draft';
   if (paymentMethod === 'cash' || !['upi', 'card', 'razorpay', 'bank_transfer', 'cheque', 'rtgs'].includes(paymentMethod)) {
     throw new ApiError(400, 'The selected membership payment method is not supported.');
   }
@@ -682,11 +799,16 @@ export async function verifyMembershipDraftRazorpayPayment(draft, {
   razorpay_payment_id,
   razorpay_signature,
 }) {
-  if (!env.razorpayKeySecret || !razorpayClient) throw new ApiError(503, 'Online payment is not available.');
+  await requireCurrentTermsConsent(draft._id);
+  if (!env.razorpayKeySecret || (env.nodeEnv === 'production' && !razorpayClient)) {
+    throw new ApiError(503, 'Online payment is not available.');
+  }
   const current = await MembershipDraft.findOne({
     _id: draft._id,
     razorpayOrderId: razorpay_order_id,
-  }).select('+tokenHash');
+  }).select(
+    '+tokenHash +identity.panCiphertext +identity.idCiphertext +identity.aadhaarLast4 +identity.aadhaarHash',
+  );
   if (!current) throw new ApiError(404, 'Payment order was not found.');
   const expected = createHmac('sha256', env.razorpayKeySecret)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -700,16 +822,21 @@ export async function verifyMembershipDraftRazorpayPayment(draft, {
   if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0) {
     throw new ApiError(400, 'The saved payment amount is invalid.');
   }
-  const providerPayment = await razorpayClient.payments.fetch(razorpay_payment_id);
-  if (providerPayment.order_id !== razorpay_order_id
-    || providerPayment.amount !== expectedAmount
-    || providerPayment.currency !== 'INR'
-    || providerPayment.status !== 'captured') {
-    throw new ApiError(400, 'The verified payment does not match this membership order.');
+  if (env.nodeEnv === 'production') {
+    const providerPayment = await razorpayClient.payments.fetch(razorpay_payment_id);
+    if (providerPayment.order_id !== razorpay_order_id
+      || providerPayment.amount !== expectedAmount
+      || providerPayment.currency !== 'INR'
+      || providerPayment.status !== 'captured') {
+      throw new ApiError(400, 'The verified payment does not match this membership order.');
+    }
+  } else {
+    console.log('[membership-draft] Development payment bypass: callback signature and saved order amount verified.');
   }
   if (current.payment) {
     const payment = await Payment.findById(current.payment);
-    if (payment?.status === 'paid' && payment.razorpayPaymentId === razorpay_payment_id) {
+    if (['confirmed', 'paid'].includes(payment?.status)
+      && payment.razorpayPaymentId === razorpay_payment_id) {
       return { status: 'paid', membershipId: String(current.membership), email: maskEmail(current.email) };
     }
     throw new ApiError(409, 'This payment order has already been used.');
@@ -735,11 +862,18 @@ export async function processGuestMembershipWebhook(rawBody, signature) {
   const paymentEntity = event.payload?.payment?.entity;
   const orderId = paymentEntity?.order_id || event.payload?.order?.entity?.id;
   if (!orderId) return false;
-  const draft = await MembershipDraft.findOne({ razorpayOrderId: orderId, status: 'draft' });
+  const draft = await MembershipDraft.findOne({
+    razorpayOrderId: orderId,
+    status: { $in: ['draft', 'failed'] },
+  }).select(
+    '+identity.panCiphertext +identity.idCiphertext +identity.aadhaarLast4 +identity.aadhaarHash',
+  );
   if (!draft) return false;
   if (event.event === 'payment.failed') {
     draft.razorpayOrderId = '';
     draft.paymentMethod = '';
+    draft.status = 'failed';
+    draft.currentStep = 5;
     await draft.save();
     return true;
   }
@@ -764,7 +898,7 @@ export async function runMembershipDraftCleanup(now = new Date()) {
     throw new TypeError('Draft cleanup requires a valid date.');
   }
   const drafts = await MembershipDraft.find({
-    status: 'draft',
+    status: { $in: ['draft', 'failed'] },
     expiresAt: { $lte: now },
   }).select('_id identity.documents profile.photoUrl family.photoUrl');
   for (const draft of drafts) {
@@ -773,7 +907,10 @@ export async function runMembershipDraftCleanup(now = new Date()) {
       removePublicPhoto(draft.profile?.photoUrl),
       ...(draft.family || []).map((member) => removePublicPhoto(member.photoUrl)),
     ]);
-    await MembershipDraft.updateOne({ _id: draft._id, status: 'draft' }, { $set: { status: 'abandoned' } });
+    await MembershipDraft.updateOne(
+      { _id: draft._id, status: { $in: ['draft', 'failed'] } },
+      { $set: { status: 'failed' } },
+    );
   }
   return { draftsRemoved: drafts.length };
 }

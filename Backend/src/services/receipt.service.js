@@ -16,14 +16,14 @@ async function ensureReceiptNumber(paymentId, userId) {
   const filter = { _id: paymentId, ...(userId ? { user: userId } : {}) };
   const existing = await Payment.findOne(filter).select('status');
   if (!existing) throw new ApiError(404, 'Payment was not found.');
-  if (existing.status !== 'confirmed') throw new ApiError(409, pendingReceiptMessage);
+  if (!['confirmed', 'paid'].includes(existing.status)) throw new ApiError(409, pendingReceiptMessage);
 
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
       const payment = await Payment.findOne(filter).session(session);
       if (!payment) throw new ApiError(404, 'Payment was not found.');
-      if (payment.status !== 'confirmed') throw new ApiError(409, pendingReceiptMessage);
+      if (!['confirmed', 'paid'].includes(payment.status)) throw new ApiError(409, pendingReceiptMessage);
       if (payment.receiptNumber) return;
 
       const confirmedAt = payment.confirmedAt || payment.verifiedAt || payment.createdAt || new Date();
@@ -62,6 +62,7 @@ function formatMoney(value) {
 }
 
 function formatMemberId(membership) {
+  if (membership.memberNo) return membership.memberNo;
   const memberCode = getMembershipMemberCode(membership);
   return memberCode ? `${memberCode.slice(0, 4)} ${memberCode.slice(4)}` : '—';
 }
@@ -80,15 +81,15 @@ function addReceiptRow(document, label, value, top) {
 
 export async function createPaymentReceipt(paymentId, userId) {
   await ensureReceiptNumber(paymentId, userId);
-  const filter = { _id: paymentId, status: 'confirmed', ...(userId ? { user: userId } : {}) };
+  const filter = { _id: paymentId, status: { $in: ['confirmed', 'paid'] }, ...(userId ? { user: userId } : {}) };
   const payment = await Payment.findOne(filter)
-    .select('user membership amount baseAmount gstRate gstEnabled gstLabel gstAmount totalAmount method reference utr razorpayPaymentId receiptNumber confirmedAt')
+    .select('user membership amount baseAmount gstRate gstEnabled gstLabel gstAmount totalAmount method reference utr razorpayPaymentId receiptNumber confirmedAt invoiceNumber invoiceGstin invoiceHsnSac')
     .lean();
   if (!payment) throw new ApiError(404, 'Payment was not found.');
 
   const [membership, profile, user, settings] = await Promise.all([
     Membership.findById(payment.membership)
-      .select('memberCode memberId memberNumber termNumber previousMembership pointsGranted plan planModel')
+      .select('memberNo memberCode memberId memberNumber termNumber previousMembership pointsGranted status plan planModel')
       .populate('plan', 'name title')
       .lean(),
     Profile.findOne({ user: payment.user }).select('fullName').lean(),
@@ -97,8 +98,6 @@ export async function createPaymentReceipt(paymentId, userId) {
   ]);
   if (!membership) throw new ApiError(404, 'Membership was not found for this payment.');
 
-  const document = new PDFDocument({ size: 'A4', margin: 58 });
-  const pageWidth = document.page.width - 116;
   const memberName = profile?.fullName || user?.firstName || '—';
   const tier = membership.plan?.name || membership.plan?.title || '—';
   const term = membership.previousMembership || Number(membership.termNumber) > 1
@@ -106,14 +105,22 @@ export async function createPaymentReceipt(paymentId, userId) {
     : 'New membership';
   const reference = payment.reference || payment.utr || payment.razorpayPaymentId || '—';
   const issuer = settings.receiptCompanyName || defaultCompanyName;
+  const gstEnabled = payment.gstEnabled ?? payment.gstAmount > 0;
+  const gstin = payment.invoiceGstin || settings.receiptGstin || settings.gstin;
+  const hsnSac = payment.invoiceHsnSac || settings.receiptHsnSac;
+  if (gstEnabled && !hsnSac) {
+    throw new ApiError(503, 'Configure the GST HSN/SAC setting before issuing this invoice.');
+  }
 
+  const document = new PDFDocument({ size: 'A4', margin: 58 });
+  const pageWidth = document.page.width - 116;
   document.font('Helvetica-Bold').fontSize(18).fillColor('#183c2d').text(issuer, { width: pageWidth });
   document.moveDown(0.4);
   if (settings.receiptAddress) {
     document.font('Helvetica').fontSize(9).fillColor('#46534a').text(settings.receiptAddress, { width: pageWidth });
   }
-  if (settings.receiptGstin) {
-    document.font('Helvetica').fontSize(9).fillColor('#46534a').text(`GSTIN: ${settings.receiptGstin}`);
+  if (gstin) {
+    document.font('Helvetica').fontSize(9).fillColor('#46534a').text(`GSTIN: ${gstin}`);
   }
   document.moveDown(1.5);
   document.font('Helvetica-Bold').fontSize(20).fillColor('#183c2d').text('PAYMENT RECEIPT');
@@ -122,12 +129,13 @@ export async function createPaymentReceipt(paymentId, userId) {
   document.moveDown(1);
   const rowsStart = Math.max(174, document.y + 8);
 
-  const gstEnabled = payment.gstEnabled ?? payment.gstAmount > 0;
   const gstRate = payment.gstRate ?? (payment.baseAmount
     ? Math.round((payment.gstAmount / payment.baseAmount) * 10000) / 100
     : 0);
   const rows = [
     ['Receipt number', payment.receiptNumber],
+    ...(payment.invoiceNumber ? [['Invoice number', payment.invoiceNumber]] : []),
+    ...(gstEnabled && hsnSac ? [['HSN/SAC', hsnSac]] : []),
     ['Receipt date', formatDate(payment.confirmedAt)],
     ['Member name', memberName],
     ['Member ID', formatMemberId(membership)],
@@ -140,7 +148,9 @@ export async function createPaymentReceipt(paymentId, userId) {
     ['Reference / transaction ID', reference],
     ['Status', 'Paid'],
     ['Confirmed on', formatDate(payment.confirmedAt)],
-    ['Points granted', `${new Intl.NumberFormat('en-IN').format(membership.pointsGranted || 0)} points`],
+    ...(membership.status === 'active' && membership.pointsGranted > 0
+      ? [['Points granted', `${new Intl.NumberFormat('en-IN').format(membership.pointsGranted)} points`]]
+      : []),
   ];
   rows.forEach(([label, value], index) => addReceiptRow(document, label, value, rowsStart + index * 30));
 
@@ -149,6 +159,8 @@ export async function createPaymentReceipt(paymentId, userId) {
     document.font('Helvetica').fontSize(9).fillColor('#46534a')
       .text(settings.receiptFooterNote, 58, rowsStart + rows.length * 30 + 16, { width: pageWidth });
   }
+  document.font('Helvetica').fontSize(9).fillColor('#46534a')
+    .text('Membership payments are non-refundable, subject to the agreement and applicable law.', 58, rowsStart + rows.length * 30 + 38, { width: pageWidth });
   document.end();
   return { document, receiptNumber: payment.receiptNumber };
 }

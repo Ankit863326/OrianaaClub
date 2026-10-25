@@ -25,12 +25,23 @@ function productionFallbackOrigin(siteUrl) {
 }
 
 export default defineConfig(({ command, mode }) => {
-  const { VITE_SITE_URL: siteUrl } = loadEnv(mode, frontendDirectory, 'VITE_');
+  const {
+    VITE_BACKEND_URL: backendUrl,
+    VITE_SITE_URL: siteUrl,
+  } = loadEnv(mode, frontendDirectory, 'VITE_');
   const fallbackSiteUrl = siteUrl || (command === 'serve' ? 'http://localhost:5173' : undefined);
   if (!fallbackSiteUrl) throw new Error('VITE_SITE_URL must be configured for production builds.');
+  const backendTarget = backendUrl || 'http://localhost:5000';
   return {
     plugins: [react(), tailwindcss(), productionFallbackOrigin(fallbackSiteUrl)],
-    server: { port: 5173, strictPort: true },
+    server: {
+      port: 5173,
+      strictPort: true,
+      proxy: {
+        '/api': { target: backendTarget, changeOrigin: true },
+        '/terms': { target: backendTarget, changeOrigin: true },
+      },
+    },
     build: { sourcemap: false },
     resolve: {
       alias: {

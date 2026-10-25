@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useAuth from '../../context/useAuth.js';
 import useAutoRefresh from '../../hooks/useAutoRefresh.js';
@@ -19,22 +19,8 @@ import { isValidIdentityNumber } from '../../lib/identityValidation.js';
 import './MemberDashboard.css';
 
 const tabs = ['Overview', 'Family', 'Documents', 'Bills & Bookings', 'Points History', 'Renew', 'Payments & Receipts'];
-const pointChannelLabels = {
-  admin_manual: 'Admin adjustment',
-  billing_counter: 'Billing counter',
-  app: 'App',
-  card: 'Card',
-};
 const rowsPerPage = 10;
 const emptyFilters = { from: '', to: '', status: '' };
-const pointLabels = {
-  credit_joining: 'Joined',
-  credit_renewal: 'Renewed',
-  debit_redeem: 'Used',
-  refund: 'Refunded',
-  expire: 'Expired',
-  admin_adjust: 'Adjusted',
-};
 
 const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
 const formatPts = (value) => `${numberFormat.format(Number(value) || 0)} pts`;
@@ -325,7 +311,7 @@ function PointsHistoryTab({ membership, onSessionExpired }) {
   const [error, setError] = useState('');
 
   const load = useCallback(async (nextPage = page, { silent = false } = {}) => {
-    if (!membership) {
+    if (!membership || membership.status !== 'active') {
       setData({ items: [], page: 1, pages: 0, total: 0 });
       setLoading(false);
       return;
@@ -355,30 +341,31 @@ function PointsHistoryTab({ membership, onSessionExpired }) {
 
   return <section className="member-hub__panel">
     <h2>Points History</h2>
+    {membership && membership.status !== 'active' && <p className="member-hub__warning" role="status">
+      Payment received. Your membership is under review. Points will appear after approval.
+    </p>}
     {loading && !data && <p className="member-hub__loading" role="status">Loading your points history…</p>}
     {error && <ErrorMessage message={error} retry={() => load(page)} />}
     {data && (data.items.length
       ? <>
         <div className="member-hub__table-wrap">
           <table className="member-hub__table">
-            <thead><tr>{['Activity', 'Amount', 'Balance after', 'Date', 'Note'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
+            <thead><tr>{['Date', 'Amount basis', 'Points', 'Status'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
             <tbody>{data.items.map((entry, index) => <tr key={`${entry.date}-${entry.type}-${index}`}>
-              <td>{pointLabels[entry.type] || String(entry.type || 'Activity').replaceAll('_', ' ')} <small>· {pointChannelLabels[entry.channel] || 'Billing counter'}</small></td>
-              <td>{entry.direction === '-' ? '−' : '+'}{formatPts(entry.amount)}</td>
-              <td>{formatPts(entry.balanceAfter)}</td>
               <td>{formatDate(entry.date, true)}</td>
-              <td>{entry.note || '—'}</td>
+              <td>{entry.amountBasis === null || entry.amountBasis === undefined ? '—' : formatINR(entry.amountBasis)}</td>
+              <td>{entry.points < 0 ? '−' : '+'}{formatPts(Math.abs(entry.points))}</td>
+              <td>{String(entry.status || 'active').replaceAll('_', ' ')}</td>
             </tr>)}</tbody>
           </table>
         </div>
         <div className="member-hub__cards">
           {data.items.map((entry, index) => <article className="member-hub__bill-card" key={`${entry.date}-${entry.type}-card-${index}`}>
-            <strong>{pointLabels[entry.type] || String(entry.type || 'Activity').replaceAll('_', ' ')} <small>· {pointChannelLabels[entry.channel] || 'Billing counter'}</small></strong>
-            <span>{entry.direction === '-' ? '−' : '+'}{formatPts(entry.amount)}</span>
+            <strong>{formatDate(entry.date, true)}</strong>
             <dl>
-              <div><dt>Balance after</dt><dd>{formatPts(entry.balanceAfter)}</dd></div>
-              <div><dt>Date</dt><dd>{formatDate(entry.date, true)}</dd></div>
-              <div><dt>Note</dt><dd>{entry.note || '—'}</dd></div>
+              <div><dt>Amount basis</dt><dd>{entry.amountBasis === null || entry.amountBasis === undefined ? '—' : formatINR(entry.amountBasis)}</dd></div>
+              <div><dt>Points</dt><dd>{entry.points < 0 ? '−' : '+'}{formatPts(Math.abs(entry.points))}</dd></div>
+              <div><dt>Status</dt><dd>{String(entry.status || 'active').replaceAll('_', ' ')}</dd></div>
             </dl>
           </article>)}
         </div>
@@ -400,15 +387,6 @@ export default function MemberDashboardPage() {
   const [membershipLoading, setMembershipLoading] = useState(true);
   const [membershipError, setMembershipError] = useState('');
   const [qrUrl, setQrUrl] = useState('');
-
-  const expireWarning = useMemo(() => {
-    if (!membership?.pointsExpireAt || !membership.pointsBalance) return null;
-    const days = Math.ceil((new Date(membership.pointsExpireAt).getTime() - Date.now()) / 86_400_000);
-    if (days > 90) return null;
-    return days < 0
-      ? `Your points expired ${formatDate(membership.pointsExpireAt)}.`
-      : `Your points expire in ${days} day${days === 1 ? '' : 's'} (${formatDate(membership.pointsExpireAt)}).`;
-  }, [membership?.pointsExpireAt, membership?.pointsBalance]);
 
   const handleSessionExpired = useCallback(async () => {
     try {
@@ -480,33 +458,47 @@ export default function MemberDashboardPage() {
       </EmptyState>;
     }
 
+    const approved = membership.status === 'active';
     const pointsBalance = Number(membership.pointsBalance) || 0;
+    const paymentConfirmed = Boolean(membership.paymentConfirmedAt)
+      || ['pending_approval', 'active', 'expired'].includes(membership.status);
+    const stages = [
+      { label: 'Details and plan', complete: Boolean(membership.tier) },
+      { label: 'Payment confirmed', complete: paymentConfirmed },
+      { label: 'Admin approval', complete: approved },
+      { label: 'Points credited', complete: approved && membership.pointsCredited },
+    ];
     return <>
       {membershipError && <ErrorMessage message={membershipError} retry={loadMembership} />}
-      {expireWarning && <div className="member-hub__warning" role="status">{expireWarning}</div>}
-      <div className="member-hub__grid">
+      <ol className="member-hub__progress" aria-label="Membership progress">
+        {stages.map((stage, index) => <li
+          className={`${stage.complete ? 'is-complete' : ''}${!stage.complete && (index === 0 || stages[index - 1]?.complete) ? ' is-current' : ''}`}
+          key={stage.label}
+        ><span aria-hidden="true">{stage.complete ? '✓' : index + 1}</span>{stage.label}</li>)}
+      </ol>
+      {!approved && <p className="member-hub__warning" role="status">
+        {paymentConfirmed
+          ? 'Payment received. Your membership is under review.'
+          : 'Your membership details are saved. Complete payment to continue.'}
+      </p>}
+      {approved && <div className="member-hub__grid">
         <article className="member-hub__membership">
           <p className="member-hub__eyebrow">Membership overview</p>
           <h2>{membership.tier || 'Orianaa Club Membership'}</h2>
           <p>Welcome, {user?.firstName || 'Member'}</p>
           <div className="member-hub__badges">
             {membership.discountPercent > 0 && <span className="member-hub__badge">{membership.discountPercent}% discount active</span>}
-            {membership.earlyBirdApplied && <span className="member-hub__badge member-hub__badge--gold">Early-bird member</span>}
             <span className="member-hub__badge">{String(membership.status || 'pending').replaceAll('_', ' ')}</span>
           </div>
-          <p className="member-hub__code">Member ID: {formatMemberCode(membership.memberCode)}</p>
-          {qrUrl && <img className="member-hub__qr" src={qrUrl} alt={`Membership QR code for ${formatMemberCode(membership.memberCode)}`} />}
-          <div className="member-hub__dates">
-            <div className="member-hub__date"><span>Points expire</span><strong>{formatDate(membership.pointsExpireAt)}</strong></div>
-            <div className="member-hub__date"><span>Membership expires</span><strong>{formatDate(membership.membershipExpireAt)}</strong></div>
-          </div>
+          <p className="member-hub__code">Member ID: {formatMemberCode(membership.memberNo || membership.memberCode)}</p>
+          {qrUrl && <img className="member-hub__qr" src={qrUrl} alt={`Membership QR code for ${formatMemberCode(membership.memberNo || membership.memberCode)}`} />}
         </article>
         <article className="member-hub__points">
           <span className="member-hub__points-label">Available points</span>
           <strong className="member-hub__points-value">{formatPts(pointsBalance)}</strong>
           <span className="member-hub__points-equivalent">Value equivalent: {formatINR(pointsBalance)} (1 point = ₹1)</span>
         </article>
-      </div>
+      </div>}
     </>;
   }
 

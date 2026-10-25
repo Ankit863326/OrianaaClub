@@ -18,6 +18,7 @@ import {
   getMembershipCheckoutQuote,
   getPaymentMembership,
   getPublicGstSettings,
+  getFamilyPrices,
   getIdentityVerification,
   purchaseMembership,
   submitIdentityVerification,
@@ -28,14 +29,18 @@ import {
   verifyMembershipPayment,
 } from '../../lib/memberApi.js';
 import apiClient from '../../lib/apiClient.js';
+import { getTermsApplication, saveTermsConsent } from '../../lib/termsApi.js';
+import TermsConsentCard from '../../components/TermsConsentCard.jsx';
 import {
   addMembershipDraftFamily,
   deleteMembershipDraftFamily,
   getMembershipDraft,
   getMembershipDraftBankDetails,
   getMembershipDraftQuote,
+  getMembershipDraftFamilyPrices,
   resendMembershipDraftOtp,
   requestMembershipDraftPasswordLink,
+  requestMembershipHelp,
   saveMembershipDraftPlan,
   saveMembershipDraftProfile,
   startMembershipDraft,
@@ -62,9 +67,16 @@ const emptyProfile = {
 
 const emptyFamilyForm = {
   fullName: '',
-  gender: 'female',
+  gender: 'prefer_not_to_say',
   relationship: 'Spouse',
   dob: '',
+  parentSide: 'member',
+  anniversaryDate: '',
+  wantsOwnMembership: false,
+  nomineeRole: '',
+  designation: '',
+  workEmail: '',
+  phone: '',
 };
 const maxImageSize = 10 * 1024 * 1024;
 const maxIdentityFileSize = 5 * 1024 * 1024;
@@ -193,27 +205,36 @@ function dateInputValue(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
 }
 
-function formatPlainDate(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
-  if (!match) return '—';
+function familyMemberType(member = {}) {
+  if (member.memberType?.startsWith('nominee_')) return member.memberType;
+  if (member.isNominee) return 'nominee';
+  const relationship = String(member.relationship || member.relation || '').toLowerCase();
+  if (['wife', 'husband', 'spouse'].includes(relationship)) return 'spouse';
+  if (relationship === 'father' || relationship === 'mother') return relationship;
+  if (member.type === 'child' || ['child', 'son', 'daughter'].includes(relationship)) return 'child';
+  return ['spouse', 'child', 'father', 'mother'].includes(member.memberType)
+    ? member.memberType : '';
+}
 
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const date = new Date(0);
-  date.setFullYear(year, month - 1, day);
-  date.setHours(12, 0, 0, 0);
+function ageOnPurchaseDate(dateOfBirth, purchaseDate = new Date()) {
+  if (!dateOfBirth) return null;
+  const birth = new Date(`${dateOfBirth}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  let age = purchaseDate.getFullYear() - birth.getFullYear();
+  if (
+    purchaseDate.getMonth() < birth.getMonth()
+    || (purchaseDate.getMonth() === birth.getMonth() && purchaseDate.getDate() < birth.getDate())
+  ) age -= 1;
+  return age;
+}
 
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return '—';
-  }
-
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
+function priceForFamilyMember(member, prices) {
+  const type = familyMemberType(member);
+  if (['nominee', 'nominee_gm', 'nominee_hr'].includes(type)) return null;
+  const priceType = type === 'spouse' ? 'spouse'
+    : type === 'father' || type === 'mother' ? 'parent'
+      : type === 'child' ? 'child' : '';
+  return priceType ? prices?.prices?.[priceType] || null : null;
 }
 
 export default function MembershipAll() {
@@ -237,6 +258,8 @@ export default function MembershipAll() {
   const [passwordLinkSent, setPasswordLinkSent] = useState(false);
   const [passwordLinkMessage, setPasswordLinkMessage] = useState('');
   const [passwordLinkResendSeconds, setPasswordLinkResendSeconds] = useState(0);
+  const [helpRequestBusy, setHelpRequestBusy] = useState(false);
+  const [helpRequestMessage, setHelpRequestMessage] = useState('');
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [identityVerification, setIdentityVerification] = useState(null);
   const [panNumber, setPanNumber] = useState('');
@@ -252,6 +275,12 @@ export default function MembershipAll() {
   const [familyForm, setFamilyForm] = useState(emptyFamilyForm);
   const [familyPhoto, setFamilyPhoto] = useState(null);
   const [editingFamilyId, setEditingFamilyId] = useState(null);
+  const [familyTab, setFamilyTab] = useState('spouse');
+  const [familyPrices, setFamilyPrices] = useState(null);
+  const [familyPricesLoading, setFamilyPricesLoading] = useState(false);
+  const [familyPricesError, setFamilyPricesError] = useState('');
+  const [familyPricesRetry, setFamilyPricesRetry] = useState(0);
+  const [parentAnniversaries, setParentAnniversaries] = useState({ member: '', spouse: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -267,6 +296,22 @@ export default function MembershipAll() {
   const [rtgsTransferDate, setRtgsTransferDate] = useState('');
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [termsApplicationId, setTermsApplicationId] = useState(
+    user?._id || user?.id || '',
+  );
+  const [existingTermsConsent, setExistingTermsConsent] = useState(null);
+  const [termsState, setTermsState] = useState({
+    manifest: null,
+    version: '',
+    language: '',
+    readToEnd: false,
+    checked: false,
+    acceptedConsent: null,
+  });
+  const [termsError, setTermsError] = useState('');
+  const [termsHighlighted, setTermsHighlighted] = useState(false);
+  const [termsNotice, setTermsNotice] = useState('');
+  const termsSubmittingRef = useRef(false);
   const [verificationFile, setVerificationFile] = useState(null);
   const [verificationError, setVerificationError] = useState('');
   const [verificationUploaded, setVerificationUploaded] = useState(false);
@@ -312,6 +357,25 @@ export default function MembershipAll() {
       || plan.title === paymentMembership?.plan?.name) || null,
     [plans, membership, paymentMembership],
   );
+  useEffect(() => {
+    const planId = selectedPlan?._id || selectedPlan?.id;
+    if (![3, 4].includes(step) || !planId) return undefined;
+    let active = true;
+    setFamilyPricesLoading(true);
+    setFamilyPricesError('');
+    (isLoggedIn ? getFamilyPrices(planId) : getMembershipDraftFamilyPrices(planId))
+      .then((prices) => {
+        if (active) setFamilyPrices(prices);
+      })
+      .catch((requestError) => {
+        if (active) setFamilyPricesError(requestError.message || 'Family prices could not be loaded.');
+      })
+      .finally(() => {
+        if (active) setFamilyPricesLoading(false);
+      });
+    return () => { active = false; };
+  }, [familyPricesRetry, isLoggedIn, selectedPlan, step]);
+
   const paymentMembershipId = searchParams.get('membershipId');
   const requestedStep = searchParams.get('step');
 
@@ -391,6 +455,8 @@ export default function MembershipAll() {
         if (draft) {
           setDraftStarted(true);
           setDraftEmailVerified(Boolean(draft.emailVerified));
+          setTermsApplicationId(draft.id || '');
+          setExistingTermsConsent(draft.termsConsent || null);
           setProfile((current) => ({
             ...current,
             ...draft.profile,
@@ -398,7 +464,7 @@ export default function MembershipAll() {
             dob: dateInputValue(draft.profile?.dob),
           }));
           setPasswordLinkEmail(draft.email || '');
-          if (['payment_submitted', 'paid'].includes(draft.status)) {
+          if (['payment_pending', 'payment_submitted', 'paid', 'password_pending'].includes(draft.status)) {
             setStep(6);
             setPaymentSubmittedMethod(draft.paymentMethod || '');
             setSearchParams({ step: '6' }, { replace: true });
@@ -431,6 +497,21 @@ export default function MembershipAll() {
       });
     return () => { active = false; };
   }, [isLoggedIn, setSearchParams, user?.email]);
+
+  useEffect(() => {
+    const applicationId = user?._id || user?.id || '';
+    setTermsApplicationId(applicationId);
+    if (!isLoggedIn || !/^[a-f\d]{24}$/i.test(applicationId)) return undefined;
+    let active = true;
+    getTermsApplication(applicationId)
+      .then((application) => {
+        if (active) setExistingTermsConsent(application.termsConsent || null);
+      })
+      .catch((requestError) => {
+        if (active) setTermsError(requestError.message || 'Agreement status could not be loaded.');
+      });
+    return () => { active = false; };
+  }, [isLoggedIn, user?._id, user?.id]);
 
   useEffect(() => {
     loadPlans();
@@ -753,23 +834,124 @@ export default function MembershipAll() {
   }
 
   function resetFamilyForm() {
-    setFamilyForm(emptyFamilyForm);
+    setFamilyForm({
+      ...emptyFamilyForm,
+      relationship: familyTab === 'children' ? 'Son'
+        : familyTab === 'extended' ? 'Father'
+          : familyTab === 'nominees' ? 'Nominee' : 'Spouse',
+    });
     setFamilyPhoto(null);
     setEditingFamilyId(null);
   }
 
   async function submitFamily(event) {
     event.preventDefault();
+    const isCorporate = familyPrices?.tier === 'corporate';
+    const isNominee = familyTab === 'nominees' || isCorporate;
+    const memberType = isNominee
+      ? isCorporate && familyForm.nomineeRole === 'GM'
+        ? 'nominee_gm'
+        : isCorporate && familyForm.nomineeRole === 'HR'
+          ? 'nominee_hr'
+          : 'nominee'
+      : familyTab === 'spouse'
+        ? 'spouse'
+        : familyTab === 'children'
+          ? 'child'
+          : familyForm.relationship.toLowerCase();
+    const dob = familyForm.dob;
+    if (!familyPrices) {
+      setError('Family prices and tier limits are still loading. Please try again.');
+      return;
+    }
+    const existingMembers = family.filter((member) => member._id !== editingFamilyId);
+    const existingNominees = existingMembers.filter((member) => (
+      ['nominee', 'nominee_gm', 'nominee_hr'].includes(familyMemberType(member))
+    ));
+    const existingRelatives = existingMembers.filter((member) => (
+      !['nominee', 'nominee_gm', 'nominee_hr'].includes(familyMemberType(member))
+    ));
+    if (isNominee && existingNominees.length >= familyPrices.maxNominees) {
+      setError(`This tier allows up to ${familyPrices.maxNominees} nominees.`);
+      return;
+    }
+    if (isNominee && !familyPrices.nomineesEnabled) {
+      setError('Nominees are not enabled for this membership tier.');
+      return;
+    }
+    if (!isNominee && !familyPrices.familyEnabled) {
+      setError('Family memberships are not enabled for this tier.');
+      return;
+    }
+    if (!isNominee && familyTab === 'spouse'
+      && existingRelatives.filter((member) => familyMemberType(member) === 'spouse').length
+        >= familyPrices.limits.spouse) {
+      setError(`This tier allows up to ${familyPrices.limits.spouse} spouse.`);
+      return;
+    }
+    if (!isNominee && familyTab === 'extended') {
+      const existingParents = existingRelatives.filter((member) => (
+        ['father', 'mother'].includes(familyMemberType(member))
+      ));
+      if (existingParents.length >= familyPrices.limits.parents) {
+        setError(`This tier allows up to ${familyPrices.limits.parents} parents.`);
+        return;
+      }
+      if (existingParents.filter((member) => member.parentSide === familyForm.parentSide).length
+        >= familyPrices.limits.parentsPerSide) {
+        setError(`A maximum of ${familyPrices.limits.parentsPerSide} parents is allowed on that side.`);
+        return;
+      }
+    }
+    if (!isNominee && memberType === 'child') {
+      const currentChildren = existingRelatives.filter((member) => familyMemberType(member) === 'child').length;
+      if (familyPrices.limits.children !== null && currentChildren >= familyPrices.limits.children) {
+        setError(`This tier allows up to ${familyPrices.limits.children} children.`);
+        return;
+      }
+      const age = ageOnPurchaseDate(dob);
+      if (age === null || age > familyPrices.childMaxAge) {
+        setError(`This child is over ${familyPrices.childMaxAge} and needs their own membership.`);
+        return;
+      }
+    }
+    if (!isNominee && familyPricesError) {
+      setError('Load family pricing before adding a family profile.');
+      return;
+    }
+    const values = {
+      fullName: familyForm.fullName.trim(),
+      gender: isNominee ? 'prefer_not_to_say' : familyForm.gender,
+      relationship: isNominee ? 'Nominee' : familyForm.relationship,
+      memberType,
+      isNominee,
+      dob: isNominee ? '' : dob,
+      parentSide: memberType === 'father' || memberType === 'mother' ? familyForm.parentSide : '',
+      anniversaryDate: familyTab === 'spouse'
+        ? familyForm.anniversaryDate
+        : familyTab === 'extended'
+          ? parentAnniversaries[familyForm.parentSide]
+          : '',
+      wantsOwnMembership: isNominee ? false : Boolean(familyForm.wantsOwnMembership),
+      nomineeRole: isNominee ? familyForm.nomineeRole.trim() : '',
+      designation: isNominee ? familyForm.designation.trim() : '',
+      workEmail: isNominee ? familyForm.workEmail.trim() : '',
+      phone: isNominee ? familyForm.phone.trim() : '',
+    };
+    if (isNominee && !values.workEmail) {
+      setError('Enter the nominee’s work email address.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
       const saved = editingFamilyId
         ? (isLoggedIn
-          ? await updateFamilyMember(editingFamilyId, familyForm, familyPhoto)
-          : await updateMembershipDraftFamily(editingFamilyId, familyForm, familyPhoto))
+          ? await updateFamilyMember(editingFamilyId, values, familyPhoto)
+          : await updateMembershipDraftFamily(editingFamilyId, values, familyPhoto))
         : (isLoggedIn
-          ? await addFamilyMember(familyForm, familyPhoto)
-          : await addMembershipDraftFamily(familyForm, familyPhoto));
+          ? await addFamilyMember(values, familyPhoto)
+          : await addMembershipDraftFamily(values, familyPhoto));
       const normalizedSaved = { ...saved, _id: saved._id || saved.id };
       setFamily((current) => editingFamilyId
         ? current.map((member) => (member._id === normalizedSaved._id ? normalizedSaved : member))
@@ -783,14 +965,56 @@ export default function MembershipAll() {
   }
 
   function startFamilyEdit(member) {
+    const type = familyMemberType(member);
+    const tab = ['nominee', 'nominee_gm', 'nominee_hr'].includes(type)
+      ? 'nominees'
+      : type === 'spouse'
+        ? 'spouse'
+        : type === 'child'
+          ? 'children'
+          : 'extended';
+    const existingRelationship = String(member.relationship || '').toLowerCase();
+    setFamilyTab(tab);
     setEditingFamilyId(member._id);
     setFamilyForm({
       fullName: member.fullName,
       gender: member.gender,
-      relationship: member.relationship,
+      relationship: tab === 'children'
+        ? ['son', 'daughter'].includes(existingRelationship)
+          ? existingRelationship[0].toUpperCase() + existingRelationship.slice(1)
+          : 'Son'
+        : tab === 'extended'
+          ? type[0].toUpperCase() + type.slice(1)
+          : tab === 'spouse'
+            ? 'Spouse'
+            : member.relationship || 'Nominee',
       dob: dateInputValue(member.dob),
+      parentSide: member.parentSide || 'member',
+      anniversaryDate: dateInputValue(member.anniversaryDate),
+      wantsOwnMembership: Boolean(member.wantsOwnMembership),
+      nomineeRole: member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : ''),
+      designation: member.designation || '',
+      workEmail: member.workEmail || member.email || '',
+      phone: member.phone || '',
     });
+    if (tab === 'extended') {
+      setParentAnniversaries((current) => ({
+        ...current,
+        [member.parentSide || 'member']: dateInputValue(member.anniversaryDate),
+      }));
+    }
     setFamilyPhoto(null);
+  }
+
+  function selectFamilyTab(tab) {
+    setFamilyTab(tab);
+    setError('');
+    setEditingFamilyId(null);
+    setFamilyPhoto(null);
+    setFamilyForm({
+      ...emptyFamilyForm,
+      relationship: tab === 'spouse' ? 'Spouse' : tab === 'children' ? 'Child' : 'Father',
+    });
   }
 
   async function removeFamilyMember(id) {
@@ -826,22 +1050,70 @@ export default function MembershipAll() {
     }
   }
 
+  const handleTermsStateChange = useCallback((nextState) => {
+    setTermsState(nextState);
+  }, []);
+
+  function returnToTermsAfterPaymentGate() {
+    setExistingTermsConsent(null);
+    setTermsState((current) => ({ ...current, checked: false, acceptedConsent: null }));
+    setTermsError('Please accept the current membership agreement before proceeding to payment.');
+    setTermsHighlighted(true);
+    setTermsNotice('');
+    setPaymentError('');
+    setPaymentProcessing(false);
+    setStep(4);
+    setSearchParams({ step: '4', ...(selectedPlan?._id ? { planId: selectedPlan._id } : {}) });
+  }
+
+  function handlePaymentError(requestError) {
+    if (requestError.code === 'TERMS_NOT_ACCEPTED') {
+      returnToTermsAfterPaymentGate();
+      return;
+    }
+    setPaymentError(requestError.message || 'We could not start your payment. Please try again.');
+  }
+
   async function confirmAndOpenPayment() {
+    if (termsSubmittingRef.current || saving) return;
     if (!selectedPlan?._id) {
       setError('Please choose a membership plan before continuing.');
       return;
     }
+    if (!termsApplicationId || !termsState.manifest || !termsState.checked || !termsState.readToEnd) {
+      setTermsError('Read the agreement and tick the box to continue.');
+      return;
+    }
+    termsSubmittingRef.current = true;
     setSaving(true);
     setError('');
+    setTermsError('');
     try {
+      const accepted = await saveTermsConsent(termsApplicationId, {
+        version: termsState.version,
+        language: termsState.language,
+        readToEnd: true,
+      });
+      const savedConsent = {
+        version: accepted.version,
+        language: accepted.language,
+        acceptedAt: accepted.acceptedAt,
+      };
+      setExistingTermsConsent(savedConsent);
+      const acceptedDate = new Date(accepted.acceptedAt);
+      const displayedDate = Number.isNaN(acceptedDate.getTime())
+        ? accepted.acceptedAt
+        : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(acceptedDate);
+      setTermsNotice(`Consent saved: ${accepted.version} · ${accepted.language} · ${displayedDate}. Continuing to Step 5, Payment.`);
       if (isLoggedIn) await savePlan(selectedPlan._id);
       else await saveMembershipDraftPlan(selectedPlan._id);
       setSearchParams({ step: '5', planId: selectedPlan._id });
       setStep(5);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (requestError) {
-      setError(requestError.message);
+      setTermsError(requestError.message || 'Your agreement could not be saved. Please try again.');
     } finally {
+      termsSubmittingRef.current = false;
       setSaving(false);
     }
   }
@@ -917,7 +1189,7 @@ export default function MembershipAll() {
               setPaymentMembership((current) => ({ ...current, ...verification }));
               moveTo(6);
             } catch (requestError) {
-              setPaymentError(requestError.message || 'Payment could not be verified. Please retry.');
+            handlePaymentError(requestError);
             } finally {
               setPaymentProcessing(false);
             }
@@ -1006,7 +1278,7 @@ export default function MembershipAll() {
             }
 
           } catch (requestError) {
-            setPaymentError(requestError.message || 'Payment could not be verified. Please retry.');
+            handlePaymentError(requestError);
           } finally {
             setPaymentProcessing(false);
           }
@@ -1025,10 +1297,12 @@ export default function MembershipAll() {
       checkout.open();
     } catch (requestError) {
       setPaymentProcessing(false);
-      if (requestError.status === 503) {
+      if (requestError.code === 'TERMS_NOT_ACCEPTED') {
+        returnToTermsAfterPaymentGate();
+      } else if (requestError.status === 503) {
         setPaymentUnavailable(true);
       } else {
-        setPaymentError(requestError.message || 'We could not start your payment. Please try again.');
+        handlePaymentError(requestError);
       }
     }
   }
@@ -1037,25 +1311,39 @@ export default function MembershipAll() {
     event.preventDefault();
     if (!passwordLinkEmail.trim() || passwordLinkResendSeconds > 0) return;
     setPaymentError('');
+    setPasswordLinkMessage('');
     try {
       const response = isLoggedIn
         ? await apiClient.post('/auth/onboarding/password-link', { email: passwordLinkEmail.trim() })
         : await requestMembershipDraftPasswordLink(passwordLinkEmail.trim());
       const result = response.data || response;
-      if (result.maskedEmail) {
+      if (result.sent && result.maskedEmail) {
         setPasswordLinkSent(true);
         setPasswordLinkMessage(`Password link sent to ${result.maskedEmail}`);
+        setPasswordLinkResendSeconds(60);
         setProfile((current) => ({ ...current, email: passwordLinkEmail.trim() }));
       } else {
         setPasswordLinkSent(false);
         setPasswordLinkMessage(result.message || response.message || 'If the address can be used, a password link will be sent.');
       }
-      setPasswordLinkResendSeconds(60);
     } catch (requestError) {
-      if (requestError.retryAfterSeconds) {
-        setPasswordLinkResendSeconds(requestError.retryAfterSeconds);
-      }
-      setPaymentError(requestError.message || 'The password setup link could not be requested.');
+      setPasswordLinkSent(false);
+      setPasswordLinkResendSeconds(0);
+      setPasswordLinkMessage(requestError.message || 'The password setup link could not be requested.');
+    }
+  }
+
+  async function requestAdminHelp() {
+    if (!passwordLinkEmail.trim() || helpRequestBusy) return;
+    setHelpRequestBusy(true);
+    setHelpRequestMessage('');
+    try {
+      const response = await requestMembershipHelp(passwordLinkEmail.trim());
+      setHelpRequestMessage(response.message || 'Your request has been sent to the membership team.');
+    } catch (requestError) {
+      setHelpRequestMessage(requestError.message || 'We could not send your help request. Please try again.');
+    } finally {
+      setHelpRequestBusy(false);
     }
   }
 
@@ -1109,6 +1397,21 @@ export default function MembershipAll() {
     : existingMembership?.status === 'pending_payment'
       ? 'Your membership payment is pending admin confirmation'
       : '';
+  const familyNominees = family.filter((member) => (
+    ['nominee', 'nominee_gm', 'nominee_hr'].includes(familyMemberType(member))
+  ));
+  const familyRelatives = family.filter((member) => !familyNominees.includes(member));
+  const spouseCount = familyRelatives.filter((member) => familyMemberType(member) === 'spouse').length;
+  const parentMembers = familyRelatives.filter((member) => ['father', 'mother'].includes(familyMemberType(member)));
+  const childCount = familyRelatives.filter((member) => familyMemberType(member) === 'child').length;
+  const corporateTier = familyPrices?.tier === 'corporate'
+    || String(selectedPlan?.slug || selectedPlan?.id || '').toLowerCase() === 'corporate';
+  const nomineeLimit = familyPrices?.maxNominees ?? 0;
+  const familyLimits = familyPrices?.limits;
+  const familyTotal = family.reduce((sum, member) => {
+    const price = priceForFamilyMember(member, familyPrices);
+    return sum + (price?.totalPayable || 0);
+  }, 0);
 
   if (isLoggedIn && !user?.onboarding && (isLockedActiveMembership || isRenewableMembership || pendingMessage)) {
     return <main className="join-membership-page">
@@ -1120,7 +1423,6 @@ export default function MembershipAll() {
             </p>
             <p><strong>Tier:</strong> {existingMembership.tier || 'Membership'}</p>
             <p><strong>Points balance:</strong> {formatPoints(existingMembership.pointsBalance || 0)}</p>
-            <p><strong>Points expiry:</strong> {formatPlainDate(dateInputValue(existingMembership.pointsExpireAt))}</p>
             <button className="jm-btn-submit" type="button" onClick={() => navigate('/dashboard')}>
               Go to My Dashboard
             </button>
@@ -1199,6 +1501,7 @@ export default function MembershipAll() {
           </header>
 
           {error && <p className="jm-api-message jm-api-message--error" role="alert">{error}</p>}
+          {termsNotice && <p className="jm-api-message" role="status">{termsNotice}</p>}
 
           {step === 1 && (
             <form className="jm-application-card jm-hero-form" onSubmit={submitProfile}>
@@ -1425,53 +1728,262 @@ export default function MembershipAll() {
           )}
 
           {step === 3 && (
-            <div className="jm-application-card">
-              <h2>Family members</h2>
-              <p>This plan allows up to {selectedPlan?.maxFamilyMembers ?? 0} additional family profiles.</p>
-              <form className="jm-application-grid" onSubmit={submitFamily}>
-                <label className="jm-field">Full name
-                  <input className="jm-input" required minLength="2" value={familyForm.fullName}
-                    onChange={(event) => setFamilyForm({ ...familyForm, fullName: event.target.value })} />
-                </label>
-                <label className="jm-field">Gender
-                  <select className="jm-input jm-select" value={familyForm.gender}
-                    onChange={(event) => setFamilyForm({ ...familyForm, gender: event.target.value })}>
-                    <option value="male">Male</option><option value="female">Female</option>
-                    <option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option>
-                  </select>
-                </label>
-                <label className="jm-field">Relationship
-                  <input className="jm-input" required value={familyForm.relationship}
-                    onChange={(event) => setFamilyForm({ ...familyForm, relationship: event.target.value })} />
-                </label>
-                <label className="jm-field">Date of birth
-                  <input className="jm-input" required type="date" value={familyForm.dob}
-                    onChange={(event) => setFamilyForm({ ...familyForm, dob: event.target.value })} />
-                </label>
-                <label className="jm-field">Photo (optional; max 10 MB)
-                  <input className="jm-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                    onChange={(event) => selectImageFile(event, setFamilyPhoto, setError)} />
-                </label>
-                <div className="jm-family-actions">
-                  <button className="jm-btn-submit" disabled={saving}>{saving ? 'Saving…' : editingFamilyId ? 'Update member' : 'Add family member'}</button>
-                  {editingFamilyId && <button type="button" className="jm-btn-pill-outline" onClick={resetFamilyForm}>Cancel edit</button>}
+            <div className="jm-application-card jm-family-step">
+              <header className="jm-family-step__header">
+                <p className="jm-family-step__eyebrow">{corporateTier ? 'Corporate membership' : 'Your membership family'}</p>
+                <h2>{corporateTier ? 'Add your nominees' : 'Family details'}</h2>
+                <p>{corporateTier
+                  ? 'Nominees are added at no extra cost. Add one General Manager (GM) and one Human Resources (HR) nominee.'
+                  : `Add ${spouseCount}/${familyLimits?.spouse ?? '—'} spouse, ${familyLimits?.children === null ? 'unlimited' : `up to ${familyLimits?.children ?? '—'}`} children (${childCount} added), up to ${familyLimits?.parents ?? '—'} parents (${familyLimits?.parentsPerSide ?? '—'} per side; ${parentMembers.length} added), and up to ${nomineeLimit} nominees. A family profile is not a membership; the person becomes a member when they pay.`}</p>
+              </header>
+
+              {familyPricesLoading && <p className="jm-quote-status" role="status">Loading family prices…</p>}
+              {familyPricesError && (
+                <div className="jm-family-price-error" role="alert">
+                  <span>{familyPricesError}</span>
+                  <button className="jm-btn-pill-outline" type="button" onClick={() => setFamilyPricesRetry((count) => count + 1)}>Retry</button>
                 </div>
-              </form>
-              <div className="jm-family-list">
-                <h3>Added Family Members ({family.length})</h3>
-                {family.map((member) => (
-                  <div className="jm-family-chip" key={member._id}>
-                    {member.photoUrl && <img className="jm-family-photo" src={apiFileUrl(member.photoUrl)} alt="" />}
-                    <span>{member.fullName} <small>({member.relationship} · {member.gender})</small></span>
-                    <button className="jm-btn-pill-outline" type="button" onClick={() => startFamilyEdit(member)}>Edit</button>
-                    <button className="jm-family-chip__delete" type="button" disabled={saving}
-                      onClick={() => removeFamilyMember(member._id)} aria-label={`Delete ${member.fullName}`}>Delete</button>
-                  </div>
-                ))}
-              </div>
+              )}
+
+              {!corporateTier && (
+                <div className="jm-family-tabs" role="tablist" aria-label="Family profile type">
+                  {[
+                    ['spouse', 'Spouse'],
+                    ['children', 'Children'],
+                    ['extended', 'Extended family'],
+                    ['nominees', 'Nominees'],
+                  ].filter(([tab]) => tab !== 'nominees'
+                    || (familyPrices?.nomineesEnabled && familyPrices.maxNominees > 0))
+                    .map(([tab, label]) => (
+                    <button
+                      key={tab}
+                      className={`jm-family-tab${familyTab === tab ? ' is-active' : ''}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={familyTab === tab}
+                      onClick={() => selectFamilyTab(tab)}
+                    >{label}</button>
+                  ))}
+                </div>
+              )}
+
+              {familyTab === 'nominees' || corporateTier ? (
+                <section className="jm-family-panel" aria-label="Nominee details">
+                  <p className="jm-family-panel__intro">
+                    {corporateTier
+                      ? 'Add nominees at no extra cost. Each nominee confirms their email with a code and earns no points.'
+                      : 'Add a nominee at no extra cost. Nominees confirm their email with a code and earn no points.'}
+                  </p>
+                  <form className="jm-application-grid jm-family-form" onSubmit={submitFamily}>
+                    {corporateTier && (
+                      <label className="jm-field">Nominee role
+                        <select
+                          className="jm-input jm-select"
+                          required
+                          value={familyForm.nomineeRole}
+                          onChange={(event) => setFamilyForm({ ...familyForm, nomineeRole: event.target.value })}
+                        >
+                          <option value="">Select a role</option>
+                          {['GM', 'HR'].filter((role) => !familyNominees.some((member) => (
+                            member.nomineeRole === role
+                            || familyMemberType(member) === `nominee_${role.toLowerCase()}`
+                          )) || (editingFamilyId && family.find((member) => member._id === editingFamilyId)?.nomineeRole === role))
+                            .map((role) => <option value={role} key={role}>{role}</option>)}
+                        </select>
+                      </label>
+                    )}
+                    {!corporateTier && (
+                      <label className="jm-field">Role
+                        <input
+                          className="jm-input"
+                          required
+                          maxLength="80"
+                          value={familyForm.nomineeRole}
+                          placeholder="Friend, PA, etc."
+                          onChange={(event) => setFamilyForm({ ...familyForm, nomineeRole: event.target.value })}
+                        />
+                      </label>
+                    )}
+                    <label className="jm-field">Full name
+                      <input className="jm-input" required minLength="2" maxLength="120" value={familyForm.fullName}
+                        onChange={(event) => setFamilyForm({ ...familyForm, fullName: event.target.value })} />
+                    </label>
+                    <label className="jm-field">Designation
+                      <input className="jm-input" required maxLength="120" value={familyForm.designation}
+                        onChange={(event) => setFamilyForm({ ...familyForm, designation: event.target.value })} />
+                    </label>
+                    <label className="jm-field">Work email
+                      <input className="jm-input" required type="email" maxLength="254" value={familyForm.workEmail}
+                        onChange={(event) => setFamilyForm({ ...familyForm, workEmail: event.target.value })} />
+                    </label>
+                    <label className="jm-field">Phone
+                      <input className="jm-input" required type="tel" maxLength="40" value={familyForm.phone}
+                        onChange={(event) => setFamilyForm({ ...familyForm, phone: event.target.value })} />
+                    </label>
+                    <label className="jm-field">Photo (optional; max 10 MB)
+                      <input className="jm-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        onChange={(event) => selectImageFile(event, setFamilyPhoto, setError)} />
+                    </label>
+                    <div className="jm-family-actions">
+                      <button className="jm-btn-submit" disabled={saving
+                        || !familyPrices?.nomineesEnabled
+                        || familyNominees.length >= nomineeLimit && !editingFamilyId}>
+                        {saving ? 'Saving…' : editingFamilyId ? 'Update nominee' : 'Add nominee'}
+                      </button>
+                      {editingFamilyId && <button type="button" className="jm-btn-pill-outline" onClick={resetFamilyForm}>Cancel edit</button>}
+                    </div>
+                  </form>
+                  {!corporateTier && <p className="jm-family-limit-note">Nominees do not pay, receive a discount, or earn points.</p>}
+                </section>
+              ) : (
+                <section className="jm-family-panel" aria-label={`${familyTab} details`}>
+                  {(() => {
+                    const priceType = familyTab === 'spouse' ? 'spouse' : familyTab === 'children' ? 'child' : 'parent';
+                    const price = familyPrices?.prices?.[priceType];
+                    return price ? (
+                      <div className="jm-family-price-card" aria-label={`${priceType} price`}>
+                        <span className="jm-family-discount">{price.discountPct}% discount</span>
+                        <div><span>Base price</span><strong>{money(price.baseAmount)}</strong></div>
+                        <div><span>GST</span><strong>{money(price.gstAmount)}</strong></div>
+                        <div className="jm-family-price-card__total"><span>Total</span><strong>{money(price.totalPayable)}</strong></div>
+                      </div>
+                    ) : (
+                      <p className="jm-quote-status" role="status">Family pricing is unavailable for this tier.</p>
+                    );
+                  })()}
+
+                  <form className="jm-application-grid jm-family-form" onSubmit={submitFamily}>
+                    {familyTab === 'extended' && (
+                      <label className="jm-field">Whose parents?
+                        <select
+                          className="jm-input jm-select"
+                          value={familyForm.parentSide}
+                          onChange={(event) => setFamilyForm({ ...familyForm, parentSide: event.target.value })}
+                        >
+                          <option value="member">Member’s parents</option>
+                          <option value="spouse">Spouse’s parents</option>
+                        </select>
+                      </label>
+                    )}
+                    <label className="jm-field">Full name
+                      <input className="jm-input" required minLength="2" maxLength="120" value={familyForm.fullName}
+                        onChange={(event) => setFamilyForm({ ...familyForm, fullName: event.target.value })} />
+                    </label>
+                    <label className="jm-field">Gender
+                      <select className="jm-input jm-select" required value={familyForm.gender}
+                        onChange={(event) => setFamilyForm({ ...familyForm, gender: event.target.value })}>
+                        <option value="male">Male</option><option value="female">Female</option>
+                        <option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option>
+                      </select>
+                    </label>
+                    <label className="jm-field">Relationship
+                      <select
+                        className="jm-input jm-select"
+                        required
+                        value={familyForm.relationship}
+                        onChange={(event) => setFamilyForm({ ...familyForm, relationship: event.target.value })}
+                      >
+                        {(familyTab === 'spouse' ? ['Spouse']
+                          : familyTab === 'children' ? ['Son', 'Daughter']
+                            : ['Father', 'Mother']).map((relationship) => (
+                              <option key={relationship} value={relationship}>{relationship}</option>
+                            ))}
+                      </select>
+                    </label>
+                    <label className="jm-field">Date of birth
+                      <input className="jm-input" required type="date" value={familyForm.dob}
+                        onChange={(event) => setFamilyForm({ ...familyForm, dob: event.target.value })} />
+                    </label>
+                    {familyTab === 'spouse' && (
+                      <label className="jm-field">Anniversary date (for the couple)
+                        <input className="jm-input" type="date" value={familyForm.anniversaryDate}
+                          onChange={(event) => setFamilyForm({ ...familyForm, anniversaryDate: event.target.value })} />
+                      </label>
+                    )}
+                    {familyTab === 'extended' && (
+                      <label className="jm-field">Parents’ anniversary date
+                        <input
+                          className="jm-input"
+                          type="date"
+                          value={parentAnniversaries[familyForm.parentSide]}
+                          onChange={(event) => setParentAnniversaries((current) => ({
+                            ...current,
+                            [familyForm.parentSide]: event.target.value,
+                          }))}
+                        />
+                      </label>
+                    )}
+                    <label className="jm-field">Photo (optional; max 10 MB)
+                      <input className="jm-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        onChange={(event) => selectImageFile(event, setFamilyPhoto, setError)} />
+                    </label>
+                    <label className="jm-family-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(familyForm.wantsOwnMembership)}
+                        onChange={(event) => setFamilyForm({ ...familyForm, wantsOwnMembership: event.target.checked })}
+                      />
+                      <span>Wants own membership</span>
+                    </label>
+                    <p className="jm-family-document-note">
+                      Aadhaar and other documents are uploaded securely in the verification step, after you add this person. Payment is non-refundable if verification cannot be completed.
+                    </p>
+                    <div className="jm-family-actions">
+                      <button className="jm-btn-submit" disabled={saving || familyPricesLoading || !familyPrices}>
+                        {saving ? 'Saving…' : editingFamilyId ? 'Update family profile' : 'Add family profile'}
+                      </button>
+                      {editingFamilyId && <button type="button" className="jm-btn-pill-outline" onClick={resetFamilyForm}>Cancel edit</button>}
+                    </div>
+                  </form>
+                </section>
+              )}
+
+              {error && <p className="jm-api-message jm-api-message--error" role="alert">{error}</p>}
+
+              <section className="jm-family-list jm-family-added" aria-labelledby="jm-family-added-title">
+                <div className="jm-family-added__heading">
+                  <h3 id="jm-family-added-title">Added ({family.length})</h3>
+                  {family.length > 0 && !corporateTier && <strong>Family profiles: {money(familyTotal)}</strong>}
+                </div>
+                {family.length === 0 ? (
+                  <p>No family profiles or nominees added yet.</p>
+                ) : family.map((member) => {
+                  const type = familyMemberType(member);
+                  const price = priceForFamilyMember(member, familyPrices);
+                  const isNominee = ['nominee', 'nominee_gm', 'nominee_hr'].includes(type);
+                  return (
+                    <article className="jm-family-added-card" key={member._id}>
+                      {member.photoUrl && <img className="jm-family-photo" src={apiFileUrl(member.photoUrl)} alt="" />}
+                      <div className="jm-family-added-card__details">
+                        <strong>{member.fullName}</strong>
+                        <span>{isNominee ? `Nominee · ${member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : `${member.relationship}${member.parentSide ? ` · ${member.parentSide === 'member' ? 'Member’s parents' : 'Spouse’s parents'}` : ''}`}</span>
+                        {isNominee ? (
+                          <span>No cost · No discount · No points</span>
+                        ) : (
+                          <>
+                            {price && <span className="jm-family-discount">{price.discountPct}% discount</span>}
+                            <span>{price ? `Base ${money(price.baseAmount)} + GST ${money(price.gstAmount)} = ${money(price.totalPayable)}` : 'Price unavailable'}</span>
+                            <span>Welcome kit included · Aadhaar status: {member.aadhaarStatus || 'Not added'}</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="jm-family-added-card__actions">
+                        <button className="jm-btn-pill-outline" type="button" onClick={() => startFamilyEdit(member)}>Edit</button>
+                        <button className="jm-family-chip__delete" type="button" disabled={saving}
+                          onClick={() => removeFamilyMember(member._id)} aria-label={`Delete ${member.fullName}`}>Delete</button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+
+              <p className="jm-non-refundable-notice" role="note">
+                Payments are non-refundable. Please review family details and required documents before continuing.
+              </p>
               <div className="jm-family-actions">
                 <button className="jm-btn-pill-outline" type="button" onClick={() => moveTo(2)}>Back</button>
-                <button className="jm-btn-submit" type="button" onClick={saveDraftAndReview} disabled={saving}>
+                <button className="jm-btn-submit" type="button" onClick={saveDraftAndReview}
+                  disabled={saving || familyPricesLoading || Boolean(familyPricesError)}>
                   {saving ? 'Saving…' : 'Continue to review'}
                 </button>
               </div>
@@ -1482,15 +1994,6 @@ export default function MembershipAll() {
             <div className="jm-review-layout">
               <section className="jm-review-plan-card" aria-label="Selected membership plan">
                 <h2 className="jm-review-plan-card__title">{selectedPlan?.title || 'Selected plan'}</h2>
-                <p className="jm-review-plan-card__rate">1 Redemption points = 1 Rupee</p>
-                <div className="jm-review-plan-card__benefits">
-                  {(selectedPlan?.benefits || []).map((benefit, index) => (
-                    <div className="jm-review-plan-card__benefit" key={`${selectedPlan.slug}-${index}`}>
-                      <strong>{formatPoints(benefit.points)} points</strong>
-                      <span>{benefit.label}</span>
-                    </div>
-                  ))}
-                </div>
                 <div className="jm-review-plan-card__price">
                   <span>Plan price</span>
                   <strong>{money(selectedPlan?.price)}</strong>
@@ -1509,6 +2012,39 @@ export default function MembershipAll() {
                     <div><dt>Date of Birth</dt><dd>{formatPlainDate(profile.dob)}</dd></div>
                     <div><dt>Phone</dt><dd>{profile.mobile ? `${profile.countryCode || ''} ${profile.mobile}`.trim() : '—'}</dd></div>
                   </dl>
+                </section>
+
+                <section className="jm-review-card" aria-label="Family profiles and nominees">
+                  <h2 className="jm-review-card__title">Family profiles &amp; nominees</h2>
+                  {family.length === 0 ? (
+                    <p>No family profiles or nominees added.</p>
+                  ) : (
+                    <div className="jm-family-review-list">
+                      {family.map((member) => {
+                        const type = familyMemberType(member);
+                        const price = priceForFamilyMember(member, familyPrices);
+                        const isNominee = ['nominee', 'nominee_gm', 'nominee_hr'].includes(type);
+                        return (
+                          <div className="jm-family-review-item" key={member._id}>
+                            <strong>{member.fullName}</strong>
+                            <span>{isNominee ? `Nominee · ${member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : member.relationship}</span>
+                            {isNominee ? (
+                              <span>No extra cost</span>
+                            ) : price ? (
+                              <>
+                                <span className="jm-family-discount">{price.discountPct}% discount</span>
+                                <dl>
+                                  <div><dt>Base</dt><dd>{money(price.baseAmount)}</dd></div>
+                                  <div><dt>GST</dt><dd>{money(price.gstAmount)}</dd></div>
+                                  <div><dt>Total</dt><dd>{money(price.totalPayable)}</dd></div>
+                                </dl>
+                              </>
+                            ) : <span>Price unavailable</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
 
                 <section className="jm-review-card jm-payment-details" aria-label="Payment details">
@@ -1535,15 +2071,45 @@ export default function MembershipAll() {
                   ) : (
                     <p className="jm-quote-status" role="status">Select a plan to view payment details.</p>
                   )}
+                </section>
+                <TermsConsentCard
+                  savedLanguage={profile.language || user?.language}
+                  existingConsent={existingTermsConsent}
+                  highlighted={termsHighlighted}
+                  error={termsError}
+                  onStateChange={handleTermsStateChange}
+                />
+                <div className="jm-terms-confirm">
+                  <p className="jm-non-refundable-notice" role="note">
+                    Payments are non-refundable. Please make sure your membership and family details are correct before proceeding.
+                  </p>
                   <button
                     className="jm-btn-submit jm-confirm-payment"
                     type="button"
                     onClick={confirmAndOpenPayment}
-                    disabled={saving || quoteLoading || Boolean(quoteError) || !quote}
+                    disabled={
+                      saving
+                      || quoteLoading
+                      || Boolean(quoteError)
+                      || !quote
+                      || !termsApplicationId
+                      || !termsState.manifest
+                      || (!termsState.checked && !(
+                        existingTermsConsent
+                        && existingTermsConsent.version === termsState.manifest?.version
+                      ))
+                      || !termsState.readToEnd
+                    }
                   >
-                    {saving ? 'Preparing payment…' : 'Confirm & Proceed to Payment'}
+                    {saving ? 'Saving consent…' : 'Confirm & Proceed to Payment'}
                   </button>
-                </section>
+                  {!termsState.checked && !(
+                    existingTermsConsent
+                    && existingTermsConsent.version === termsState.manifest?.version
+                  ) && (
+                    <p className="jm-terms-confirm__hint">Read the agreement and tick the box to continue.</p>
+                  )}
+                </div>
                 {selectedPlan?.requiresCompanyDetails && (
                   <section className="jm-review-card" aria-label="Company details">
                     <h2 className="jm-review-card__title">Company Details</h2>
@@ -1709,6 +2275,9 @@ export default function MembershipAll() {
                     </div>
                   ) : (
                     <>
+                      <p className="jm-non-refundable-notice" role="note">
+                        Payments are non-refundable. Verification must be completed to unlock the family rate.
+                      </p>
                       {paymentError && <p className="jm-payment-error" role="alert">{paymentError}</p>}
                       <button
                         className="jm-btn-submit jm-pay-securely"
@@ -1755,7 +2324,7 @@ export default function MembershipAll() {
                 </label>
                 {passwordLinkSent && <p className="mt-3" role="status">{passwordLinkMessage}</p>}
                 {passwordLinkMessage && !passwordLinkSent
-                  && <p className="mt-3" role="status">{passwordLinkMessage}</p>}
+                  && <p className="mt-3 jm-payment-error" role="alert">{passwordLinkMessage}</p>}
                 <p className="mt-3 text-sm">Check your inbox and spam folder.</p>
                 <button
                   className="jm-btn-submit mt-4"
@@ -1770,6 +2339,19 @@ export default function MembershipAll() {
                 </button>
               </form>
               {paymentError && <p className="jm-payment-error mt-4" role="alert">{paymentError}</p>}
+              {helpRequestMessage && <p className="mt-4" role="status">{helpRequestMessage}</p>}
+              <div className="mt-5 flex flex-wrap items-center gap-4 text-sm">
+                <button
+                  className="jm-btn-submit"
+                  type="button"
+                  onClick={requestAdminHelp}
+                  disabled={helpRequestBusy || !passwordLinkEmail.trim()}
+                >
+                  {helpRequestBusy ? 'Sending request…' : 'Request admin help'}
+                </button>
+                <a href="/login" className="underline">Login</a>
+                <a href="/forgot-password" className="underline">Forgot password?</a>
+              </div>
             </section>
           )}
         </motion.section>

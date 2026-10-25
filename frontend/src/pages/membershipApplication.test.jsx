@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AuthContext from '../context/auth-context.js';
@@ -24,6 +24,27 @@ const planRecord = {
   subtitle: 'Twenty years', price: 100000, maxFamilyMembers: 4,
   benefits: [{ points: 50000, label: 'Joining points' }],
 };
+const userId = '64a000000000000000000001';
+const termsManifest = {
+  version: 'v1',
+  effectiveFrom: '2026-10-20',
+  languages: ['hi', 'mr', 'gu'].map((code, index) => ({
+    code,
+    label: ['Hindi', 'Marathi', 'Gujarati'][index],
+    pdfUrl: `/terms/v1/${code}.pdf`,
+    htmlUrl: `/terms/v1/${code}.html`,
+    sha256: code.repeat(32),
+  })),
+  keyPoints: [
+    'This is a long-term lifestyle membership for curated experiences.',
+    'This is not a sale of property and not an investment product.',
+    'Points are notional points redeemed under the points system.',
+    'The AMC is the annual maintenance charge described in the agreement.',
+  ],
+};
+const termsHtml = `<main>${Array.from({ length: 21 }, (_, index) => (
+  `<h2 id="s${index + 1}">Section ${index + 1}</h2>`
+)).join('')}</main>`;
 
 function setUpApi(identityStatus = 'verified', {
   membership: currentMembership = member.membership,
@@ -33,7 +54,37 @@ function setUpApi(identityStatus = 'verified', {
     const requestUrl = new URL(url);
     const path = requestUrl.pathname;
     const method = options.method || 'GET';
+    if (path.endsWith('/terms/current')) return jsonResponse(termsManifest);
+    if (path.endsWith(`/membership/applications/${userId}`) && method === 'GET') {
+      return jsonResponse({ data: { id: userId, termsConsent: null } });
+    }
+    if (path.endsWith('/terms-consent') && method === 'POST') {
+      const body = JSON.parse(options.body);
+      return jsonResponse({ data: {
+        id: 'terms-consent-1',
+        acceptedAt: '2026-10-20T12:00:00.000Z',
+        version: body.version,
+        language: body.language,
+      } }, 201);
+    }
+    if (/\/terms\/v1\/(hi|mr|gu)\.html$/.test(path)) {
+      return { ok: true, status: 200, text: async () => termsHtml };
+    }
     if (path.endsWith('/member/me')) return jsonResponse({ data: { ...member, membership: currentMembership } });
+    if (path.endsWith('/family-prices')) return jsonResponse({ data: {
+      tier: 'founder-legacy',
+      familyEnabled: true,
+      nomineesEnabled: true,
+      maxNominees: 2,
+      nomineeRoles: 'free_text',
+      childMaxAge: 18,
+      limits: { spouse: 1, parents: 4, parentsPerSide: 2, children: null },
+      prices: {
+        spouse: { baseAmount: 50000, gstAmount: 9000, totalPayable: 59000, discountPct: 50 },
+        parent: { baseAmount: 50000, gstAmount: 9000, totalPayable: 59000, discountPct: 50 },
+        child: { baseAmount: 25000, gstAmount: 4500, totalPayable: 29500, discountPct: 75 },
+      },
+    } });
     if (path.endsWith('/member/identity-verification')) return jsonResponse({ data: {
       status: method === 'PUT' ? 'pending' : identityStatus,
       panMask: 'ABCDE****F', idType: 'aadhaar', idMask: 'XXXX XXXX 9904',
@@ -54,7 +105,22 @@ function setUpApi(identityStatus = 'verified', {
     } });
     if (path.endsWith('/member/profile')) return jsonResponse({ data: member.profile });
     if (path.endsWith('/member/plan')) return jsonResponse({ data: { _id: 'membership-1', status: 'draft', plan: { _id: 'plan-1', slug: 'gold' } } });
-    if (path.endsWith('/member/family') && method === 'POST') return jsonResponse({ data: { _id: 'family-new', fullName: 'Jo Member', gender: 'female', relationship: 'Spouse', dob: '1992-01-01' } });
+    if (path.endsWith('/member/family') && method === 'POST') {
+      const values = options.body;
+      return jsonResponse({ data: {
+        _id: 'family-new',
+        fullName: values.get('fullName'),
+        gender: values.get('gender'),
+        relationship: values.get('relationship'),
+        memberType: values.get('memberType'),
+        isNominee: values.get('isNominee') === 'true',
+        nomineeRole: values.get('nomineeRole'),
+        designation: values.get('designation'),
+        workEmail: values.get('workEmail'),
+        phone: values.get('phone'),
+        dob: values.get('dob') || null,
+      } });
+    }
     if (path.endsWith('/member/family/family-old') && method === 'PUT') return jsonResponse({ data: { ...member.family[0], fullName: 'Sam Updated' } });
     if (path.endsWith('/member/family/family-old') && method === 'DELETE') return jsonResponse({ data: { deleted: true } });
     if (path.endsWith('/member/checkout') && method === 'POST') return jsonResponse({ data: { _id: 'pending-1', status: 'pending_payment' } });
@@ -82,6 +148,12 @@ function setUpApi(identityStatus = 'verified', {
         maskedEmail: 'm***@example.test',
       });
     }
+    if (path.endsWith('/membership/request-help')) {
+      return jsonResponse({
+        data: { requested: true, email: 'm***@example.test' },
+        message: 'Your request has been sent to the membership team.',
+      }, 202);
+    }
     if (path.endsWith('/membership/razorpay/order')) return jsonResponse({ data: {
       keyId: 'test-key', orderId: 'order-1', amount: 11800000, currency: 'INR',
     } });
@@ -92,7 +164,7 @@ function setUpApi(identityStatus = 'verified', {
 
 function renderMembership(
   route = '/luxury-membership?step=1',
-  user = { email: 'member@example.test', status: 'active', emailVerified: true },
+  user = { _id: userId, email: 'member@example.test', status: 'active', emailVerified: true },
   refreshUser = jest.fn(),
 ) {
   return render(
@@ -112,6 +184,7 @@ function renderMembership(
 describe('integrated membership application and payment flow', () => {
   beforeEach(() => {
     fetch.mockReset();
+    window.localStorage.clear();
     URL.createObjectURL = jest.fn((file) => `blob:${file.name}`);
     URL.revokeObjectURL = jest.fn();
     setUpApi();
@@ -134,19 +207,21 @@ describe('integrated membership application and payment flow', () => {
 
     expect(await screen.findByRole('button', { name: 'Select Plan' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Select Plan' }));
-    expect(await screen.findByRole('heading', { name: 'Family members' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Family details' })).toBeInTheDocument();
+    expect(screen.queryByText(/early bird/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/points/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.getByLabelText('Full name')).toHaveValue('Sam Member');
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Sam Updated' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Update member' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update family profile' }));
     expect(await screen.findByText(/Sam Updated/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Delete Sam Updated' }));
     await waitFor(() => expect(screen.queryByText(/Sam Updated/)).not.toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Jo Member' } });
     fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1992-01-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add family member' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
     expect(await screen.findByText(/Jo Member/)).toBeInTheDocument();
 
     const continueButton = screen.getByRole('button', { name: 'Continue to review' });
@@ -157,14 +232,41 @@ describe('integrated membership application and payment flow', () => {
     });
     expect(await screen.findByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
     expect(screen.getByText('14 Oct 1990')).toBeInTheDocument();
-    expect(screen.getByText('50,000 points')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Family profiles and nominees' }))
+      .queryByText(/points/i)).not.toBeInTheDocument();
     expect(await screen.findByText('₹1,18,000')).toBeInTheDocument();
     const confirmPayment = screen.getByRole('button', { name: 'Confirm & Proceed to Payment' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Read full agreement' })).toBeEnabled());
+    expect(confirmPayment).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
+    let agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
+    let agreementText = agreementDialog.querySelector('.terms-modal__text');
+    expect(agreementText).toHaveStyle({ fontSize: '18px', lineHeight: '1.8' });
+    fireEvent.click(screen.getByRole('button', { name: 'Increase agreement text size' }));
+    expect(agreementText).toHaveStyle({ fontSize: '20px' });
+    expect(window.localStorage.getItem('agreement-reader-font-size')).toBe('20');
+    fireEvent.click(screen.getByRole('button', { name: 'Close agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
+    agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
+    agreementText = agreementDialog.querySelector('.terms-modal__text');
+    expect(agreementText).toHaveStyle({ fontSize: '20px' });
+    Object.defineProperty(agreementText, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(agreementText, 'scrollHeight', { configurable: true, value: 500 });
+    agreementText.scrollTop = 450;
+    fireEvent.scroll(agreementText);
+    expect(await screen.findByText('You reached the end. You can confirm now.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'I have read this' }));
+    const consentCheckbox = screen.getByLabelText(/I have read and agree to the Orianaa Leisure Membership Agreement/);
+    expect(consentCheckbox).toBeEnabled();
+    fireEvent.click(consentCheckbox);
     await waitFor(() => expect(confirmPayment).toBeEnabled());
     await act(async () => {
       fireEvent.click(confirmPayment);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+    expect(fetch.mock.calls.some(([url, options]) => (
+      String(url).endsWith('/terms-consent') && options?.method === 'POST'
+    ))).toBe(true);
     expect(await screen.findByRole('heading', { name: 'Select Payment Method' })).toBeInTheDocument();
     expect(await screen.findByText('Plan fee')).toBeInTheDocument();
     expect(screen.getByText('GST (18%)')).toBeInTheDocument();
@@ -188,6 +290,41 @@ describe('integrated membership application and payment flow', () => {
     expect(await screen.findByText('Member dashboard destination')).toBeInTheDocument();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/membership/razorpay/verify'))).toBe(true);
     expect(container).toBeInTheDocument();
+  });
+
+  test('blocks over-age child profiles and lets nominees be added without family pricing fields', async () => {
+    const draftMembership = {
+      status: 'draft',
+      plan: { _id: 'plan-1', slug: 'gold' },
+    };
+    setUpApi('verified', { membership: draftMembership });
+    renderMembership('/luxury-membership?step=3');
+    expect(await screen.findByRole('heading', { name: 'Family details' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Children' }));
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Adult Child' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '2000-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/needs their own membership/i);
+    expect(fetch.mock.calls.some(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    ))).toBe(false);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Nominees' }));
+    expect(screen.getByText(/nominees confirm their email with a code and earn no points/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'Friend' } });
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Casey Nominee' } });
+    fireEvent.change(screen.getByLabelText('Designation'), { target: { value: 'Advisor' } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'casey@example.test' } });
+    fireEvent.change(screen.getByLabelText('Phone'), { target: { value: '9876543210' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add nominee' }));
+    expect(await screen.findByText('Casey Nominee')).toBeInTheDocument();
+    const request = fetch.mock.calls.find(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    ));
+    expect(request[1].body.get('memberType')).toBe('nominee');
+    expect(request[1].body.get('dob')).toBe('');
+    expect(request[1].body.get('workEmail')).toBe('casey@example.test');
   });
 
   test('restores pending payment details directly from the route token', async () => {
@@ -313,6 +450,80 @@ describe('integrated membership application and payment flow', () => {
     expect(await screen.findByRole('button', { name: 'Resend in 60s' })).toBeDisabled();
     const linkRequest = fetch.mock.calls.find(([url]) => String(url).endsWith('/auth/onboarding/password-link'));
     expect(JSON.parse(linkRequest[1].body)).toEqual({ email: 'member@example.test' });
+  });
+
+  test('shows password-link request failures and leaves retries enabled', async () => {
+    setUpApi();
+    const originalFetch = fetch.getMockImplementation();
+    fetch.mockImplementation(async (url, options = {}) => {
+      if (String(url).endsWith('/auth/onboarding/password-link')) {
+        return jsonResponse({ message: 'The password setup link could not be sent.' }, 503);
+      }
+      return originalFetch(url, options);
+    });
+    const onboardingUser = {
+      email: 'member@example.test',
+      status: 'pending',
+      emailVerified: true,
+      onboarding: true,
+    };
+    renderMembership('/luxury-membership?step=6', onboardingUser);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send password setup link' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The password setup link could not be sent.',
+    );
+    expect(screen.getByRole('button', { name: 'Send password setup link' })).toBeEnabled();
+  });
+
+  test('does not start a resend timer when no password link was sent', async () => {
+    setUpApi();
+    const originalFetch = fetch.getMockImplementation();
+    fetch.mockImplementation(async (url, options = {}) => {
+      if (String(url).endsWith('/auth/onboarding/password-link')) {
+        return jsonResponse({
+          message: 'If the address can be used, instructions will be sent shortly.',
+          sent: false,
+        }, 202);
+      }
+      return originalFetch(url, options);
+    });
+    const onboardingUser = {
+      email: 'member@example.test',
+      status: 'pending',
+      emailVerified: true,
+      onboarding: true,
+    };
+    renderMembership('/luxury-membership?step=6', onboardingUser);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send password setup link' }));
+
+    expect(await screen.findByText('If the address can be used, instructions will be sent shortly.'))
+      .toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send password setup link' })).toBeEnabled();
+  });
+
+  test('lets step 6 members request admin help and open login or password recovery', async () => {
+    const onboardingUser = {
+      email: 'member@example.test',
+      status: 'pending',
+      emailVerified: true,
+      onboarding: true,
+    };
+    renderMembership('/luxury-membership?step=6', onboardingUser);
+
+    const emailField = await screen.findByLabelText('Email');
+    expect(emailField).toHaveValue('member@example.test');
+    fireEvent.click(screen.getByRole('button', { name: 'Request admin help' }));
+
+    expect(await screen.findByText('Your request has been sent to the membership team.'))
+      .toBeInTheDocument();
+    const helpRequest = fetch.mock.calls.find(([url]) => String(url).endsWith('/membership/request-help'));
+    expect(JSON.parse(helpRequest[1].body)).toEqual({ email: 'member@example.test' });
+    expect(screen.getByRole('link', { name: 'Login' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Forgot password?' }))
+      .toHaveAttribute('href', '/forgot-password');
   });
 
   test('routes an Admin-paid legacy membership from document submission directly to password setup', async () => {

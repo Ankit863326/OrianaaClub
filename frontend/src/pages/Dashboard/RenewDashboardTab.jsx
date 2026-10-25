@@ -14,12 +14,6 @@ const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }
 const formatINR = (value) => `₹${numberFormat.format(Number(value) || 0)}`;
 const formatPts = (value) => `${numberFormat.format(Number(value) || 0)} pts`;
 
-function formatDate(value) {
-  if (!value) return 'not set';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'not set' : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(date);
-}
-
 function RenewalCard({ plan, selectedPlanId, onChoose, loading }) {
   return <article className="member-hub__bill-card">
     <h3>{plan.name}</h3>
@@ -227,9 +221,8 @@ export default function RenewDashboardTab() {
       </div>
       : !membership.canRenew
         ? <div className="member-hub__warning">
-          <p>Renewal is not available yet. It becomes available when your points balance reaches zero or your points expire.</p>
-          <p>Points remaining: <strong>{formatPts(membership.pointsBalance)}</strong></p>
-          <p>Points expiry date: <strong>{formatDate(membership.pointsExpireAt)}</strong></p>
+          <p>Renewal is not available yet. It will become available when your membership is eligible.</p>
+          {membership.status === 'active' && <p>Points remaining: <strong>{formatPts(membership.pointsBalance)}</strong></p>}
           <p>Membership status: <strong>{String(membership.status || 'unknown').replaceAll('_', ' ')}</strong></p>
         </div>
         : <>

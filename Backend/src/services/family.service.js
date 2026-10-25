@@ -3,11 +3,18 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import FamilyMember, { deriveFamilyMemberType } from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
+import Verification from '../models/Verification.js';
 import User from '../models/User.js';
 import { getSettings } from '../models/Setting.js';
 import AuditLog from '../models/AuditLog.js';
 import ApiError from '../utils/ApiError.js';
+import { getBalance } from './points-ledger.service.js';
 import { publicMediaDirectory } from '../utils/uploadDirectories.js';
+import {
+  invalidateVerificationAfterProfileChange,
+  removeFamilyVerificationForNominee,
+} from './family-verification.service.js';
+import { validateFamilyProfileSet } from './family-profile-rules.service.js';
 
 
 function groupFamily(members) {
@@ -30,7 +37,12 @@ function publicFamilyMember(member) {
 }
 
 async function ownedMembership(userId) {
-  const membership = await Membership.findOne({ user: userId, status: 'active' });
+  const membership = await Membership.findOne({
+    user: userId,
+    memberType: 'primary',
+    linkedTo: null,
+    status: 'active',
+  }).populate('plan');
   if (!membership) throw new ApiError(404, 'Active membership was not found.');
   return membership;
 }
@@ -59,16 +71,18 @@ async function storePhoto(file) {
   return `/media/${filename}`;
 }
 
-async function enforceFamilyCapacity(membershipId, session) {
-  const settings = await getSettings();
-  const count = await FamilyMember.countDocuments({
-    membership: membershipId,
-    status: { $in: ['active', 'pending_approval'] },
+async function enforceFamilyCapacity(membership, values) {
+  const settings = await getSettings({ forceRefresh: true });
+  const profiles = await FamilyMember.find({
+    membership: membership._id,
+    status: { $ne: 'removed' },
     pendingAction: { $ne: 'remove' },
-  }).session(session || null);
-  if (count >= settings.maxFamilyMembers) {
-    throw new ApiError(409, `A membership allows up to ${settings.maxFamilyMembers} family members.`);
-  }
+  }).lean();
+  await validateFamilyProfileSet({
+    plan: membership.plan,
+    members: [...profiles, values],
+    purchaseDate: new Date(),
+  });
   return settings;
 }
 
@@ -83,22 +97,67 @@ function familyValues(values, settings) {
     normalized.dateOfBirth = dateOfBirth || null;
     normalized.dob = dateOfBirth || null;
     normalized.type = dateOfBirth
-      ? deriveFamilyMemberType(dateOfBirth, settings.childAgeLimit)
+      ? deriveFamilyMemberType(dateOfBirth, settings.familyMembership.childMaxAge)
       : 'adult';
   }
   if (values.phone !== undefined) normalized.phone = values.phone;
+  if (values.email !== undefined) normalized.email = values.email.trim().toLowerCase();
+  if (values.workEmail !== undefined) normalized.workEmail = values.workEmail.trim().toLowerCase();
+  if (values.nomineeRole !== undefined) normalized.nomineeRole = values.nomineeRole;
+  if (values.designation !== undefined) normalized.designation = values.designation;
+  if (values.gender !== undefined) normalized.gender = values.gender;
+  if (values.address !== undefined) normalized.address = values.address;
+  if (values.parentSide !== undefined) normalized.parentSide = values.parentSide;
   return normalized;
 }
 
 export async function listOwnedFamily(userId) {
-  const membership = await ownedMembership(userId);
-  const members = await FamilyMember.find({ membership: membership._id }).sort({ createdAt: 1 }).lean();
-  return groupFamily(members);
+  const membership = await Membership.findOne({
+    user: userId,
+    memberType: 'primary',
+    linkedTo: null,
+    status: { $in: ['draft', 'profile_only', 'pending_payment', 'payment_pending', 'pending_verification', 'pending_approval', 'active', 'expired'] },
+  }).sort({ createdAt: -1 });
+  if (!membership) return { adults: [], children: [] };
+  const members = await FamilyMember.find({
+    membership: membership._id,
+    isPrimary: { $ne: true },
+  }).sort({ createdAt: 1 }).lean();
+  const memberIds = members.map((member) => member._id);
+  const [verifications, linkedMemberships] = await Promise.all([
+    memberIds.length
+      ? Verification.find({ memberId: { $in: memberIds } }).select('memberId status rejectionReason').lean()
+      : [],
+    memberIds.length
+      ? Membership.find({ familyMember: { $in: memberIds } }).select('_id familyMember status memberNo').lean()
+      : [],
+  ]);
+  const verificationByMember = new Map(verifications.map((item) => [String(item.memberId), item]));
+  const membershipByMember = new Map(linkedMemberships.map((item) => [String(item.familyMember), item]));
+  return groupFamily(await Promise.all(members.map(async (member) => {
+    const verification = verificationByMember.get(String(member._id));
+    const linkedMembership = membershipByMember.get(String(member._id));
+    const isNominee = Boolean(member.isNominee || member.memberType?.startsWith('nominee'));
+    const approved = !isNominee && linkedMembership?.status === 'active';
+    const { idProofStorageKey, idProof, approvalSeq, approvalDueAt,
+      approvalOverdueAt, approvalOverdueNotifiedAt, ...safeMember } = member;
+    return {
+      ...safeMember,
+      memberNo: linkedMembership?.memberNo || member.memberNo || '',
+      memberStatus: linkedMembership?.status || '',
+      verificationStatus: isNominee
+        ? (member.emailConfirmedAt ? 'verified' : 'not_added')
+        : verification?.status || 'not_added',
+      ...(approved ? { pointsBalance: await getBalance(linkedMembership._id) } : {}),
+      hasIdProof: Boolean(idProofStorageKey || idProof),
+    };
+  })));
 }
 
 export async function requestAddFamilyMember(userId, values, photo) {
   const membership = await ownedMembership(userId);
-  const settings = await enforceFamilyCapacity(membership._id);
+  const normalized = familyValues(values, await getSettings());
+  const settings = await enforceFamilyCapacity(membership, normalized);
   const photoUrl = await storePhoto(photo);
   const data = {
     membership: membership._id,
@@ -168,6 +227,7 @@ export async function requestNominee(userId, familyMemberId) {
   if (!nominee || nominee.type !== 'adult') {
     throw new ApiError(400, 'Nominee must be an active adult family member.');
   }
+  if (!nominee.workEmail) throw new ApiError(400, 'A nominee work email is required.');
   if (nominee.pendingAction && nominee.pendingAction !== 'nominee') {
     throw new ApiError(409, 'This family member already has a pending request.');
   }
@@ -198,9 +258,10 @@ export async function adminListFamily(membershipId) {
 }
 
 export async function adminAddFamilyMember(adminId, membershipId, values, photo) {
-  const membership = await Membership.findById(membershipId);
+  const membership = await Membership.findById(membershipId).populate('plan');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
-  const settings = await enforceFamilyCapacity(membershipId);
+  const normalized = familyValues(values, await getSettings());
+  const settings = await enforceFamilyCapacity(membership, normalized);
   const photoUrl = await storePhoto(photo);
   const member = await FamilyMember.create({
     membership: membershipId,
@@ -218,7 +279,9 @@ export async function adminAddFamilyMember(adminId, membershipId, values, photo)
   return member;
 }
 
-async function saveNominee(membership, member) {
+async function saveNominee(membership, member, adminId) {
+  if (member && !member.workEmail) throw new ApiError(400, 'A nominee work email is required.');
+  if (member) await removeFamilyVerificationForNominee(adminId, member._id);
   await FamilyMember.updateMany(
     { membership: membership._id, $or: [{ isNominee: true }, { pendingAction: 'nominee' }] },
     { $set: { isNominee: false, pendingAction: '' } },
@@ -240,7 +303,7 @@ export async function setAdminNominee(adminId, membershipId, familyMemberId) {
     throw new ApiError(400, 'Nominee must be an active adult family member.');
   }
   const before = { nominee: membership.nominee };
-  await saveNominee(membership, member);
+  await saveNominee(membership, member, adminId);
   await writeAudit({
     actorType: 'admin', actorId: adminId, action: 'family.nominee.set',
     membershipId, entityId: member?._id || membershipId, before,
@@ -288,6 +351,7 @@ export async function updateAdminFamilyMember(adminId, memberId, values, idProof
   member.status = 'active';
   member.approvedBy = adminId;
   await member.save();
+  await invalidateVerificationAfterProfileChange(member, before, adminId, 'admin');
   await writeAudit({
     actorType: 'admin', actorId: adminId, action: 'family.update',
     membershipId: member.membership, entityId: member._id, before, after: member.toObject(),
@@ -349,7 +413,9 @@ export async function decideFamilyRequest(adminId, memberId, approve, reason = '
     } else if (action === 'update') {
       Object.assign(member, member.pendingChanges || {});
       const settings = await getSettings();
-      if (member.dateOfBirth) member.type = deriveFamilyMemberType(member.dateOfBirth, settings.childAgeLimit);
+      if (member.dateOfBirth) {
+        member.type = deriveFamilyMemberType(member.dateOfBirth, settings.familyMembership.childMaxAge);
+      }
       if (before.type === 'adult' && member.type === 'child' && member.status === 'active') {
         const adults = await FamilyMember.countDocuments({
           membership: member.membership,
@@ -386,11 +452,11 @@ export async function decideFamilyRequest(adminId, memberId, approve, reason = '
         throw new ApiError(409, 'This nominee request has been superseded.');
       }
       if (membership.pendingNomineeRemoval) {
-        await saveNominee(membership, null);
+        await saveNominee(membership, null, adminId);
       } else if (member.status !== 'active' || member.type !== 'adult') {
         throw new ApiError(409, 'Nominee must be an active adult family member.');
       } else {
-        await saveNominee(membership, member);
+        await saveNominee(membership, member, adminId);
       }
     }
   } else if (action === 'add') {

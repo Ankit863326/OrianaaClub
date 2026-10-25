@@ -10,7 +10,7 @@ import { env } from '../config/env.js';
 import { createEmailToken, consumeEmailToken, signAccessToken, signOnboardingToken, signRefreshToken, verifyEmailToken, verifyOnboardingToken, verifyRefreshToken } from './token.service.js';
 import { sendMail } from './mail.service.js';
 import { verifyRecaptcha } from './recaptcha.service.js';
-import { reserveEmailCooldown } from './email-cooldown.service.js';
+import { releaseEmailCooldown, reserveEmailCooldown } from './email-cooldown.service.js';
 
 export const GENERIC_EMAIL_MESSAGE = 'If the address can be used, instructions will be sent shortly.';
 const passwordCost = 12;
@@ -39,7 +39,7 @@ export function createSession(user) {
 async function hasSubmittedMembershipPayment(userId) {
   const membership = await Membership.findOne({
     user: userId,
-    status: { $in: ['pending_payment', 'pending_verification', 'active'] },
+    status: { $in: ['pending_payment', 'payment_pending', 'pending_verification', 'pending_approval', 'active'] },
   }).select('_id');
   return Boolean(membership && await Payment.exists({
     membership: membership._id,
@@ -50,6 +50,9 @@ async function hasSubmittedMembershipPayment(userId) {
 async function sendAccountLink(user, type, token) {
   const path = type === 'activation' ? '/set-password' : '/reset-password';
   const link = `${env.frontendUrl.replace(/\/+$/, '')}${path}?token=${encodeURIComponent(token.trim())}`;
+  if (env.nodeEnv !== 'production') {
+    console.log(`[mail:dev] ${type === 'activation' ? 'Password setup' : 'Password reset'} URL: ${link}`);
+  }
   const subject = type === 'activation'
     ? 'Set your OrianaaClub password'
     : 'Reset your OrianaaClub password';
@@ -63,16 +66,26 @@ async function sendAccountLink(user, type, token) {
     template: type,
     data: { firstName: user.firstName, link, expiry },
   });
+  return true;
 }
 
-async function issueAccountLink(user, type) {
-  const allowed = await reserveEmailCooldown(user.email, type);
-  if (!allowed) return false;
+async function issueAccountLink(user, type, { bypassCooldown = false } = {}) {
+  const reservation = bypassCooldown
+    ? new Date()
+    : await reserveEmailCooldown(user.email, type);
+  if (!reservation) {
+    console.log(`[auth] ${type} email cooldown active for ${maskEmail(user.email)}.`);
+    return false;
+  }
 
-  const token = await createEmailToken(user._id, type);
   try {
-    await sendAccountLink(user, type, token);
-    if (type === 'activation') {
+    const token = await createEmailToken(user._id, type);
+    console.log(`[auth] ${type} token created for ${maskEmail(user.email)}.`);
+    const emailed = await sendAccountLink(user, type, token);
+    console.log(
+      `[auth] ${type} ${emailed ? 'email sent' : 'URL logged in development'} for ${maskEmail(user.email)}.`,
+    );
+    if (type === 'activation' && emailed) {
       await User.updateOne({ _id: user._id }, {
         $set: {
           activationEmailStatus: ['sent', 'resent'].includes(user.activationEmailStatus) ? 'resent' : 'sent',
@@ -84,6 +97,11 @@ async function issueAccountLink(user, type) {
   } catch (error) {
     if (type === 'activation') {
       await User.updateOne({ _id: user._id }, { $set: { activationEmailStatus: 'failed' } });
+    }
+    try {
+      await releaseEmailCooldown(user.email, type, reservation);
+    } catch (releaseError) {
+      console.error(`[auth] Failed to release ${type} email cooldown after delivery failure.`, releaseError);
     }
     throw error;
   }
@@ -105,13 +123,14 @@ export async function sendAdminActivation(userId) {
     _id: userId,
     role: 'member',
     deletedAt: null,
-  });
+  }).select('+passwordHash');
   if (!user) throw new ApiError(404, 'Member was not found.');
   if (user.status !== 'pending') throw new ApiError(409, 'Only members who have not set a password can receive a password link.');
+  if (user.passwordHash) throw new ApiError(409, 'A password has already been set for this member.');
   if (!await hasSubmittedMembershipPayment(user._id)) {
     throw new ApiError(409, 'A password link can be sent after payment is submitted.');
   }
-  return issueAccountLink(user, 'activation');
+  return issueAccountLink(user, 'activation', { bypassCooldown: true });
 }
 
 export async function registerAccount({ firstName, email, recaptchaToken }) {
@@ -200,15 +219,27 @@ async function updatePaidPendingEmail(user, email) {
 }
 
 async function requestPaidPendingPasswordLink(user, email) {
-  if (!user || user.status !== 'pending' || !user.emailVerified || user.passwordHash) {
+  if (!user) {
+    console.log('[membership-password-link] User not found.');
+    return { message: GENERIC_EMAIL_MESSAGE, sent: false };
+  }
+  if (user.status !== 'pending' || !user.emailVerified || user.passwordHash) {
+    console.log(`[membership-password-link] User is not eligible for password setup: ${maskEmail(user.email)}.`);
     return { message: GENERIC_EMAIL_MESSAGE, sent: false };
   }
   if (!await hasSubmittedMembershipPayment(user._id)) {
+    console.log(`[membership-password-link] Payment not confirmed or submitted: ${maskEmail(user.email)}.`);
     return { message: GENERIC_EMAIL_MESSAGE, sent: false };
   }
 
   await updatePaidPendingEmail(user, email);
   const sent = await issueAccountLink(user, 'activation');
+  if (sent) {
+    await MembershipDraft.updateMany(
+      { $or: [{ user: user._id }, { email: user.email }] },
+      { $set: { status: 'password_pending', currentStep: 6, lastEmailError: '' } },
+    );
+  }
   return { message: GENERIC_EMAIL_MESSAGE, sent, maskedEmail: maskEmail(user.email) };
 }
 
@@ -219,6 +250,7 @@ export async function requestOnboardingPasswordLink(userId, email) {
 
 export async function requestDraftPasswordLink(draft, email) {
   if (!draft.user || !['payment_submitted', 'paid'].includes(draft.status)) {
+    console.log('[membership-password-link] Payment not confirmed or submitted for this draft.');
     return { message: GENERIC_EMAIL_MESSAGE, sent: false };
   }
   const user = await User.findOne({
@@ -276,6 +308,10 @@ export async function activateAccount({ token, password }) {
   ).select('+passwordHash');
 
   if (!user) throw new ApiError(400, 'This password link is invalid, expired, or already used. Request a new link to continue.');
+  await MembershipDraft.updateMany(
+    { $or: [{ user: user._id }, { email: user.email }] },
+    { $set: { status: 'active', currentStep: 6, lastEmailError: '' } },
+  );
   return createSession(user);
 }
 
@@ -309,6 +345,10 @@ export async function setOnboardingPassword(userId, { password }) {
     { new: true },
   ).select('+passwordHash');
   if (!activated) throw new ApiError(409, 'A password has already been set for this account.');
+  await MembershipDraft.updateMany(
+    { $or: [{ user: activated._id }, { email: activated.email }] },
+    { $set: { status: 'active', currentStep: 6, lastEmailError: '' } },
+  );
   return createSession(activated);
 }
 
@@ -351,9 +391,19 @@ export async function requestPasswordReset(email) {
     deletedAt: null,
     role: 'member',
   });
-  if (user && (user.status === 'active' || await hasSubmittedMembershipPayment(user._id))) {
-    await issueAccountLink(user, user.status === 'pending' ? 'activation' : 'reset');
+  if (!user) {
+    console.log(`[auth] Password-link request ignored: no eligible account for ${maskEmail(normalizedEmail)}.`);
+    return { message: GENERIC_EMAIL_MESSAGE };
   }
+
+  if (user.status === 'pending' && !await hasSubmittedMembershipPayment(user._id)) {
+    console.log(`[auth] Password-link request ignored: membership payment not submitted for ${maskEmail(user.email)}.`);
+    return { message: GENERIC_EMAIL_MESSAGE };
+  }
+
+  const type = user.status === 'pending' ? 'activation' : 'reset';
+  console.log(`[auth] ${type} link requested for ${maskEmail(user.email)}.`);
+  await issueAccountLink(user, type);
   return { message: GENERIC_EMAIL_MESSAGE };
 }
 

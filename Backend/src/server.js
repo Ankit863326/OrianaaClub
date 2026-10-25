@@ -1,14 +1,21 @@
 // Phase 0: Connect MongoDB before starting the HTTP server.
 import app from './app.js';
-import { connectDatabase } from './config/db.js';
+import { connectDatabase, safeErrorMessage } from './config/db.js';
 import { env } from './config/env.js';
 import mongoose from 'mongoose';
 import {
   startMembershipExpiryJob,
   stopMembershipExpiryJob,
 } from './jobs/membership-expiry.job.js';
+import {
+  startMembershipApprovalJobs,
+  stopMembershipApprovalJobs,
+} from './jobs/membership-approval.job.js';
 import { ensureUploadDirectories } from './utils/uploadDirectories.js';
 import logger from './utils/logger.js';
+import { verifyMailTransport } from './services/mail.service.js';
+import { initializeTermsManifest } from './config/terms.js';
+import { startFamilyVerificationJob, stopFamilyVerificationJob } from './jobs/family-verification.job.js';
 
 let server;
 let isShuttingDown = false;
@@ -23,8 +30,14 @@ async function startServer() {
   logger.info(`Identity document encryption: configured (key length ${env.identityDocumentEncryptionKey.length})`);
 
   await ensureUploadDirectories();
+  if (!await initializeTermsManifest()) {
+    logger.warn('Current membership agreement files are not deployed; terms acceptance and payment are unavailable.');
+  }
   await connectDatabase();
+  await verifyMailTransport();
   startMembershipExpiryJob();
+  startMembershipApprovalJobs();
+  startFamilyVerificationJob();
 
   server = app.listen(env.port, () => {
     logger.info(`Listening on port ${env.port}`);
@@ -44,6 +57,8 @@ async function shutdown(signal) {
 
   try {
     stopMembershipExpiryJob();
+    stopMembershipApprovalJobs();
+    stopFamilyVerificationJob();
     if (server) {
       await new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
@@ -68,6 +83,6 @@ process.on('unhandledRejection', () => {
 });
 
 startServer().catch((error) => {
-  logger.error('Startup failed. The HTTP server was not started; inspect the startup validation message above.');
+  logger.error(`Startup failed: ${safeErrorMessage(error)} HTTP server was not started.`);
   process.exit(1);
 });

@@ -2,11 +2,12 @@
 import { API_BASE_URL } from '../config/api.js';
 
 export class ApiClientError extends Error {
-  constructor(message, status, retryAfterSeconds) {
+  constructor(message, status, retryAfterSeconds, code) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.code = code;
   }
 }
 
@@ -54,6 +55,7 @@ async function request(path, options = {}, retried = false) {
       payload?.message || `Request failed with status ${response.status}.`,
       response.status,
       payload?.retryAfterSeconds,
+      payload?.code,
     );
   }
 
@@ -66,7 +68,7 @@ const jsonRequest = (method) => (path, body) => request(path, {
 });
 
 const apiClient = {
-  get: (path) => request(path),
+  get: (path, options) => request(path, options),
   post: jsonRequest('POST'),
   patch: jsonRequest('PATCH'),
   put: jsonRequest('PUT'),

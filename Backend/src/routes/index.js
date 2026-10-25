@@ -14,6 +14,8 @@ import membershipWebhookRoutes from './membership-webhook.routes.js';
 import meRoutes from './me.routes.js';
 import billingRoutes from './billing.routes.js';
 import membershipDraftRoutes from './membership-draft.routes.js';
+import termsRoutes from './terms.routes.js';
+import membershipTermsRoutes from './membership-terms.routes.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -39,6 +41,8 @@ router.use('/member', memberRoutes);
 router.use('/payments/webhook', webhookRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/membership/draft', membershipDraftRoutes);
+router.use('/terms', termsRoutes);
+router.use('/membership/applications', membershipTermsRoutes);
 router.use('/membership', membershipPurchaseRoutes);
 router.use('/webhooks/razorpay', membershipWebhookRoutes);
 router.use(contentRoutes);

@@ -11,6 +11,7 @@ import Redemption from '../../models/Redemption.js';
 import ApiError from '../../utils/ApiError.js';
 import { getMembershipMemberCode } from '../../utils/memberCode.js';
 import * as identityVerificationService from '../../services/identity-verification.service.js';
+import * as membershipApprovalService from '../../services/membership-approval.service.js';
 
 export const listPlans = asyncHandler(async (request, response) => {
   const data = await membershipAdminService.listMembershipPlans();
@@ -64,6 +65,11 @@ export const listMemberships = asyncHandler(async (request, response) => {
 export const membershipDetails = asyncHandler(async (request, response) => {
   const data = await membershipAdminService.getMembershipDetails(request.validated.params.id);
   response.json({ success: true, data, message: 'Membership details loaded.' });
+});
+
+export const familyTree = asyncHandler(async (request, response) => {
+  const data = await membershipAdminService.getFamilyTree(request.validated.params.memberNo);
+  response.json({ success: true, data, message: 'Family tree loaded.' });
 });
 
 export const identityVerificationDetails = asyncHandler(async (request, response) => {
@@ -183,6 +189,19 @@ export const rejectVerification = asyncHandler(async (request, response) => {
 export const queue = asyncHandler(async (request, response) => {
   const data = await membershipAdminService.getMembershipQueue(request.validated.query);
   response.json({ success: true, data, message: 'Membership queue loaded.' });
+});
+
+export const approvalQueue = asyncHandler(async (request, response) => {
+  const data = await membershipApprovalService.getMembershipApprovalQueue(request.validated.query);
+  response.json({ success: true, data, message: 'Membership approval queue loaded.' });
+});
+
+export const approveMembership = asyncHandler(async (request, response) => {
+  const data = await membershipApprovalService.approveMembership(
+    request.validated.params.id,
+    request.user._id,
+  );
+  response.json({ success: true, data, message: 'Membership approved.' });
 });
 
 export const reports = asyncHandler(async (request, response) => {

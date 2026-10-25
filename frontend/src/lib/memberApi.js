@@ -35,6 +35,11 @@ export async function getMembershipCheckoutQuote(planId) {
   return result.data;
 }
 
+export async function getFamilyPrices(planId) {
+  const result = await apiClient.get(`/member/family-prices?planId=${encodeURIComponent(planId)}`);
+  return result.data;
+}
+
 export async function getPaymentMembership(membershipId) {
   const result = await apiClient.get(`/payments/memberships/${encodeURIComponent(membershipId)}`);
   return result.data;

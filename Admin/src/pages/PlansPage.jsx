@@ -4,7 +4,7 @@ import { adminApi } from '../api/admin.js';
 import { errorMessage } from '../api/client.js';
 import { Button, DataTable, FormField, LoadingState, PageHeading, Panel, Toast, controlClass, formatRupees } from '../components/ui.jsx';
 
-const blankPlan = { id: '', title: '', subtitle: '', price: '', gstPercent: 18, planFee: '', maxFamilyMembers: 0, isActive: true, isFeatured: false, sortOrder: 0, pointsTiers: [] };
+const blankPlan = { id: '', title: '', subtitle: '', price: '', gstPercent: 18, planFee: '', isActive: true, isFeatured: false, sortOrder: 0, pointsTiers: [] };
 
 export default function PlansPage() {
   const [plans, setPlans] = useState(null);
@@ -28,7 +28,7 @@ export default function PlansPage() {
     event.preventDefault();
     setError('');
     try {
-      const values = { ...selected, price: Number(selected.price), gstPercent: Number(selected.gstPercent), planFee: Number(selected.planFee), maxFamilyMembers: Number(selected.maxFamilyMembers), sortOrder: Number(selected.sortOrder), pointsTiers: JSON.parse(tiers) };
+      const values = { ...selected, price: Number(selected.price), gstPercent: Number(selected.gstPercent), planFee: Number(selected.planFee), sortOrder: Number(selected.sortOrder), pointsTiers: JSON.parse(tiers) };
       if (selected._id) await adminApi.updatePlan(selected._id, values);
       else await adminApi.createPlan(values);
       setSelected(null);
@@ -50,7 +50,7 @@ export default function PlansPage() {
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={save}>
         <h2 className="font-display text-xl sm:col-span-2">{selected._id ? 'Edit plan' : 'Create plan'}</h2>
         {[
-          ['Plan slug', 'id', 'text'], ['Title', 'title', 'text'], ['Subtitle', 'subtitle', 'text'], ['Price (INR)', 'price', 'number'], ['GST %', 'gstPercent', 'number'], ['Plan fee (INR)', 'planFee', 'number'], ['Max family members', 'maxFamilyMembers', 'number'], ['Sort order', 'sortOrder', 'number'],
+          ['Plan slug', 'id', 'text'], ['Title', 'title', 'text'], ['Subtitle', 'subtitle', 'text'], ['Price (INR)', 'price', 'number'], ['GST %', 'gstPercent', 'number'], ['Plan fee (INR)', 'planFee', 'number'], ['Sort order', 'sortOrder', 'number'],
         ].map(([label, key, type]) => <FormField label={label} key={key}><input className={controlClass} type={type} min={type === 'number' ? 0 : undefined} disabled={key === 'id' && Boolean(selected._id)} required={['id', 'title', 'price', 'gstPercent', 'planFee'].includes(key)} value={selected[key] ?? selected.slug ?? ''} onChange={(event) => setSelected({ ...selected, [key]: event.target.value, ...(key === 'id' ? { slug: event.target.value } : {}) })} /></FormField>)}
         <FormField label="Points tiers (JSON)" className="sm:col-span-2"><textarea className={`${controlClass} font-mono`} rows="7" value={tiers} onChange={(event) => setTiers(event.target.value)} /></FormField>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(selected.isActive)} onChange={(event) => setSelected({ ...selected, isActive: event.target.checked })} />Active</label>

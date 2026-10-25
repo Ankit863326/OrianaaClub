@@ -3,15 +3,21 @@ import MembershipPlan from '../models/MembershipPlan.js';
 import '../models/Plan.js';
 import FamilyMember from '../models/FamilyMember.js';
 import PointLedger from '../models/PointLedger.js';
+import PointsLedger from '../models/PointsLedger.js';
+import { getBalance, getMemberSafeLedger } from './points-ledger.service.js';
 import Redemption from '../models/Redemption.js';
 import { getSettings } from '../models/Setting.js';
+import Verification from '../models/Verification.js';
 import { formatMemberCode, getMembershipMemberCode } from '../utils/memberCode.js';
 import ApiError from '../utils/ApiError.js';
 
 const visibleMembershipStatuses = [
   'draft',
+  'profile_only',
   'pending_payment',
+  'payment_pending',
   'pending_verification',
+  'pending_approval',
   'active',
   'expired',
 ];
@@ -19,6 +25,8 @@ const visibleMembershipStatuses = [
 async function latestMemberMembership(userId) {
   const membership = await Membership.findOne({
     user: userId,
+    memberType: 'primary',
+    linkedTo: null,
     status: { $in: visibleMembershipStatuses },
   })
     .sort({ createdAt: -1 })
@@ -31,6 +39,8 @@ async function latestMemberMembership(userId) {
 export async function getMyMemberCode(userId) {
   const membership = await Membership.findOne({
     user: userId,
+    memberType: 'primary',
+    linkedTo: null,
     status: { $in: visibleMembershipStatuses },
   })
     .sort({ createdAt: -1 })
@@ -59,9 +69,15 @@ export async function getMyMembership(userId) {
   const now = new Date();
   const status = membershipStatus(membership, now);
   const pointsExpired = !membership.pointsExpireAt || membership.pointsExpireAt <= now;
-  const pointsBalance = Number.isSafeInteger(membership.pointsBalance) ? membership.pointsBalance : 0;
+  const [ledgerBalance, hasPointsLedger] = await Promise.all([
+    getBalance(membership._id),
+    PointsLedger.exists({ memberId: membership._id }),
+  ]);
+  const pointsBalance = hasPointsLedger
+    ? ledgerBalance
+    : Number.isSafeInteger(membership.pointsBalance) ? membership.pointsBalance : 0;
   const canRenew = ['active', 'expired'].includes(status) && (pointsBalance === 0 || pointsExpired);
-  const [nominee, plans] = await Promise.all([
+  const [nominee, plans, familyProfiles] = await Promise.all([
     membership.nominee
       ? FamilyMember.findOne({
         _id: membership.nominee,
@@ -76,18 +92,80 @@ export async function getMyMembership(userId) {
         .sort({ sortOrder: 1 })
         .lean()
       : [],
+    FamilyMember.find({ membership: membership._id, status: { $ne: 'removed' }, isPrimary: { $ne: true } })
+      .select('_id name fullName relation relationship type status memberType memberNo isNominee nomineeRole designation emailConfirmedAt paymentConfirmedAt discountPct parentSide isPrimary phone dob dateOfBirth photo photoUrl pendingAction')
+      .sort({ createdAt: 1 })
+      .lean(),
   ]);
   const memberCode = getMembershipMemberCode(membership);
+  const familyIds = familyProfiles.map((member) => member._id);
+  const [familyMemberships, verifications] = await Promise.all([
+    familyIds.length
+      ? Membership.find({ familyMember: { $in: familyIds } })
+        .select('_id familyMember status memberNo')
+        .lean()
+      : [],
+    familyIds.length
+      ? Verification.find({ memberId: { $in: familyIds } }).select('memberId status').lean()
+      : [],
+  ]);
+  const familyMembershipById = new Map(familyMemberships.map((item) => [String(item.familyMember), item]));
+  const verificationByMemberId = new Map(verifications.map((item) => [String(item.memberId), item.status]));
+  const familyMemberViews = await Promise.all(familyProfiles.map(async (member) => {
+    const linkedMembership = familyMembershipById.get(String(member._id));
+    const isNominee = Boolean(member.isNominee || member.memberType?.startsWith('nominee'));
+    const isApproved = !isNominee && linkedMembership?.status === 'active';
+    return {
+      id: String(member._id),
+      name: member.name || member.fullName || '',
+      relation: member.relation || member.relationship || '',
+      type: member.type,
+      status: member.status,
+      dob: member.dob || member.dateOfBirth || null,
+      phone: member.phone || '',
+      photo: member.photo || member.photoUrl || '',
+      pendingAction: member.pendingAction || '',
+      memberNo: linkedMembership?.memberNo || member.memberNo || '',
+      verificationStatus: isNominee
+        ? (member.emailConfirmedAt ? 'verified' : 'not_added')
+        : verificationByMemberId.get(String(member._id)) || 'not_added',
+      emailConfirmed: Boolean(member.emailConfirmedAt),
+      isNominee,
+      nomineeRole: member.nomineeRole || member.designation || '',
+      memberStatus: linkedMembership?.status || '',
+      ...(isApproved ? { pointsBalance: await getBalance(linkedMembership._id) } : {}),
+    };
+  }));
+  const familyConfig = settings.familyMembership;
+  const tierName = String(membership.tier || membership.plan?.slug || membership.plan?.id || membership.plan?.name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const tierConfig = familyConfig.tiers.find((item) => item.tier === tierName);
+  const family = {
+    adults: familyMemberViews.filter((member) => member.type === 'adult' && !member.isNominee),
+    children: familyMemberViews.filter((member) => member.type === 'child' && !member.isNominee),
+    nominees: familyMemberViews.filter((member) => member.isNominee).map(({ pointsBalance, ...member }) => member),
+  };
   return {
     tier: membership.plan?.name || membership.plan?.title || '',
     status,
+    memberNo: membership.memberNo || '',
     memberCode,
     formattedMemberCode: memberCode ? formatMemberCode(memberCode) : '',
-    pointsBalance,
-    pointsExpireAt: membership.pointsExpireAt,
-    membershipExpireAt: membership.membershipExpireAt,
-    earlyBirdApplied: Boolean(membership.earlyBirdApplied),
+    ...(status === 'active' ? { pointsBalance } : {}),
+    ...(status === 'active' ? { pointsCredited: hasPointsLedger } : {}),
     discountPercent: status === 'active' ? settings.discountPercent : 0,
+    paymentConfirmedAt: membership.paymentConfirmedAt || null,
+    approvedAt: membership.approvedAt || null,
+    family,
+    familyPolicy: {
+      enabled: tierConfig?.familyEnabled !== false,
+      discounts: familyConfig.discounts,
+      limits: familyConfig.limits,
+      maxNominees: tierConfig?.maxNominees ?? 0,
+    },
     nominee: nominee ? {
       id: String(nominee._id),
       name: nominee.name || nominee.fullName || '',
@@ -166,25 +244,43 @@ export async function getMyPointsHistory(userId, query) {
   if (query.type) filter.type = query.type;
   const createdAt = dateRange(query.from, query.to);
   if (createdAt) filter.createdAt = createdAt;
-  const [items, total] = await Promise.all([
+  const [legacyItems, legacyTotal, safeLedger] = await Promise.all([
     PointLedger.find(filter)
       .select('type amount direction balanceAfter note channel createdAt')
       .sort({ createdAt: -1, _id: -1 })
-      .skip(skip)
-      .limit(limit)
+      .limit(skip + limit)
       .lean(),
     PointLedger.countDocuments(filter),
+    getMemberSafeLedger(membership._id),
   ]);
-  return {
-    items: items.map((item) => ({
-      type: item.type,
-      amount: item.amount,
-      direction: item.direction,
-      balanceAfter: item.balanceAfter,
-      note: item.note,
-      channel: item.channel || 'billing_counter',
+  const newItems = query.type && query.type !== 'credit_joining'
+    ? []
+    : safeLedger
+      .filter((entry) => !createdAt || (
+        entry.creditedAt >= createdAt.$gte || !createdAt.$gte
+      ) && (
+        entry.creditedAt <= createdAt.$lte || !createdAt.$lte
+      ))
+      .map((entry) => ({
+        points: entry.points,
+        amountBasis: entry.pointsBasis,
+        date: entry.creditedAt,
+        status: entry.status,
+      }));
+  const items = [
+    ...legacyItems.map((item) => ({
+      points: item.direction === 'debit' || item.direction === '-' ? -item.amount : item.amount,
+      amountBasis: null,
       date: item.createdAt,
+      status: item.type === 'expire' ? 'expired' : 'active',
     })),
+    ...newItems,
+  ]
+    .sort((left, right) => right.date - left.date)
+    .slice(skip, skip + limit);
+  const total = legacyTotal + newItems.length;
+  return {
+    items,
     page,
     limit,
     total,

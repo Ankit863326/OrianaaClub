@@ -19,8 +19,6 @@ const settingFields = [
   ['Discount percent', 'discountPercent', 0, 100],
   ['Points validity (years)', 'pointsValidityYears', 1],
   ['Membership validity (years)', 'membershipValidityYears', 1],
-  ['Maximum family members', 'maxFamilyMembers', 1],
-  ['Child age limit', 'childAgeLimit', 0],
   ['Early-bird limit', 'earlyBirdLimit', 0],
 ];
 
@@ -33,6 +31,7 @@ const keyColumns = [
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(null);
+  const [familyConfigJson, setFamilyConfigJson] = useState('');
   const [keys, setKeys] = useState(null);
   const [keyName, setKeyName] = useState('');
   const [rawKey, setRawKey] = useState('');
@@ -90,7 +89,9 @@ export default function SettingsPage() {
   async function loadSettings() {
     setSettingsError('');
     try {
-      setSettings(await membershipSettingsApi.getSettings());
+      const result = await membershipSettingsApi.getSettings();
+      setSettings(result);
+      setFamilyConfigJson(JSON.stringify(result.familyMembership, null, 2));
     } catch (failure) {
       setSettingsError(errorMessage(failure));
     }
@@ -130,7 +131,16 @@ export default function SettingsPage() {
     setBusy(true);
     setSettingsError('');
     try {
+      let familyMembership;
+      try {
+        familyMembership = JSON.parse(familyConfigJson);
+      } catch {
+        setSettingsError('Family membership configuration must be valid JSON.');
+        setBusy(false);
+        return;
+      }
       const values = Object.fromEntries(settingFields.map(([, key]) => [key, Number(settings[key])]));
+      values.familyMembership = familyMembership;
       values.receiptCompanyName = settings.receiptCompanyName || '';
       values.receiptAddress = settings.receiptAddress || '';
       values.receiptGstin = settings.receiptGstin || '';
@@ -227,7 +237,7 @@ export default function SettingsPage() {
   ];
 
   return <section>
-    <PageHeading eyebrow="MEMBERSHIP" title="Settings" description="Configure membership validity, discounts, and billing API access." />
+    <PageHeading eyebrow="MEMBERSHIP" title="Settings" description="Configure membership, family pricing, approval, and billing settings." />
     {notice && <Toast onDismiss={() => setNotice('')}>{notice}</Toast>}
     {settingsError && <Toast kind="error" onDismiss={() => setSettingsError('')}>{settingsError}</Toast>}
     {settings === null && !settingsError && <LoadingState />}
@@ -252,6 +262,15 @@ export default function SettingsPage() {
             />
           </FormField>)}
         </div>
+        <FormField label="Family membership configuration (JSON)" className="mt-5">
+          <textarea
+            className={`${controlClass} min-h-80 font-mono text-xs`}
+            value={familyConfigJson}
+            onChange={(event) => setFamilyConfigJson(event.target.value)}
+            spellCheck="false"
+            required
+          />
+        </FormField>
         <div className="mt-6 border-t border-slate-200 pt-5">
           <h3 className="mb-3 font-semibold text-slate-800">Receipt details</h3>
           <div className="grid gap-4 sm:grid-cols-2">

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { invalidateSettingsCache } from '../../src/models/Setting.js';
 
 export async function clearDatabase() {
   const { collections } = mongoose.connection;
@@ -15,6 +16,7 @@ globalThis.beforeAll(async () => {
 
 globalThis.afterEach(async () => {
   await clearDatabase();
+  invalidateSettingsCache();
 });
 
 globalThis.afterAll(async () => {

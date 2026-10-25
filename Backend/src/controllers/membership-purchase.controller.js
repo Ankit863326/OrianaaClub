@@ -20,7 +20,10 @@ export const listPlans = asyncHandler(async (request, response) => {
       title: plan.name,
       subtitle: `${settings.membershipValidityYears} year membership`,
       termYears: settings.membershipValidityYears,
-      maxFamilyMembers: settings.maxFamilyMembers,
+      familyLimits: settings.familyMembership.limits,
+      familyEnabled: settings.familyMembership.tiers
+        .find((tier) => tier.tier === plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+        ?.familyEnabled ?? false,
       benefitsTitle: plan.name,
       benefits: [
         { points: plan.earlyBirdPoints, label: `First ${settings.earlyBirdLimit} members` },
