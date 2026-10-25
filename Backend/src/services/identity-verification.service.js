@@ -7,7 +7,7 @@ import Payment from '../models/Payment.js';
 import { decryptDocumentFile, encryptIdentityValue, hashIdentityValue } from '../utils/identityDocumentCrypto.js';
 import { identityDocumentPath } from '../utils/identityDocumentStorage.js';
 import { validateIdentityNumber } from '../utils/identityDocumentValidation.js';
-import { activateMembership, finalizePayment } from './payment.service.js';
+import { finalizePayment } from './payment.service.js';
 
 function publicDocument(document) {
   return {
@@ -174,11 +174,7 @@ export async function reviewIdentityVerification(userId, adminId, { status, reas
       const plan = await membership.populate('plan');
       const eligibilityVerified = !plan?.plan?.requiresVerification || membership.eligibilityVerified;
       if (payment && eligibilityVerified) {
-        if (membership.planModel === 'Plan') {
-          await finalizePayment(payment._id);
-        } else {
-          await activateMembership(membership._id, payment._id);
-        }
+        await finalizePayment(payment._id);
       }
     }
   }

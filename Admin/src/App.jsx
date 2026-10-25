@@ -15,11 +15,14 @@ const PointsPage = lazy(() => import('./pages/PointsPage.jsx'));
 const PaymentsPage = lazy(() => import('./pages/PaymentsPage.jsx'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage.jsx'));
 const MembershipMemberDetailPage = lazy(() => import('./membership/MembershipMemberDetailPage.jsx'));
+const MembershipFamilyTreePage = lazy(() => import('./membership/MembershipFamilyTreePage.jsx'));
+const FamilyVerificationReviewPage = lazy(() => import('./membership/FamilyVerificationReviewPage.jsx'));
 const MembershipBillsPage = lazy(() => import('./membership/MembershipBillsPage.jsx'));
 const MembershipPendingQueuePage = lazy(() => import('./membership/MembershipPendingQueuePage.jsx'));
 const MembershipReportsPage = lazy(() => import('./membership/MembershipReportsPage.jsx'));
 const NewMembershipPlansPage = lazy(() => import('./membership/PlansPage.jsx'));
 const MembershipComingNextPage = lazy(() => import('./membership/ComingNextPage.jsx'));
+const DraftMembersPage = lazy(() => import('./pages/DraftMembersPage.jsx'));
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -41,7 +44,10 @@ export default function App() {
         <Route path="payments" element={<PaymentsPage />} />
         <Route path="membership/plans" element={<NewMembershipPlansPage />} />
         <Route path="membership/members" element={<MembershipComingNextPage title="Members" />} />
+        <Route path="membership/drafts" element={<DraftMembersPage />} />
         <Route path="membership/members/:id" element={<MembershipMemberDetailPage />} />
+        <Route path="membership/family-tree/:memberNo" element={<MembershipFamilyTreePage />} />
+        <Route path="membership/family-verifications/:familyId" element={<FamilyVerificationReviewPage />} />
         <Route path="membership/bills" element={<MembershipBillsPage />} />
         <Route path="membership/queue" element={<MembershipPendingQueuePage />} />
         <Route path="membership/settings" element={<MembershipComingNextPage title="Settings" />} />

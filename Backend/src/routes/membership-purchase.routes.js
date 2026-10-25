@@ -10,6 +10,9 @@ import {
   membershipPurchaseSchema,
   membershipRenewalSchema,
 } from '../validators/membership-purchase.schema.js';
+import { passwordLinkSchema } from '../validators/auth.schema.js';
+import * as draftController from '../controllers/membership-draft.controller.js';
+import { sensitiveAuthLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 const paymentLimiter = rateLimit({
@@ -22,6 +25,7 @@ const paymentLimiter = rateLimit({
 
 router.get('/plans', membershipPurchaseController.listPlans);
 router.get('/gst-settings', membershipPurchaseController.publicGstSettings);
+router.post('/request-help', sensitiveAuthLimiter, validate(passwordLinkSchema), draftController.requestHelp);
 router.use(memberAccessAuth);
 router.get('/bank-details', membershipPurchaseController.bankDetails);
 router.post('/purchase', paymentLimiter, validate(membershipPurchaseSchema), membershipPurchaseController.purchase);

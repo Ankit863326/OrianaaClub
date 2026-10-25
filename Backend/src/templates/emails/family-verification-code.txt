@@ -1,0 +1,3 @@
+Hello {{firstName}},
+
+Your OrianaaClub family verification code is {{code}}. It is valid for 10 minutes. Do not share it with anyone.

@@ -2,6 +2,7 @@ import { env } from '../config/env.js';
 import * as draftService from '../services/membership-draft.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
+import { getApplicationTermsConsent } from '../services/terms.service.js';
 
 const cookieOptions = {
   httpOnly: true,
@@ -46,18 +47,33 @@ export const start = asyncHandler(async (request, response) => {
   });
 });
 
-export const get = (request, response) => {
+export const requestHelp = asyncHandler(async (request, response) => {
+  const result = await draftService.requestMembershipHelp(request.validated.body.email);
+  response.status(202).json({
+    success: true,
+    data: result,
+    message: 'Your request has been sent to the membership team.',
+  });
+});
+
+export const get = asyncHandler(async (request, response) => {
+  const data = draftService.getMembershipDraft(request.membershipDraft);
+  data.termsConsent = await getApplicationTermsConsent(request.membershipDraft._id);
   response.json({
     success: true,
-    data: draftService.getMembershipDraft(request.membershipDraft),
+    data,
     message: 'Membership application loaded.',
   });
-};
+});
 
 export const requestPasswordLink = asyncHandler(async (request, response) => {
+  console.log('[membership-password-link] Controller received a password-link request.');
   const data = await draftService.requestPasswordLink(
     request.membershipDraft,
     request.validated.body.email,
+  );
+  console.log(
+    `[membership-password-link] Controller completed request: ${data.sent ? 'link issued' : 'no link issued'}.`,
   );
   response.status(202).json({
     success: true,
@@ -116,6 +132,14 @@ export const quote = asyncHandler(async (request, response) => {
     request.validated.body.planId,
   );
   response.json({ success: true, data, message: 'Membership payment details loaded.' });
+});
+
+export const familyPrices = asyncHandler(async (request, response) => {
+  const data = await draftService.getMembershipDraftFamilyPriceBreakdown(
+    request.membershipDraft,
+    request.validated.query.planId,
+  );
+  response.json({ success: true, data, message: 'Family prices loaded.' });
 });
 
 export const saveFamily = asyncHandler(async (request, response) => {

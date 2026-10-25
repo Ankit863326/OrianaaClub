@@ -8,9 +8,57 @@ const membershipSchema = new mongoose.Schema({
   planModel: { type: String, enum: ['Plan', 'MembershipPlan'], default: 'Plan' },
   status: {
     type: String,
-    enum: ['draft', 'pending_payment', 'pending_verification', 'active', 'expired', 'cancelled'],
+    enum: [
+      'draft',
+      'pending_payment',
+      'pending_verification',
+      'active',
+      'expired',
+      'cancelled',
+      'profile_only',
+      'payment_pending',
+      'pending_approval',
+    ],
     default: 'draft',
   },
+  legacyStatus: { type: String, default: '' },
+  memberNo: {
+    type: String,
+    trim: true,
+    default: '',
+    match: /^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/,
+  },
+  approvalSeq: { type: Number, default: null, min: 1, validate: (value) => value === null || Number.isSafeInteger(value) },
+  earlyBird: { type: Boolean, default: false },
+  memberType: {
+    type: String,
+    enum: ['primary', 'spouse', 'child', 'father', 'mother', 'nominee_gm', 'nominee_hr', 'nominee'],
+    default: 'primary',
+  },
+  linkedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Membership', default: null },
+  familyMember: { type: mongoose.Schema.Types.ObjectId, ref: 'FamilyMember', default: null },
+  parentSide: { type: String, enum: ['member', 'spouse', null], default: null },
+  tier: { type: String, trim: true, default: '' },
+  discountPct: { type: Number, enum: [0, 50, 75], default: 0 },
+  dob: { type: Date, default: null },
+  gender: { type: String, enum: ['male', 'female', 'other', 'prefer_not_to_say', ''], default: '' },
+  photo: { type: String, trim: true, default: '' },
+  anniversaryDate: { type: Date, default: null },
+  email: { type: String, lowercase: true, trim: true, default: '' },
+  phone: { type: String, trim: true, default: '' },
+  nomineeRole: { type: String, trim: true, default: '' },
+  designation: { type: String, trim: true, default: '' },
+  workEmail: { type: String, lowercase: true, trim: true, default: '' },
+  emailConfirmedAt: { type: Date, default: null },
+  baseAmount: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
+  gstAmount: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
+  totalPaid: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
+  paymentConfirmedAt: { type: Date, default: null },
+  approvedAt: { type: Date, default: null },
+  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvalDueAt: { type: Date, default: null },
+  approvalOverdueAt: { type: Date, default: null },
+  approvalOverdueNotifiedAt: { type: Date, default: null },
   memberNumber: {
     type: String,
     default: '',
@@ -55,6 +103,22 @@ membershipSchema.index(
   },
 );
 membershipSchema.index({ customer: 1 });
+membershipSchema.index(
+  { familyMember: 1 },
+  {
+    unique: true,
+    name: 'membership_family_member_unique',
+    partialFilterExpression: { familyMember: { $type: 'objectId' } },
+  },
+);
+membershipSchema.index(
+  { memberNo: 1 },
+  { unique: true, partialFilterExpression: { memberNo: { $type: 'string', $gt: '' } } },
+);
+membershipSchema.index(
+  { approvalSeq: 1 },
+  { unique: true, partialFilterExpression: { approvalSeq: { $type: 'number' } } },
+);
 membershipSchema.index({ membershipExpireAt: 1, status: 1 });
 membershipSchema.index({ pointsExpireAt: 1, pointsBalance: 1 });
 membershipSchema.index(

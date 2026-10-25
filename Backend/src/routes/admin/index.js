@@ -15,12 +15,14 @@ import membershipsRoutes from './memberships.routes.js';
 import familyRoutes from './family.routes.js';
 import billingAdminRoutes from './billing.routes.js';
 import membershipConsoleRoutes from './membership-console.routes.js';
+import draftsRoutes from './drafts.routes.js';
 
 const router = Router();
 
 router.use(adminCsrf);
 router.use('/auth', authRoutes);
 router.use(adminAuth);
+router.use('/drafts', draftsRoutes);
 router.use('/points', pointsRoutes);
 router.use('/members', membersRoutes);
 router.use('/dashboard', dashboardRoutes);

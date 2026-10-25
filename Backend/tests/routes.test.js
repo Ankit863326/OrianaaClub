@@ -1,6 +1,7 @@
 import { readFile, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { createHmac } from 'node:crypto';
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import { createApp } from './helpers/createApp.js';
 import { createAdmin, createMember, createPlan } from './helpers/factories.js';
@@ -12,6 +13,7 @@ import User from '../src/models/User.js';
 import Payment from '../src/models/Payment.js';
 import { invalidateSettingsCache } from '../src/models/Setting.js';
 import AuditLog from '../src/models/AuditLog.js';
+import TermsConsent from '../src/models/TermsConsent.js';
 import Post from '../src/models/Post.js';
 import Event from '../src/models/Event.js';
 import Enquiry from '../src/models/Enquiry.js';
@@ -28,6 +30,22 @@ const validProfile = {
   dob: '1990-01-01',
   interestArea: 'Travel',
 };
+
+async function acceptTerms(applicationId, userId = null) {
+  const acceptedAt = new Date();
+  return TermsConsent.create({
+    application_id: applicationId,
+    user_id: userId,
+    terms_version: 'v1',
+    language: 'hi',
+    document_sha256: 'a'.repeat(64),
+    accepted_at: acceptedAt,
+    ip_address: '127.0.0.1',
+    user_agent: 'route-test',
+    read_to_end: true,
+    scroll_completed_at: acceptedAt,
+  });
+}
 
 afterEach(() => invalidateSettingsCache());
 
@@ -53,6 +71,7 @@ describe('public account and plan routes', () => {
       email: 'unknown@example.invalid',
     })).status).toBe(202);
 
+    const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
     const started = await request(app).post('/api/membership/draft/start').send({
       firstName: 'Guest',
       email: 'guest@example.invalid',
@@ -67,7 +86,33 @@ describe('public account and plan routes', () => {
     const draft = await request(app).get('/api/membership/draft').set('Cookie', draftCookie);
     expect(draft.status).toBe(200);
     expect(draft.body.data).toMatchObject({ status: 'draft', emailVerified: false });
+    const otpEmail = globalThis.__orianaMailTransport.sendMail.mock.calls.at(-1)[0];
+    const otpCode = otpEmail.html.match(/letter-spacing:8px;">(\d{6})</)?.[1];
+    expect(otpCode).toBeTruthy();
+    expect(consoleLog.mock.calls.flat().join(' ')).toContain(otpCode);
+    consoleLog.mockRestore();
     expect((await request(app).get('/api/membership/draft')).status).toBe(401);
+  });
+
+  test('logs the SMTP error code and message when verification mail fails', async () => {
+    const transport = globalThis.__orianaMailTransport;
+    transport.sendMail.mockRejectedValueOnce(Object.assign(
+      new Error('Connection refused by local SMTP server'),
+      { code: 'ECONNECTION' },
+    ));
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await request(app).post('/api/membership/draft/start').send({
+      firstName: 'Mail Failure',
+      email: 'mail-failure@example.invalid',
+      profile: { ...validProfile, fullName: 'Mail Failure' },
+    });
+
+    expect(response.status).toBe(503);
+    const logs = errorLog.mock.calls.flat().join(' ');
+    expect(logs).toContain('ECONNECTION');
+    expect(logs).toContain('Connection refused by local SMTP server');
+    errorLog.mockRestore();
   });
 
   test('uses generic password recovery responses and enforces reset token expiry and single use', async () => {
@@ -274,7 +319,12 @@ describe('member profile, plan, family, and payment routes', () => {
   });
 
   test('enforces plan family limits and prevents access to another member family record', async () => {
-    const plan = await createPlan({ maxFamilyMembers: 1 });
+    const plan = await createPlan({
+      id: 'founder-legacy',
+      slug: 'founder-legacy',
+      name: 'Founder Legacy',
+      title: 'Founder Legacy',
+    });
     const owner = await createMember({
       membership: { plan: plan._id, status: 'draft' },
     });
@@ -282,10 +332,10 @@ describe('member profile, plan, family, and payment routes', () => {
       membership: { plan: plan._id, status: 'draft' },
     });
     const first = await request(app).post('/api/member/family').set('Cookie', owner.cookie)
-      .send({ fullName: 'First Family', gender: 'other', relationship: 'Sibling', dob: '1995-01-01' });
+      .send({ fullName: 'First Family', gender: 'other', relationship: 'Spouse', dob: '1995-01-01' });
     expect(first.status).toBe(201);
     expect((await request(app).post('/api/member/family').set('Cookie', owner.cookie)
-      .send({ fullName: 'Second Family', gender: 'other', relationship: 'Sibling', dob: '1995-01-01' })).status).toBe(409);
+      .send({ fullName: 'Second Family', gender: 'other', relationship: 'Spouse', dob: '1995-01-01' })).status).toBe(409);
     expect((await request(app).delete(`/api/member/family/${first.body.data._id}`)
       .set('Cookie', other.cookie)).status).toBe(404);
     expect(await FamilyMember.countDocuments({ membership: owner.membership._id })).toBe(1);
@@ -295,6 +345,7 @@ describe('member profile, plan, family, and payment routes', () => {
     const plan = await createPlan({ price: 1000 });
     const owner = await createMember({ membership: { plan: plan._id, status: 'pending_payment' } });
     const another = await createMember();
+    await acceptTerms(owner.user._id, owner.user._id);
     const quote = await request(app).post('/api/member/checkout/quote').set('Cookie', owner.cookie)
       .send({ planId: String(plan._id) });
     expect(quote.status).toBe(200);
@@ -347,6 +398,7 @@ describe('member profile, plan, family, and payment routes', () => {
       .set('X-Admin-Request', '1')
       .send({ gstRate: 18 });
     const firstMember = await createMember();
+    await acceptTerms(firstMember.user._id, firstMember.user._id);
     const firstPurchase = await request(app).post('/api/membership/purchase').set('Cookie', firstMember.cookie)
       .send({ planId: String(plan._id), paymentMethod: 'razorpay' });
     expect(firstPurchase.status).toBe(201);
@@ -373,6 +425,7 @@ describe('member profile, plan, family, and payment routes', () => {
     expect((await Payment.findById(firstPayment._id)).gstRate).toBe(18);
 
     const secondMember = await createMember();
+    await acceptTerms(secondMember.user._id, secondMember.user._id);
     const secondPurchase = await request(app).post('/api/membership/purchase').set('Cookie', secondMember.cookie)
       .send({ planId: String(plan._id), paymentMethod: 'bank_transfer' });
     expect(secondPurchase.status).toBe(201);
@@ -437,7 +490,12 @@ describe('member profile, plan, family, and payment routes', () => {
   });
 
   test('starts membership payment, reads the owner payment view, and edits only their family', async () => {
-    const plan = await createPlan({ maxFamilyMembers: 2 });
+    const plan = await createPlan({
+      id: 'founder-legacy',
+      slug: 'founder-legacy',
+      name: 'Founder Legacy',
+      title: 'Founder Legacy',
+    });
     const owner = await createMember();
     const other = await createMember();
     const started = await request(app).post('/api/member/checkout').set('Cookie', owner.cookie)
@@ -449,10 +507,10 @@ describe('member profile, plan, family, and payment routes', () => {
     expect((await request(app).get(`/api/payments/memberships/${membershipId}`)
       .set('Cookie', other.cookie)).status).toBe(404);
     const created = await request(app).post('/api/member/family').set('Cookie', owner.cookie)
-      .send({ fullName: 'Family One', gender: 'other', relationship: 'Sibling', dob: '1995-01-01' });
+      .send({ fullName: 'Family One', gender: 'other', relationship: 'Spouse', dob: '1995-01-01' });
     const familyId = created.body.data._id;
     expect((await request(app).put(`/api/member/family/${familyId}`).set('Cookie', owner.cookie)
-      .send({ fullName: 'Family Updated', gender: 'other', relationship: 'Sibling', dob: '1995-01-01' })).status).toBe(200);
+      .send({ fullName: 'Family Updated', gender: 'other', relationship: 'Spouse', dob: '1995-01-01' })).status).toBe(200);
     expect((await request(app).get('/api/member/family').set('Cookie', owner.cookie)).body.data[0].fullName)
       .toBe('Family Updated');
     expect((await request(app).delete(`/api/member/family/${familyId}`).set('Cookie', owner.cookie)).status).toBe(200);
@@ -677,7 +735,10 @@ describe('admin authorization and webhook routes', () => {
     const duplicateEvent = await send();
     expect(duplicateEvent.status).toBe(200);
     expect(duplicateEvent.body.processed).toBe(false);
-    expect((await Payment.findById(payment._id)).status).toBe('paid');
-    expect((await Membership.findById(member.membership._id)).status).toBe('active');
+    expect((await Payment.findById(payment._id)).status).toBe('confirmed');
+    expect(await Membership.findById(member.membership._id)).toMatchObject({
+      status: 'pending_approval',
+      approvalSeq: null,
+    });
   });
 });

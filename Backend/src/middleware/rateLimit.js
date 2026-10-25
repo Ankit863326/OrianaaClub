@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 
 const createLimiter = (windowMs, limit, message) => rateLimit({
   windowMs,
-  limit: env.nodeEnv === 'production' ? Math.max(1, Math.floor(limit / 2)) : limit,
+  limit: env.nodeEnv === 'production' ? Math.max(1, Math.floor(limit / 2)) : Math.max(limit, 1000),
   standardHeaders: true,
   legacyHeaders: false,
   message: { status: 'error', message },

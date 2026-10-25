@@ -50,7 +50,7 @@ export default function MembershipConsolePage({ section }) {
     event.preventDefault();
     await act(async () => {
       const body = { ...settingsDraft };
-      ['discountPercent', 'pointsValidityYears', 'membershipValidityYears', 'maxFamilyMembers', 'childAgeLimit', 'earlyBirdLimit'].forEach((key) => { body[key] = Number(body[key]); });
+      ['discountPercent', 'pointsValidityYears', 'membershipValidityYears', 'earlyBirdLimit'].forEach((key) => { body[key] = Number(body[key]); });
       await membershipApi.updateSettings(body);
     }, 'Membership settings saved.');
   }
@@ -166,8 +166,7 @@ export default function MembershipConsolePage({ section }) {
         <h2 className="font-display text-xl sm:col-span-2 xl:col-span-3">Membership rules</h2>
         {[
           ['Discount percent', 'discountPercent'], ['Points validity (years)', 'pointsValidityYears'],
-          ['Membership validity (years)', 'membershipValidityYears'], ['Maximum family members', 'maxFamilyMembers'],
-          ['Child age limit', 'childAgeLimit'], ['Early-bird limit', 'earlyBirdLimit'],
+          ['Membership validity (years)', 'membershipValidityYears'], ['Early-bird limit', 'earlyBirdLimit'],
         ].map(([label, key]) => <FormField key={key} label={label}><input className={controlClass} type="number" min="0" step="1" required value={settingsDraft[key]} onChange={(event) => setSettingsDraft({ ...settingsDraft, [key]: event.target.value })} /></FormField>)}
         <Button type="submit" disabled={busy}>Save settings</Button>
       </form></Panel>

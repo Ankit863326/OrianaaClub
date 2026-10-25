@@ -12,6 +12,8 @@ const refundSchema = new mongoose.Schema({
 const paymentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   membership: { type: mongoose.Schema.Types.ObjectId, ref: 'Membership', required: true, index: true },
+  familyMember: { type: mongoose.Schema.Types.ObjectId, ref: 'FamilyMember', default: null, index: true },
+  discountPct: { type: Number, enum: [0, 50, 75], default: 0 },
   plan: { type: mongoose.Schema.Types.ObjectId, refPath: 'planModel', required: true },
   planModel: { type: String, enum: ['Plan', 'MembershipPlan'], default: 'Plan' },
   amount: { type: Number, min: 0, validate: (value) => value === undefined || Number.isSafeInteger(value) },
@@ -54,6 +56,8 @@ const paymentSchema = new mongoose.Schema({
   verifiedAt: { type: Date, default: null },
   rejectionReason: { type: String, default: '', trim: true, maxlength: 500 },
   invoiceNumber: { type: String, default: '' },
+  invoiceGstin: { type: String, default: '', trim: true, maxlength: 30 },
+  invoiceHsnSac: { type: String, default: '', trim: true, maxlength: 30 },
   refunds: { type: [refundSchema], default: [] },
   note: { type: String, default: '', trim: true, maxlength: 500 },
 }, { timestamps: true });
@@ -62,6 +66,17 @@ paymentSchema.index({ utr: 1 }, { unique: true, partialFilterExpression: { utr: 
 paymentSchema.index(
   { receiptNumber: 1 },
   { unique: true, partialFilterExpression: { receiptNumber: { $type: 'string', $gt: '' } } },
+);
+paymentSchema.index(
+  { familyMember: 1 },
+  {
+    unique: true,
+    name: 'family_member_active_payment_unique',
+    partialFilterExpression: {
+      familyMember: { $type: 'objectId' },
+      status: { $in: ['pending', 'created', 'confirmed', 'paid'] },
+    },
+  },
 );
 
 const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);

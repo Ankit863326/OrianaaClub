@@ -49,6 +49,7 @@
 
 .member-hub__tab {
   flex: 0 0 auto;
+  min-height: 44px;
   border: 1px solid var(--hub-line);
   border-radius: 999px;
   padding: 10px 16px;
@@ -177,6 +178,74 @@
   color: #edf2ed;
 }
 
+.member-hub__progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.member-hub__progress li {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 86px;
+  border: 1px solid var(--hub-line);
+  border-radius: 12px;
+  padding: 12px 8px;
+  color: var(--hub-muted);
+  background: #fbfcfa;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.member-hub__progress li > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd7cf;
+  border-radius: 50%;
+  color: var(--hub-muted);
+}
+
+.member-hub__progress li.is-current {
+  border-color: var(--hub-gold);
+  color: var(--hub-green-dark);
+}
+
+.member-hub__progress li.is-complete {
+  border-color: var(--hub-green);
+  color: var(--hub-green-dark);
+  background: #edf5ef;
+}
+
+.member-hub__progress li.is-complete > span {
+  border-color: var(--hub-green);
+  color: white;
+  background: var(--hub-green);
+}
+
+.member-hub__family-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 22px;
+}
+
+.member-hub__family-slot {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  border: 1px dashed #b9c8bd;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
 .member-hub__dates {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -255,7 +324,7 @@
 .member-hub__filters input,
 .member-hub__filters select {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid #ccd7d0;
   border-radius: 9px;
   padding: 8px 10px;
@@ -360,7 +429,7 @@
 
 .member-hub__pagination button,
 .member-hub__retry {
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--hub-green);
   border-radius: 9px;
   padding: 8px 13px;
@@ -391,6 +460,14 @@
   }
 
   .member-hub__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .member-hub__progress {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-hub__family-slots {
     grid-template-columns: 1fr;
   }
 

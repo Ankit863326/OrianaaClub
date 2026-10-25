@@ -5,11 +5,13 @@ import AuditLog from '../src/models/AuditLog.js';
 import Membership from '../src/models/Membership.js';
 import Payment from '../src/models/Payment.js';
 import PointsTransaction from '../src/models/PointsTransaction.js';
+import PointsLedger from '../src/models/PointsLedger.js';
 import User from '../src/models/User.js';
 import FamilyMember from '../src/models/FamilyMember.js';
 import IdentityVerification from '../src/models/IdentityVerification.js';
 import { getSettings } from '../src/models/Setting.js';
 import { reviewIdentityVerification } from '../src/services/identity-verification.service.js';
+import { approveMembership } from '../src/services/membership-approval.service.js';
 import { getPayableAmount } from '../src/utils/money.js';
 import { getMemberOverview } from '../src/services/member.service.js';
 
@@ -21,12 +23,14 @@ describe('admin member services', () => {
       firstName: 'Alpha', email: 'alpha@example.invalid',
       membership: { plan: plan._id, status: 'active' },
     });
+    await Membership.collection.updateOne({ _id: alpha.membership._id }, { $unset: { memberType: '' } });
     await createMember({ firstName: 'Beta', email: 'beta@example.invalid', status: 'suspended' });
     const filtered = await adminService.listMembers({
       search: 'Alpha', status: 'active', plan: 'filter-plan', limit: '1',
     });
     expect(filtered).toMatchObject({ total: 1, page: 1, limit: 1 });
     expect(filtered.items[0]._id.toString()).toBe(alpha.user._id.toString());
+    expect(filtered.items[0].membership.memberType).toBe('primary');
     const sorted = await adminService.listMembers({ sort: 'name', order: 'asc', page: '1', limit: '1' });
     expect(sorted.items[0].firstName).toBe('Alpha');
   });
@@ -110,6 +114,8 @@ describe('admin member services', () => {
       totalAmount: payable.totalAmount,
     });
     expect(membership.status).toBe('pending_verification');
+    expect(membership.memberNo).toBe('');
+    expect(membership.approvalSeq).toBeNull();
     expect(membership.memberNumber).toBe('');
     expect(membership.memberCode).toBeUndefined();
     expect(membership.pointsBalance).toBe(0);
@@ -132,15 +138,29 @@ describe('admin member services', () => {
     await reviewIdentityVerification(created.user._id, admin.user._id, { status: 'verified' });
 
     const activatedMembership = await Membership.findById(membership._id);
-    expect(activatedMembership.status).toBe('active');
-    expect(activatedMembership.memberNumber).toMatch(/^\d+$/);
-    expect(activatedMembership.memberCode).toMatch(/^2651\d{8}$/);
-    expect(activatedMembership.pointsBalance).toBe(10);
+    expect(activatedMembership.status).toBe('pending_approval');
+    expect(activatedMembership.memberNo).toBe('');
+    expect(activatedMembership.approvalSeq).toBeNull();
+    expect(activatedMembership.memberNumber).toBe('');
+    expect(activatedMembership.memberCode).toBeUndefined();
+    expect(activatedMembership.pointsBalance).toBe(0);
+    expect(await PointsTransaction.countDocuments({
+      membership: membership._id,
+      category: 'membership_award',
+    })).toBe(0);
+
+    await approveMembership(membership._id, admin.user._id);
+    const approvedMembership = await Membership.findById(membership._id);
+    expect(approvedMembership.status).toBe('active');
+    expect(approvedMembership.memberNo).toMatch(/^\d+$/);
+    expect(approvedMembership.approvalSeq).toBe(1);
+    expect(approvedMembership.pointsBalance).toBe(600000);
+    expect(await PointsLedger.findOne({ memberId: membership._id })).toMatchObject({ points: 600000 });
     expect(await Payment.findById(payment._id).select('status')).toMatchObject({ status: 'paid' });
     expect(await PointsTransaction.countDocuments({
       membership: membership._id,
       category: 'membership_award',
-    })).toBe(1);
+    })).toBe(0);
   });
 
   test('last admin cannot be deactivated, and no admin can deactivate themselves', async () => {

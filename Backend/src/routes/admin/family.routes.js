@@ -17,8 +17,45 @@ import {
   familyTransferSchema,
 } from '../../validators/family.schema.js';
 import { membershipIdParamsSchema } from '../../validators/membership-purchase.schema.js';
+import * as familyVerificationController from '../../controllers/family-verification.controller.js';
+import {
+  familyVerificationDecisionSchema,
+  familyVerificationDocumentTokenSchema,
+  familyVerificationParamsSchema,
+  familyVerificationRejectSchema,
+} from '../../validators/family-verification.schema.js';
 
 const router = Router();
+
+router.get('/family-verifications', familyVerificationController.listAdminQueue);
+router.get(
+  '/family-verifications/documents',
+  validate(familyVerificationDocumentTokenSchema, 'query'),
+  familyVerificationController.readAdminDocument,
+);
+router.get(
+  '/family-verifications/:familyId',
+  validate(familyVerificationParamsSchema, 'params'),
+  familyVerificationController.getAdminDetail,
+);
+router.patch(
+  '/family-verifications/:familyId/approve',
+  validate(familyVerificationParamsSchema, 'params'),
+  validate(familyVerificationDecisionSchema),
+  familyVerificationController.decideAdmin('approve'),
+);
+router.patch(
+  '/family-verifications/:familyId/reject',
+  validate(familyVerificationParamsSchema, 'params'),
+  validate(familyVerificationRejectSchema),
+  familyVerificationController.decideAdmin('reject'),
+);
+router.patch(
+  '/family-verifications/:familyId/request-reupload',
+  validate(familyVerificationParamsSchema, 'params'),
+  validate(familyVerificationRejectSchema),
+  familyVerificationController.decideAdmin('request_reupload'),
+);
 
 router.get('/family-requests', validate(familyRequestsQuerySchema, 'query'), familyController.listRequests);
 router.patch(

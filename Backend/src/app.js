@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import { publicMediaDirectory } from './utils/uploadDirectories.js';
+import { termsDirectory } from './config/terms.js';
 import logger from './utils/logger.js';
 import errorHandler from './middleware/errorHandler.js';
 import noSqlSanitizer from './middleware/noSqlSanitizer.js';
@@ -74,6 +75,13 @@ app.use(cors({
 app.get('/health', (request, response) => {
   response.json({ status: 'ok' });
 });
+app.use('/terms', express.static(termsDirectory, {
+  dotfiles: 'deny',
+  index: false,
+  fallthrough: false,
+  immutable: true,
+  maxAge: '1y',
+}));
 app.use('/media', express.static(publicMediaDirectory, {
   dotfiles: 'deny',
   index: false,

@@ -1,13 +1,18 @@
 import { jest } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import EmailToken from '../src/models/EmailToken.js';
+import EmailCooldown from '../src/models/EmailCooldown.js';
 import EmailLog from '../src/models/EmailLog.js';
 import AuditLog from '../src/models/AuditLog.js';
+import MembershipDraft from '../src/models/MembershipDraft.js';
+import MembershipPlan from '../src/models/MembershipPlan.js';
 import Payment from '../src/models/Payment.js';
 import Membership from '../src/models/Membership.js';
 import PointLedger from '../src/models/PointLedger.js';
+import PointsLedger from '../src/models/PointsLedger.js';
 import Redemption from '../src/models/Redemption.js';
 import PointsTransaction from '../src/models/PointsTransaction.js';
+import TermsConsent from '../src/models/TermsConsent.js';
 import { createAdmin, createMember, createPlan } from './helpers/factories.js';
 import {
   consumeEmailToken,
@@ -19,13 +24,35 @@ import {
   verifyRefreshToken,
 } from '../src/services/token.service.js';
 import { sendMail } from '../src/services/mail.service.js';
+import {
+  activateAccount,
+  inspectActivation,
+  requestDraftPasswordLink,
+} from '../src/services/auth.service.js';
 import { verifyRecaptcha } from '../src/services/recaptcha.service.js';
 import { listActivePlans, findActivePlan } from '../src/services/plan.service.js';
 import { recordAdminAction, recordAdminAuthAttempt } from '../src/services/audit.service.js';
 import * as pointsService from '../src/services/points.service.js';
 import { formatMemberId, getMembershipCohort, getPointsTier } from '../src/services/membership.service.js';
 import { createRazorpayOrder, finalizePayment, verifyRazorpayPayment } from '../src/services/payment.service.js';
+import { verifyMembershipDraftRazorpayPayment } from '../src/services/membership-draft.service.js';
 import { cancelRedemption, createBillingApiKey } from '../src/services/billing.service.js';
+
+async function acceptTerms(applicationId, userId = null) {
+  const acceptedAt = new Date();
+  return TermsConsent.create({
+    application_id: applicationId,
+    user_id: userId,
+    terms_version: 'v1',
+    language: 'hi',
+    document_sha256: 'a'.repeat(64),
+    accepted_at: acceptedAt,
+    ip_address: '127.0.0.1',
+    user_agent: 'service-test',
+    read_to_end: true,
+    scroll_completed_at: acceptedAt,
+  });
+}
 
 // These service tests use the in-memory database and the shared fake integrations.
 describe('single-use tokens and signed sessions', () => {
@@ -99,6 +126,140 @@ describe('redemption cancellation', () => {
     expect((await Membership.findById(member.membership._id)).pointsBalance).toBe(350);
     expect(await PointLedger.countDocuments({ billId, type: 'refund' })).toBe(0);
     expect((await cancelRedemption({ billId, cancelledAt: new Date() })).status).toBe('cancelled');
+  });
+});
+
+describe('guest membership payment verification', () => {
+  test('uses the signed frontend callback in development and marks its payment paid', async () => {
+    const plan = await MembershipPlan.create({
+      name: 'Guest callback test plan',
+      price: 10000,
+      earlyBirdPoints: 1,
+      defaultPoints: 1,
+      renewalPoints: 1,
+      sortOrder: 1,
+    });
+    const orderId = 'order_test_1';
+    const paymentId = 'payment_guest_callback';
+    const draft = await MembershipDraft.create({
+      email: 'guest-callback@example.invalid',
+      firstName: 'Guest',
+      tokenHash: 'a'.repeat(64),
+      expiresAt: new Date(Date.now() + 60_000),
+      emailVerifiedAt: new Date(),
+      profile: {
+        fullName: 'Guest Member',
+        gender: 'other',
+        countryCode: '+91',
+        mobile: '9000000000',
+        dob: new Date('1998-10-14T00:00:00.000Z'),
+        interestArea: 'Travel',
+      },
+      plan: plan._id,
+      gstSnapshot: {
+        enabled: true,
+        rate: 18,
+        label: 'GST',
+        planFee: 10000,
+        gstAmount: 1800,
+        totalAmount: 11800,
+      },
+      paymentMethod: 'razorpay',
+      razorpayOrderId: orderId,
+      identity: {
+        panCiphertext: 'encrypted-pan',
+        panMask: 'ABCDE****F',
+        idType: 'aadhaar',
+        idCiphertext: 'encrypted-id',
+        idMask: 'XXXX XXXX 1234',
+        consentAt: new Date(),
+        documents: ['pan_front', 'second_front', 'second_back'].map((kind) => ({
+          id: `test-${kind}`,
+          kind,
+          storageKey: `test-${kind}.png`,
+          mimeType: 'image/png',
+        })),
+      },
+    });
+    await acceptTerms(draft._id);
+    const signature = createHmac('sha256', 'fake-razorpay-secret-never-used')
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
+    const razorpay = globalThis.__orianaRazorpayClient;
+    razorpay.payments.fetch.mockClear();
+
+    const result = await verifyMembershipDraftRazorpayPayment(draft, {
+      razorpay_order_id: orderId,
+      razorpay_payment_id: paymentId,
+      razorpay_signature: signature,
+    });
+
+    expect(result.status).toBe('paid');
+    expect((await Payment.findOne({ razorpayOrderId: orderId })).status).toBe('paid');
+    expect((await MembershipDraft.findById(draft._id)).status).toBe('paid');
+    expect(razorpay.payments.fetch).not.toHaveBeenCalled();
+
+    const paidDraft = await MembershipDraft.findById(draft._id);
+    const linkResult = await requestDraftPasswordLink(paidDraft, paidDraft.email);
+    expect(linkResult.sent).toBe(true);
+    const sentEmail = globalThis.__orianaMailTransport.sendMail.mock.calls.at(-1)[0];
+    const rawToken = sentEmail.html.match(/token=([a-f\d]{64})/i)?.[1];
+    const tokenRecord = await EmailToken.findOne({ user: result.userId, type: 'activation' });
+    expect(tokenRecord.tokenHash).not.toBe(rawToken);
+    expect(tokenRecord.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    await expect(inspectActivation(rawToken)).resolves.toMatchObject({ email: paidDraft.email });
+    const activated = await activateAccount({ token: rawToken, password: 'GuestPassword123' });
+    expect(activated.user.status).toBe('active');
+  });
+
+  test('releases the resend cooldown when password-link delivery fails', async () => {
+    const plan = await createPlan();
+    const member = await createMember({
+      email: 'retry-password-link@example.invalid',
+      status: 'pending',
+      emailVerified: true,
+      passwordHash: undefined,
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    const payment = await Payment.create({
+      user: member.user._id,
+      membership: member.membership._id,
+      plan: plan._id,
+      method: 'bank_transfer',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+    });
+    const draft = await MembershipDraft.create({
+      email: member.user.email,
+      firstName: member.user.firstName,
+      tokenHash: 'b'.repeat(64),
+      expiresAt: new Date(Date.now() + 60_000),
+      status: 'payment_submitted',
+      user: member.user._id,
+      membership: member.membership._id,
+      payment: payment._id,
+    });
+    const transport = globalThis.__orianaMailTransport;
+    transport.sendMail.mockReset()
+      .mockRejectedValueOnce(new Error('temporary local mail failure'))
+      .mockResolvedValue({ messageId: 'retry-message' });
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(requestDraftPasswordLink(draft, member.user.email))
+      .rejects.toThrow('temporary local mail failure');
+    expect(await EmailCooldown.findOne({
+      email: member.user.email,
+      type: 'activation',
+    })).toBeNull();
+    await expect(requestDraftPasswordLink(draft, member.user.email))
+      .resolves.toMatchObject({ sent: true });
+    expect(await EmailCooldown.findOne({
+      email: member.user.email,
+      type: 'activation',
+    })).toBeTruthy();
+    errorLog.mockRestore();
   });
 });
 
@@ -281,6 +442,7 @@ describe('points and payment services', () => {
       pointsTiers: [{ label: 'Standard', points: 10, fromMember: 1, toMember: null }],
     });
     const member = await createMember({ membership: { plan: plan._id, status: 'pending_payment' } });
+    await acceptTerms(member.user._id, member.user._id);
     const result = await createRazorpayOrder(member.user._id, member.membership._id, 'upi');
     const razorpay = globalThis.__orianaRazorpayClient;
     expect(result).toEqual({ orderId: 'order_test_1', keyId: 'rzp_test_only' });
@@ -302,7 +464,7 @@ describe('points and payment services', () => {
     })).resolves.toMatchObject({ status: 'paid' });
   });
 
-  test('finalizes a payment once and does not fail when payment email delivery fails', async () => {
+  test('confirms a payment for approval without assigning a number or crediting points', async () => {
     const plan = await createPlan({
       pointsTiers: [{ label: 'Standard', points: 10, fromMember: 1, toMember: null }],
     });
@@ -320,17 +482,24 @@ describe('points and payment services', () => {
       totalAmount: 11800,
     });
     const transport = globalThis.__orianaMailTransport;
-    transport.sendMail.mockReset().mockRejectedValue(new Error('local mock mail failure'));
-    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    transport.sendMail.mockClear();
     const first = await finalizePayment(payment._id);
     const second = await finalizePayment(payment._id);
-    expect(first.status).toBe('paid');
-    expect(second.status).toBe('paid');
-    expect(await PointsTransaction.countDocuments({ membership: member.membership._id })).toBe(1);
-    const memberId = await Membership.findById(member.membership._id).then((row) => row.memberCode);
-    expect(memberId).toMatch(/^\d{12}$/);
-    expect(memberId).toMatch(/^2651\d{8}$/);
-    expect(errorLog.mock.calls.flat().join(' ')).not.toContain('fake-mail-password-never-used');
-    errorLog.mockRestore();
+    expect(first.status).toBe('confirmed');
+    expect(second.status).toBe('confirmed');
+    const confirmedMembership = await Membership.findById(member.membership._id);
+    expect(confirmedMembership).toMatchObject({
+      status: 'pending_approval',
+      baseAmount: 100,
+      gstAmount: 18,
+      totalPaid: 118,
+    });
+    expect(confirmedMembership.paymentConfirmedAt).toBeInstanceOf(Date);
+    expect(confirmedMembership.approvalDueAt.getTime() - confirmedMembership.paymentConfirmedAt.getTime())
+      .toBe(24 * 60 * 60 * 1000);
+    expect(confirmedMembership.approvalSeq).toBeNull();
+    expect(await PointsTransaction.countDocuments({ membership: member.membership._id })).toBe(0);
+    expect(await PointsLedger.countDocuments({ memberId: member.membership._id })).toBe(0);
+    expect(transport.sendMail).not.toHaveBeenCalled();
   });
 });

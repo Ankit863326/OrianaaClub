@@ -8,6 +8,7 @@ const auditLogSchema = new mongoose.Schema({
   action: { type: String, required: true, trim: true, maxlength: 80 },
   entityType: { type: String, required: true, trim: true, maxlength: 80, index: true },
   entityId: { type: String, required: true, trim: true, maxlength: 100, index: true },
+  memberNo: { type: String, default: '', trim: true, maxlength: 40, index: true },
   summary: { type: String, required: true, trim: true, maxlength: 1000 },
   before: { type: mongoose.Schema.Types.Mixed, default: null },
   after: { type: mongoose.Schema.Types.Mixed, default: null },

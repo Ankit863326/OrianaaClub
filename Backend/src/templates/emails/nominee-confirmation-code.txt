@@ -1,0 +1,3 @@
+Hello {{firstName}},
+
+Your OrianaaClub nominee email confirmation code is {{code}}. It is valid for 10 minutes.

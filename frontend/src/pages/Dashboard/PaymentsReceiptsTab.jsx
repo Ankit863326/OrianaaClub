@@ -88,25 +88,25 @@ export default function PaymentsReceiptsTab({ onSessionExpired }) {
           <dl>
             <div><dt>Date</dt><dd>{formatDate(payment.confirmedAt || payment.createdAt)}</dd></div>
             <div><dt>Plan fee</dt><dd>{formatINR(payment.baseAmount ?? Number(payment.amount || 0) * 100)}</dd></div>
-            {(payment.gstEnabled ?? Number(payment.gstAmount || 0) > 0) && <div>
+            <div>
               <dt>{payment.gstLabel || 'GST'} ({payment.gstRate ?? (
                 payment.baseAmount ? Math.round((payment.gstAmount / payment.baseAmount) * 10000) / 100 : 0
               )}%)</dt>
               <dd>{formatINR(payment.gstAmount)}</dd>
-            </div>}
+            </div>
             <div><dt>Total</dt><dd>{formatINR(payment.totalAmount ?? Number(payment.amount || 0) * 100)}</dd></div>
             <div><dt>Method</dt><dd>{String(payment.method || '—').replaceAll('_', ' ')}</dd></div>
             <div><dt>Reference</dt><dd>{payment.reference || payment.utr || payment.razorpayPaymentId || '—'}</dd></div>
           </dl>
           {confirmed
             ? <div className="member-hub-receipt__action">
-              <span className="member-hub-receipt__number">{payment.receiptNumber || 'Receipt ready'}</span>
+              <span className="member-hub-receipt__number">{payment.invoiceNumber || payment.receiptNumber || 'GST invoice ready'}</span>
               <button
                 className="member-hub__retry"
                 type="button"
                 disabled={downloading === payment._id}
                 onClick={() => download(payment)}
-              >{downloading === payment._id ? 'Downloading…' : 'Download receipt'}</button>
+              >{downloading === payment._id ? 'Downloading…' : 'Download GST invoice'}</button>
             </div>
             : <button className="member-hub__retry" type="button" disabled>
               Available after admin confirmation

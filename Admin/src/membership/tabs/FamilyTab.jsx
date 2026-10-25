@@ -15,7 +15,6 @@ import {
 } from '../../components/ui.jsx';
 import { membershipApi } from '../../api/membership.js';
 
-const MAX_FAMILY_MEMBERS = 6;
 const blankForm = { name: '', relation: '', dateOfBirth: '', phone: '' };
 
 function familyMembers(family) {
@@ -33,7 +32,6 @@ function photoUrl(member) {
 export default function FamilyTab() {
   const { id } = useParams();
   const [family, setFamily] = useState(null);
-  const [membership, setMembership] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -52,18 +50,12 @@ export default function FamilyTab() {
     member.type === 'adult' && member.status === 'active' && member.pendingAction !== 'remove'
   ));
   const requests = members.filter((member) => Boolean(member.pendingAction));
-  const atCapacity = countedMembers.length >= MAX_FAMILY_MEMBERS;
 
   async function load() {
     setError('');
     setLoading(true);
     try {
-      const [familyData, details] = await Promise.all([
-        membershipApi.family(id),
-        membershipApi.member(id),
-      ]);
-      setFamily(familyData);
-      setMembership(details.membership);
+      setFamily(await membershipApi.family(id));
     } catch (failure) {
       setError(errorMessage(failure));
     } finally {
@@ -223,13 +215,10 @@ export default function FamilyTab() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-xl">Family members</h2>
-            <p className="mt-1 text-sm text-slate-500">{countedMembers.length} of {MAX_FAMILY_MEMBERS} members</p>
+            <p className="mt-1 text-sm text-slate-500">{countedMembers.length} family profiles</p>
           </div>
-          <Button disabled={atCapacity || busy} onClick={startAdd}>Add member</Button>
+          <Button disabled={busy} onClick={startAdd}>Add member</Button>
         </div>
-        {atCapacity && <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          The membership limit of {MAX_FAMILY_MEMBERS} family members has been reached. Remove a member before adding another.
-        </p>}
         <div className="grid gap-5">
           {[
             ['Adults', family.adults || []],
@@ -297,10 +286,9 @@ export default function FamilyTab() {
           <input className={controlClass} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setPhoto(event.target.files?.[0] || null)} />
         </FormField>}
         <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" disabled={busy || (!editing && atCapacity)}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add member'}</Button>
+          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add member'}</Button>
           <Button type="button" variant="secondary" onClick={() => { setEditing(null); setFormOpen(false); setForm(blankForm); setPhoto(null); }}>Cancel</Button>
         </div>
-        {membership?.plan?.maxFamilyMembers && <p className="text-xs text-slate-500 sm:col-span-2">Membership tier allowance: {membership.plan.maxFamilyMembers}; account limit: {MAX_FAMILY_MEMBERS}.</p>}
       </form>
     </Panel>}
 

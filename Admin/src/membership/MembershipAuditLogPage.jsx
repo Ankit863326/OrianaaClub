@@ -14,7 +14,7 @@ import {
 import { membershipApi } from '../api/membership.js';
 
 const pageSize = 20;
-const emptyFilters = { entityType: '', actor: '', action: '', from: '', to: '' };
+const emptyFilters = { entityType: '', actor: '', action: '', memberNo: '', from: '', to: '' };
 
 function actorLabel(entry) {
   return entry.admin?.firstName
@@ -73,7 +73,7 @@ export default function MembershipAuditLogPage() {
     <PageHeading eyebrow="MEMBERSHIP" title="Audit Log" description="Review administrator and system actions for membership operations." />
     {error && <Toast kind="error" onDismiss={() => setError('')}>{error}</Toast>}
     <Panel className="mb-5">
-      <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" onSubmit={(event) => {
+      <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6" onSubmit={(event) => {
         event.preventDefault();
         load(1, filters);
       }}>
@@ -86,13 +86,16 @@ export default function MembershipAuditLogPage() {
         <FormField label="Action">
           <input className={controlClass} maxLength="80" value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })} />
         </FormField>
+        <FormField label="Member number">
+          <input className={controlClass} maxLength="40" value={filters.memberNo} onChange={(event) => setFilters({ ...filters, memberNo: event.target.value })} placeholder="OC-xxxx or family suffix" />
+        </FormField>
         <FormField label="From date">
           <input className={controlClass} type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
         </FormField>
         <FormField label="To date">
           <input className={controlClass} type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} />
         </FormField>
-        <div className="flex gap-2 xl:col-span-5">
+        <div className="flex gap-2 xl:col-span-6">
           <Button type="submit" disabled={loading}>Apply filters</Button>
           <Button type="button" variant="secondary" disabled={loading} onClick={() => {
             setFilters(emptyFilters);
@@ -108,7 +111,7 @@ export default function MembershipAuditLogPage() {
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft">
         <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>{['Date', 'Actor', 'Action', 'Entity', 'Reason', 'Details'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+            <tr>{['Date', 'Actor', 'Member code', 'Action', 'Entity', 'Reason', 'Details'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.items.map((entry) => <AuditLogRows
@@ -117,7 +120,7 @@ export default function MembershipAuditLogPage() {
               expanded={expanded.has(entry._id)}
               onToggle={() => toggleExpanded(entry._id)}
             />)}
-            {!data.items.length && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="6">No audit entries match these filters.</td></tr>}
+            {!data.items.length && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan="7">No audit entries match these filters.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -131,13 +134,14 @@ function AuditLogRows({ entry, expanded, onToggle }) {
     <tr>
       <td className="px-4 py-3.5 text-slate-700">{formatDate(entry.createdAt)}</td>
       <td className="px-4 py-3.5 text-slate-700">{actorLabel(entry)}</td>
+      <td className="px-4 py-3.5 text-slate-700">{entry.memberNo ? (entry.memberNo.startsWith('OC-') ? entry.memberNo : `OC-${entry.memberNo}`) : '—'}</td>
       <td className="px-4 py-3.5 text-slate-700">{entry.action}</td>
       <td className="px-4 py-3.5 text-slate-700">{entry.entityType}{entry.entityId ? <small className="block text-slate-500">{entry.entityId}</small> : null}</td>
       <td className="max-w-80 px-4 py-3.5 text-slate-700">{entry.reason || '—'}</td>
       <td className="px-4 py-3.5"><Button variant="secondary" aria-expanded={expanded} onClick={onToggle}>{expanded ? 'Hide' : 'View'}</Button></td>
     </tr>
     {expanded && <tr>
-      <td className="bg-slate-50 px-4 py-4" colSpan="6">
+      <td className="bg-slate-50 px-4 py-4" colSpan="7">
         <div className="grid gap-4 md:grid-cols-2">
           <section><h3 className="mb-2 font-semibold text-slate-700">Before</h3><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 text-xs text-slate-700">{jsonValue(entry.before)}</pre></section>
           <section><h3 className="mb-2 font-semibold text-slate-700">After</h3><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 text-xs text-slate-700">{jsonValue(entry.after)}</pre></section>

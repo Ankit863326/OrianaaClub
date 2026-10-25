@@ -33,13 +33,19 @@ function normalizeMembershipSearchQuery(query) {
 }
 
 export const membershipIdParamsSchema = z.object({ id: membershipId });
+export const familyTreeParamsSchema = z.object({
+  memberNo: z.string().trim().min(1).max(40).regex(/^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/i, 'Invalid member number.'),
+});
 export const membershipPlanIdParamsSchema = z.object({ id: objectId });
 export const membershipSearchQuerySchema = z.preprocess(
   normalizeMembershipSearchQuery,
   pagination.extend({
     search: z.string().trim().optional(),
     tier: z.string().trim().max(80).optional(),
-    status: z.enum(['pending_payment', 'pending_verification', 'active', 'expired', 'cancelled']).optional(),
+    status: z.enum(['draft', 'profile_only', 'payment_pending', 'pending_payment', 'pending_verification', 'pending_approval', 'active', 'expired', 'cancelled']).optional(),
+    memberType: z.enum(['primary', 'spouse', 'child', 'father', 'mother', 'nominee_gm', 'nominee_hr', 'nominee']).optional(),
+    ratePhase: z.enum(['early_bird', 'default']).optional(),
+    aadhaarPending: z.enum(['true', 'false']).optional().transform((value) => value === 'true'),
     documentsPending: z.enum(['true', 'false']).optional().transform((value) => value === 'true'),
     notActivated: z.enum(['true', 'false']).optional().transform((value) => value === 'true'),
   }),
@@ -55,6 +61,65 @@ export const membershipPlanPatchSchema = z.object({
   requiresCompanyDetails: z.boolean().optional(),
   sortOrder: z.coerce.number().int().positive().optional(),
 }).refine((body) => Object.keys(body).length > 0, 'At least one plan field is required.');
+
+const familyTierConfigSchema = z.object({
+  tier: z.enum([
+    'founder-legacy',
+    'platinum-crest',
+    'imperial-signature',
+    'presidential-elite',
+    'chairmans-privilege',
+    'founder-circle',
+    'corporate',
+    'privileged',
+  ]),
+  familyEnabled: z.boolean(),
+  nomineesEnabled: z.boolean(),
+  maxNominees: z.number().int().min(0).max(100),
+  nomineeRoles: z.union([
+    z.literal('free_text'),
+    z.array(z.enum(['GM', 'HR'])),
+  ]),
+});
+
+const familyMembershipConfigSchema = z.object({
+  gstPct: z.number().min(0).max(100)
+    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8),
+  pointsOnBase: z.boolean(),
+  multipliers: z.object({
+    earlyBird: z.number().finite().nonnegative(),
+    default: z.number().finite().nonnegative(),
+  }),
+  earlyBirdLimit: z.number().int().min(0).max(10000000),
+  pointExpiryYears: z.number().int().min(1).max(100),
+  discounts: z.object({
+    spouse: z.union([z.literal(0), z.literal(50), z.literal(75)]),
+    parent: z.union([z.literal(0), z.literal(50), z.literal(75)]),
+    child: z.union([z.literal(0), z.literal(50), z.literal(75)]),
+  }),
+  childMaxAge: z.number().int().min(0).max(100),
+  limits: z.object({
+    spouse: z.number().int().min(0).max(100),
+    parents: z.number().int().min(0).max(100),
+    parentsPerSide: z.number().int().min(0).max(100),
+    children: z.number().int().min(0).max(100).nullable(),
+  }),
+  reviewTargets: z.object({
+    verificationWorkingDays: z.number().int().min(0).max(365),
+    approvalHours: z.number().int().min(0).max(8760),
+  }),
+  nomineesTakeApprovalSeq: z.boolean(),
+  tiers: z.array(familyTierConfigSchema).length(8)
+    .refine((tiers) => new Set(tiers.map((tier) => tier.tier)).size === 8,
+      'Each configured membership tier must appear exactly once.')
+    .refine((tiers) => {
+      const corporate = tiers.find((tier) => tier.tier === 'corporate');
+      return corporate?.nomineeRoles?.length === 2
+        && corporate.nomineeRoles.includes('GM')
+        && corporate.nomineeRoles.includes('HR');
+    }, 'Corporate nominee roles must remain GM and HR.'),
+});
+
 export const membershipSettingsPatchSchema = z.object({
   discountPercent: z.coerce.number().int().min(0).max(100).optional(),
   gstEnabled: z.boolean().optional(),
@@ -65,12 +130,12 @@ export const membershipSettingsPatchSchema = z.object({
   gstin: z.string().trim().max(30).optional(),
   pointsValidityYears: z.coerce.number().int().positive().max(100).optional(),
   membershipValidityYears: z.coerce.number().int().positive().max(100).optional(),
-  maxFamilyMembers: z.coerce.number().int().min(1).max(100).optional(),
-  childAgeLimit: z.coerce.number().int().min(0).max(100).optional(),
   earlyBirdLimit: z.coerce.number().int().min(0).max(10000000).optional(),
+  familyMembership: familyMembershipConfigSchema.optional(),
   receiptCompanyName: z.string().trim().max(160).optional(),
   receiptAddress: z.string().trim().max(500).optional(),
   receiptGstin: z.string().trim().max(30).optional(),
+  receiptHsnSac: z.string().trim().max(30).optional(),
   receiptFooterNote: z.string().trim().max(500).optional(),
 }).refine((body) => Object.keys(body).length > 0, 'At least one setting is required.');
 export const membershipBillsQuerySchema = pagination.extend({
@@ -109,6 +174,7 @@ export const memberLedgerQuerySchema = pagination.extend({
 export const queueQuerySchema = pagination.extend({
   status: z.enum(['pending_payment', 'pending_verification']).optional(),
 });
+export const approvalQueueQuerySchema = pagination;
 export const pointsExpiringQuerySchema = z.object({
   withinDays: z.enum(['30', '90']),
 });

@@ -18,8 +18,13 @@ import Activate from './pages/Activate/Activate.jsx';
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import Dashboard from './pages/Dashboard/MemberDashboardPage.jsx';
+<<<<<<< HEAD
+import FamilyVerificationPage from './pages/Dashboard/FamilyVerificationPage.jsx';
+import FamilyCheckoutPage from './pages/Dashboard/FamilyCheckoutPage.jsx';
+=======
 import NotFound from './pages/NotFound/NotFound.jsx';
 import LuxuryCursor from './components/LuxuryCursor';
+>>>>>>> origin/main
 
 function SiteScrollMotion() {
   const location = useLocation();
@@ -123,6 +128,8 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/family/:familyId/verification" element={<ProtectedRoute><FamilyVerificationPage /></ProtectedRoute>} />
+          <Route path="/dashboard/family/:familyId/payment" element={<ProtectedRoute><FamilyCheckoutPage /></ProtectedRoute>} />
           <Route path="/luxury-membership" element={<MembershipAll />} />
           <Route path="/luxury-membership-step-2" element={<Navigate to="/luxury-membership?step=2" replace />} />
           <Route path="/luxury-membership-step-3" element={<Navigate to="/luxury-membership?step=3" replace />} />

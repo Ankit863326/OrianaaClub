@@ -4,7 +4,10 @@ import { pathToFileURL } from 'node:url';
 import { connectDatabase, safeErrorMessage } from '../src/config/db.js';
 import Counter from '../src/models/Counter.js';
 import MembershipPlan from '../src/models/MembershipPlan.js';
-import Setting, { DEFAULT_SETTINGS_ID } from '../src/models/Setting.js';
+import Setting, {
+  DEFAULT_FAMILY_MEMBERSHIP_CONFIG,
+  DEFAULT_SETTINGS_ID,
+} from '../src/models/Setting.js';
 
 const plans = [
   { name: 'Founder Legacy', price: 300000, earlyBirdPoints: 600000, defaultPoints: 480000, renewalPoints: 420000 },
@@ -47,12 +50,23 @@ export async function seedMembershipData() {
         discountPercent: 50,
         pointsValidityYears: 11,
         membershipValidityYears: 25,
-        maxFamilyMembers: 6,
+        familyMembership: DEFAULT_FAMILY_MEMBERSHIP_CONFIG,
         childAgeLimit: 18,
         earlyBirdLimit: 1000,
       },
     },
     { upsert: true, runValidators: true },
+  );
+
+  await Setting.updateOne(
+    { _id: DEFAULT_SETTINGS_ID, familyMembership: { $exists: false } },
+    { $set: { familyMembership: DEFAULT_FAMILY_MEMBERSHIP_CONFIG } },
+    { runValidators: true },
+  );
+  await Setting.updateOne(
+    { _id: DEFAULT_SETTINGS_ID, 'familyMembership.limits.parentsPerSide': { $exists: false } },
+    { $set: { 'familyMembership.limits.parentsPerSide': DEFAULT_FAMILY_MEMBERSHIP_CONFIG.limits.parentsPerSide } },
+    { runValidators: true },
   );
 
   await Counter.updateOne(
@@ -68,7 +82,13 @@ export async function seedMembershipData() {
     { upsert: true },
   );
 
-  console.log(`Seeded ${plans.length} membership plans, default settings, and member-number counter.`);
+  await Counter.updateOne(
+    { name: 'approvalSeq' },
+    { $setOnInsert: { name: 'approvalSeq', key: 'approvalSeq', value: 0, seq: 0 } },
+    { upsert: true },
+  );
+
+  console.log(`Seeded ${plans.length} membership plans, default settings, and global counters.`);
 }
 
 async function runSeed() {

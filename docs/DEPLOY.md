@@ -52,6 +52,19 @@ cd /srv/orianaaclub/OrianaaClub/Backend
 CONFIRM_INDEX_SYNC=YES npm run db:indexes
 ```
 
+## Membership agreement and consent
+
+Before deploying the consent flow, place the approved, unchanged HTML and PDF agreements in `Backend/terms/v1/` as `hi.html`, `hi.pdf`, `mr.html`, `mr.pdf`, `gu.html`, and `gu.pdf`. Each HTML document must retain its 21 section headings with ids `s1` through `s21`. The API hashes both files per language during startup; the public manifest is `GET /api/terms/current`, and the immutable documents are served at `/terms/v1/...`. Keep every published version in place permanently; publish a new version in a new directory rather than replacing an existing one.
+
+Run the append-only consent collection migration once before starting the updated API:
+
+```sh
+cd /srv/orianaaclub/OrianaaClub/Backend
+npm run db:migrate:terms-consents
+```
+
+Production trusts one reverse-proxy hop for the request IP. Keep the Node port private to Nginx, and retain the API proxy's `X-Forwarded-For $remote_addr` overwrite so client-supplied forwarding headers cannot set the recorded IP.
+
 ## Persistent uploads
 
 Create a persistent directory outside the Nginx document roots and grant the API service account write access:

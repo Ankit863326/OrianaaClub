@@ -20,6 +20,7 @@
   "dependencies": {
     "@radix-ui/react-slot": "^1.4.0",
     "class-variance-authority": "^0.7.1",
+    "dompurify": "^3.4.17",
     "framer-motion": "^12.38.0",
     "gsap": "^3.15.0",
     "lucide-react": "^1.7.0",

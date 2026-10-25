@@ -9,6 +9,7 @@ import validate from '../middleware/validate.js';
 import {
   membershipDraftFamilyIdSchema,
   membershipDraftFamilyMemberSchema,
+  membershipDraftFamilyPriceQuerySchema,
   membershipDraftFamilySchema,
   membershipDraftPaymentVerificationSchema,
   membershipDraftPlanSchema,
@@ -33,6 +34,11 @@ router.put('/profile', profilePhotoUpload, validate(profileSchema), draftControl
 router.put('/identity-verification', identityDocumentLimiter, identityDocumentUpload, draftController.saveIdentity);
 router.put('/plan', validate(membershipDraftPlanSchema), draftController.savePlan);
 router.post('/quote', validate(membershipDraftPlanSchema), draftController.quote);
+router.get(
+  '/family-prices',
+  validate(membershipDraftFamilyPriceQuerySchema, 'query'),
+  draftController.familyPrices,
+);
 router.put('/family', validate(membershipDraftFamilySchema), draftController.saveFamily);
 router.post('/family', familyPhotoUpload, validate(membershipDraftFamilyMemberSchema), draftController.addFamily);
 router.put(

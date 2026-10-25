@@ -25,6 +25,7 @@ export default function errorHandler(error, request, response, next) {
     ? (isSafeApiError ? error.message : 'Internal server error.')
     : error.message || 'Internal server error.';
   const body = { status: 'error', success: false, data: null, message };
+  if (isSafeApiError && error.code) body.code = error.code;
 
   if (env.nodeEnv !== 'production') {
     body.stack = error.stack;

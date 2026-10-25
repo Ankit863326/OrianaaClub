@@ -26,6 +26,11 @@ export async function requestMembershipDraftPasswordLink(email) {
   return result.data;
 }
 
+export async function requestMembershipHelp(email) {
+  const result = await apiClient.post('/membership/request-help', { email });
+  return { ...result.data, message: result.message };
+}
+
 export async function verifyMembershipDraftOtp(code) {
   const result = await apiClient.post(`${base}/verify-otp`, { code });
   return result.data;
@@ -59,6 +64,13 @@ export async function saveMembershipDraftPlan(planId) {
 
 export async function getMembershipDraftQuote(planId) {
   const result = await apiClient.post(`${base}/quote`, { planId });
+  return result.data;
+}
+
+export async function getMembershipDraftFamilyPrices(planId) {
+  const result = await apiClient.get(
+    `${base}/family-prices?planId=${encodeURIComponent(planId)}`,
+  );
   return result.data;
 }
 

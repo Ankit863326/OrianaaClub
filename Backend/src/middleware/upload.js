@@ -176,6 +176,52 @@ export const optionalFamilyIdProofUpload = createVerificationDocumentUpload(fals
 ]));
 
 const identityMimeTypes = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const familyVerificationMimeTypes = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const familyVerificationParser = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 2 },
+  fileFilter(request, file, callback) {
+    if (!familyVerificationMimeTypes.has(file.mimetype)) {
+      callback(new ApiError(400, 'Family documents must be JPG, PNG, or PDF.'));
+      return;
+    }
+    callback(null, true);
+  },
+});
+
+function hasValidFamilyVerificationSignature(file) {
+  if (file.mimetype === 'application/pdf') {
+    return file.buffer.length >= 5 && file.buffer.toString('ascii', 0, 5) === '%PDF-';
+  }
+  return hasValidImageSignature(file);
+}
+
+export const familyVerificationDocumentUpload = (request, response, next) => {
+  familyVerificationParser.fields([
+    { name: 'document', maxCount: 1 },
+    { name: 'extraDocument', maxCount: 1 },
+  ])(request, response, (error) => {
+    if (error instanceof multer.MulterError) {
+      next(new ApiError(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400, error.code === 'LIMIT_FILE_SIZE'
+        ? 'Each family verification document must be 5 MB or smaller.'
+        : 'Upload at most one primary document and one extra document.'));
+      return;
+    }
+    if (error) return next(error);
+
+    const files = request.files || {};
+    const document = files.document?.[0];
+    const extraDocument = files.extraDocument?.[0];
+    if (!document || !hasValidFamilyVerificationSignature(document)
+      || (extraDocument && !hasValidFamilyVerificationSignature(extraDocument))) {
+      next(new ApiError(400, 'Upload a valid JPG, PNG, or PDF verification document.'));
+      return;
+    }
+    request.verificationUploads = { document, extraDocument };
+    next();
+  });
+};
+
 const identityParser = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 4 },

@@ -12,7 +12,7 @@ export default asyncHandler(async (request, response, next) => {
   }
   const draft = await MembershipDraft.findOne({
     tokenHash: hashToken(token),
-    status: { $in: ['draft', 'payment_submitted', 'paid'] },
+    status: { $in: ['draft', 'payment_pending', 'paid', 'password_pending', 'failed', 'payment_submitted'] },
     expiresAt: { $gt: new Date() },
   }).select('+tokenHash +otpHash +otpSalt +identity.panCiphertext +identity.idCiphertext +identity.aadhaarLast4 +identity.aadhaarHash');
   if (!draft) throw new ApiError(401, 'Your membership application session has expired. Start again to continue.');

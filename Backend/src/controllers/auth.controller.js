@@ -49,9 +49,13 @@ export const resendActivation = asyncHandler(async (request, response) => {
 });
 
 export const requestOnboardingPasswordLink = asyncHandler(async (request, response) => {
+  console.log('[membership-password-link] Onboarding controller received a password-link request.');
   const result = await authService.requestOnboardingPasswordLink(
     request.user._id,
     request.validated.body.email,
+  );
+  console.log(
+    `[membership-password-link] Onboarding controller completed request: ${result.sent ? 'link issued' : 'no link issued'}.`,
   );
   response.status(202).json(result);
 });
@@ -102,7 +106,9 @@ export const refresh = asyncHandler(async (request, response) => {
 });
 
 export const forgotPassword = asyncHandler(async (request, response) => {
+  console.log('[auth] Forgot-password controller received a request.');
   const result = await authService.requestPasswordReset(request.validated.body.email);
+  console.log('[auth] Forgot-password request completed with a generic response.');
   response.status(202).json(result);
 });
 

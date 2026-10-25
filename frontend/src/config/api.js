@@ -1,6 +1,6 @@
 // Phase 1: Keep the browser's API origin configurable without exposing secrets.
 const configuredApiUrl = import.meta.env.VITE_API_URL
-  || (import.meta.env.DEV ? 'http://localhost:5000/api' : undefined);
+  || (import.meta.env.DEV ? '/api' : undefined);
 
 if (!configuredApiUrl) {
   throw new Error('VITE_API_URL must be configured for production builds.');
@@ -12,6 +12,13 @@ function getApiBaseUrl() {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+
+export function apiResourceUrl(path) {
+  if (typeof path !== 'string' || !path.trim()) return '';
+  const value = path.trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${API_BASE_URL.replace(/\/api$/, '')}/${value.replace(/^\/+/, '')}`;
+}
 
 export function getImageUrl(path) {
   if (typeof path !== 'string' || !path.trim()) return '';
@@ -27,7 +34,7 @@ export function getImageUrl(path) {
       ? `media/${normalized.slice(uploadIndex + 'uploads/'.length)}`
       : `media/${normalized.replace(/^\/+/, '')}`;
   const pathFromApi = `/${mediaPath.replace(/^\/+/, '')}`;
-  return `${API_BASE_URL.replace(/\/api$/, '')}${pathFromApi}`;
+  return apiResourceUrl(pathFromApi);
 }
 
 export const apiFileUrl = getImageUrl;
