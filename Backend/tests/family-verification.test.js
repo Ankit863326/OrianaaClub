@@ -33,13 +33,31 @@ import {
   familyVerificationCodeSchema,
   familyVerificationSubmitSchema,
 } from '../src/validators/family-verification.schema.js';
+import { buildMemberId } from '../src/utils/memberCode.js';
 
 let nextMembershipNo = 100;
 
 async function createOwnedFamily({ relation = 'mother', email = '', nominee = false, overrides = {} } = {}) {
   const plan = await createPlan();
+  const sequence = nextMembershipNo++;
+  const activatedAt = new Date('2026-10-27T00:00:00.000Z');
+  const memberId = buildMemberId({
+    activatedAt,
+    expiresAt: new Date('2051-10-27T00:00:00.000Z'),
+    sequence,
+  });
   const owner = await createMember({
-    membership: { plan: plan._id, status: 'active', memberNo: String(nextMembershipNo++), ...overrides },
+    membership: {
+      plan: plan._id,
+      status: 'active',
+      activatedAt,
+      startDate: activatedAt,
+      membershipExpireAt: new Date('2051-10-27T00:00:00.000Z'),
+      memberId,
+      memberCode: memberId,
+      memberNo: memberId,
+      ...overrides,
+    },
   });
   const member = await FamilyMember.create({
     membership: owner.membership._id,

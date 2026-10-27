@@ -13,7 +13,7 @@ export function isMemberId(value) {
 export function buildMemberId({ activatedAt, expiresAt, sequence, suffix = '' }) {
   const activationDate = new Date(activatedAt);
   const expiryDate = new Date(expiresAt);
-  const number = Number(sequence);
+  const number = sequence;
   if (Number.isNaN(activationDate.getTime()) || Number.isNaN(expiryDate.getTime())) {
     throw new TypeError('Member ID activation and expiry dates must be valid.');
   }
