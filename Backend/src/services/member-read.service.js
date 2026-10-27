@@ -7,8 +7,9 @@ import PointsLedger from '../models/PointsLedger.js';
 import { getBalance, getMemberSafeLedger } from './points-ledger.service.js';
 import Redemption from '../models/Redemption.js';
 import { getSettings } from '../models/Setting.js';
+import { getFamilyTier } from './family-tier.service.js';
 import Verification from '../models/Verification.js';
-import { formatMemberCode, getMembershipMemberCode } from '../utils/memberCode.js';
+import { formatMemberCode, getMembershipMemberCode, isMemberId } from '../utils/memberCode.js';
 import ApiError from '../utils/ApiError.js';
 
 const visibleMembershipStatuses = [
@@ -44,11 +45,11 @@ export async function getMyMemberCode(userId) {
     status: { $in: visibleMembershipStatuses },
   })
     .sort({ createdAt: -1 })
-    .select('memberCode memberNumber')
+    .select('memberNo memberCode memberId legacyMemberCode memberNumber')
     .lean();
   if (!membership) throw new ApiError(404, 'Membership was not found.');
   const memberCode = getMembershipMemberCode(membership);
-  if (!memberCode) throw new ApiError(409, 'A member code is not assigned yet.');
+  if (!memberCode) throw new ApiError(409, 'A Member ID is not assigned yet.');
   return memberCode;
 }
 
@@ -59,6 +60,19 @@ function membershipStatus(membership, now) {
     && membership.membershipExpireAt <= now
   ) return 'expired';
   return membership.status;
+}
+
+function wholeYearsBetween(startValue, endValue) {
+  if (!startValue || !endValue) return null;
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  let years = end.getUTCFullYear() - start.getUTCFullYear();
+  if (
+    end.getUTCMonth() < start.getUTCMonth()
+    || (end.getUTCMonth() === start.getUTCMonth() && end.getUTCDate() < start.getUTCDate())
+  ) years -= 1;
+  return years > 0 ? years : null;
 }
 
 export async function getMyMembership(userId) {
@@ -93,16 +107,23 @@ export async function getMyMembership(userId) {
         .lean()
       : [],
     FamilyMember.find({ membership: membership._id, status: { $ne: 'removed' }, isPrimary: { $ne: true } })
-      .select('_id name fullName relation relationship type status memberType memberNo isNominee nomineeRole designation emailConfirmedAt paymentConfirmedAt discountPct parentSide isPrimary phone dob dateOfBirth photo photoUrl pendingAction')
+      .select('_id name fullName relation relationship type status memberType memberNo isNominee nomineeRole designation emailConfirmedAt paymentConfirmedAt discountPct parentSide isPrimary phone dob dateOfBirth anniversaryDate photo photoUrl pendingAction pendingChanges')
       .sort({ createdAt: 1 })
       .lean(),
   ]);
   const memberCode = getMembershipMemberCode(membership);
+  const activatedAt = membership.activatedAt || membership.startDate || membership.approvedAt || null;
+  const membershipExpireAt = membership.membershipExpireAt || membership.endDate || null;
+  const pointsExpireAt = membership.pointsExpireAt || null;
+  const membershipValidityYears = wholeYearsBetween(activatedAt, membershipExpireAt)
+    ?? (membershipExpireAt ? settings.membershipValidityYears : null);
+  const pointsValidityYears = wholeYearsBetween(activatedAt, pointsExpireAt)
+    ?? (pointsExpireAt ? settings.pointsValidityYears : null);
   const familyIds = familyProfiles.map((member) => member._id);
   const [familyMemberships, verifications] = await Promise.all([
     familyIds.length
       ? Membership.find({ familyMember: { $in: familyIds } })
-        .select('_id familyMember status memberNo')
+        .select('_id familyMember status memberNo memberCode memberId')
         .lean()
       : [],
     familyIds.length
@@ -115,17 +136,23 @@ export async function getMyMembership(userId) {
     const linkedMembership = familyMembershipById.get(String(member._id));
     const isNominee = Boolean(member.isNominee || member.memberType?.startsWith('nominee'));
     const isApproved = !isNominee && linkedMembership?.status === 'active';
+    const storedFamilyCode = linkedMembership?.memberId || linkedMembership?.memberCode
+      || linkedMembership?.memberNo || member.memberId || member.memberNo || '';
     return {
       id: String(member._id),
       name: member.name || member.fullName || '',
       relation: member.relation || member.relationship || '',
+      parentSide: member.parentSide || 'member',
       type: member.type,
       status: member.status,
       dob: member.dob || member.dateOfBirth || null,
+      anniversaryDate: member.anniversaryDate || null,
       phone: member.phone || '',
       photo: member.photo || member.photoUrl || '',
       pendingAction: member.pendingAction || '',
-      memberNo: linkedMembership?.memberNo || member.memberNo || '',
+      pendingChanges: member.pendingChanges || null,
+      memberNo: !isNominee && isMemberId(storedFamilyCode) ? storedFamilyCode : '',
+      memberId: !isNominee && isMemberId(storedFamilyCode) ? storedFamilyCode : '',
       verificationStatus: isNominee
         ? (member.emailConfirmedAt ? 'verified' : 'not_added')
         : verificationByMemberId.get(String(member._id)) || 'not_added',
@@ -137,12 +164,7 @@ export async function getMyMembership(userId) {
     };
   }));
   const familyConfig = settings.familyMembership;
-  const tierName = String(membership.tier || membership.plan?.slug || membership.plan?.id || membership.plan?.name || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  const tierConfig = familyConfig.tiers.find((item) => item.tier === tierName);
+  const tierConfig = getFamilyTier(membership.plan, familyConfig.tiers);
   const family = {
     adults: familyMemberViews.filter((member) => member.type === 'adult' && !member.isNominee),
     children: familyMemberViews.filter((member) => member.type === 'child' && !member.isNominee),
@@ -151,9 +173,18 @@ export async function getMyMembership(userId) {
   return {
     tier: membership.plan?.name || membership.plan?.title || '',
     status,
-    memberNo: membership.memberNo || '',
+    memberNo: memberCode,
     memberCode,
+    memberId: memberCode,
     formattedMemberCode: memberCode ? formatMemberCode(memberCode) : '',
+    ...(membershipExpireAt ? {
+      membershipExpireAt,
+      membershipValidityYears,
+    } : {}),
+    ...(pointsExpireAt ? {
+      pointsExpireAt,
+      pointsValidityYears,
+    } : {}),
     ...(status === 'active' ? { pointsBalance } : {}),
     ...(status === 'active' ? { pointsCredited: hasPointsLedger } : {}),
     discountPercent: status === 'active' ? settings.discountPercent : 0,

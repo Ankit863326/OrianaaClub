@@ -468,13 +468,41 @@ export async function getFamilyForMember(userId) {
 export async function updateFamilyMember(userId, familyId, values) {
   const membership = await Membership.findOne({ user: userId }).sort({ createdAt: -1 }).select('_id');
   const member = membership
-    ? await FamilyMember.findOneAndUpdate(
-      { _id: familyId, membership: membership._id },
-      { $set: values },
-      { new: true, runValidators: true },
-    )
+    ? await FamilyMember.findOne({ _id: familyId, membership: membership._id })
     : null;
   if (!member) throw new ApiError(404, 'Family member was not found.');
+  const relation = values.relationship || member.relationship || member.relation || '';
+  const dateOfBirth = values.dob || member.dob || member.dateOfBirth;
+  if (values.anniversaryDate) {
+    const anniversaryDay = new Date(values.anniversaryDate).setUTCHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    if (anniversaryDay > today.getTime()) throw new ApiError(400, 'Anniversary date cannot be in the future.');
+    if (!dateOfBirth) throw new ApiError(400, 'Date of birth is required when an anniversary date is provided.');
+    if (anniversaryDay <= new Date(dateOfBirth).setUTCHours(0, 0, 0, 0)) {
+      throw new ApiError(400, 'Anniversary date must be after the family member’s date of birth.');
+    }
+    if (!['spouse', 'wife', 'husband', 'father', 'mother'].includes(String(relation).toLowerCase())) {
+      throw new ApiError(400, 'Anniversary date is only available for a spouse or parent.');
+    }
+  }
+  Object.assign(member, {
+    ...values,
+    ...(Object.hasOwn(values, 'anniversaryDate')
+      ? { anniversaryDate: values.anniversaryDate || null }
+      : {}),
+  });
+  if (Object.hasOwn(values, 'anniversaryDate')
+    && ['father', 'mother'].includes(String(relation).toLowerCase())) {
+    await FamilyMember.updateMany({
+      membership: membership._id,
+      parentSide: member.parentSide || 'member',
+      memberType: String(relation).toLowerCase() === 'father' ? 'mother' : 'father',
+      status: { $ne: 'removed' },
+      _id: { $ne: member._id },
+    }, { $set: { anniversaryDate: values.anniversaryDate || null } });
+  }
+  await member.save();
   return member;
 }
 

@@ -33,10 +33,22 @@ const formatDate = (value, withTime = false) => {
     ? { dateStyle: 'medium', timeStyle: 'short' }
     : { dateStyle: 'medium' }).format(date);
 };
+const formatValidityDate = (value) => {
+  if (!value || Number.isNaN(new Date(value).getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(value));
+};
+const formatValidityYears = (years) => {
+  const value = Number(years);
+  return Number.isSafeInteger(value) && value > 0 ? `${value} ${value === 1 ? 'year' : 'years'}` : '';
+};
 const formatMemberCode = (code) => {
-  const value = String(code || '').replace(/^OC-/i, '').replaceAll('-', '').toUpperCase();
-  if (/^2651\d{8}$/.test(value)) return `${value.slice(0, 4)} ${value.slice(4)}`;
-  return value.length === 10 ? `OC-${value.slice(0, 5)}-${value.slice(5)}` : value || '—';
+  const value = String(code || '').trim().toUpperCase();
+  return /^OC-\d{12,}(?:-(?:S|C\d+|F|M|SF|SM))?$/.test(value) ? value : '—';
 };
 
 function ErrorMessage({ message, retry }) {
@@ -490,13 +502,32 @@ export default function MemberDashboardPage() {
             {membership.discountPercent > 0 && <span className="member-hub__badge">{membership.discountPercent}% discount active</span>}
             <span className="member-hub__badge">{String(membership.status || 'pending').replaceAll('_', ' ')}</span>
           </div>
-          <p className="member-hub__code">Member ID: {formatMemberCode(membership.memberNo || membership.memberCode)}</p>
-          {qrUrl && <img className="member-hub__qr" src={qrUrl} alt={`Membership QR code for ${formatMemberCode(membership.memberNo || membership.memberCode)}`} />}
+          <p className="member-hub__code">Member ID: {formatMemberCode(membership.memberCode || membership.memberNo)}</p>
+          <div className="member-hub__validity">
+            {membership.membershipExpireAt && <div className="member-hub__validity-box">
+              <span>Membership valid until</span>
+              <strong>{formatValidityDate(membership.membershipExpireAt)}</strong>
+              {formatValidityYears(membership.membershipValidityYears) && (
+                <small>{formatValidityYears(membership.membershipValidityYears)}</small>
+              )}
+            </div>}
+            {membership.pointsExpireAt && <div className="member-hub__validity-box">
+              <span>Points valid until</span>
+              <strong>{formatValidityDate(membership.pointsExpireAt)}</strong>
+              {formatValidityYears(membership.pointsValidityYears) && (
+                <small>{formatValidityYears(membership.pointsValidityYears)}</small>
+              )}
+            </div>}
+          </div>
+          {qrUrl && <img className="member-hub__qr" src={qrUrl} alt={`Membership QR code for ${formatMemberCode(membership.memberCode || membership.memberNo)}`} />}
         </article>
         <article className="member-hub__points">
           <span className="member-hub__points-label">Available points</span>
           <strong className="member-hub__points-value">{formatPts(pointsBalance)}</strong>
-          <span className="member-hub__points-equivalent">Value equivalent: {formatINR(pointsBalance)} (1 point = ₹1)</span>
+          <span className="member-hub__points-equivalent">Value equivalent: {formatINR(pointsBalance)}</span>
+          {membership.pointsExpireAt && <span className="member-hub__points-validity">
+            Valid until {formatValidityDate(membership.pointsExpireAt)}
+          </span>}
         </article>
       </div>}
     </>;

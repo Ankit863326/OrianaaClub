@@ -166,7 +166,7 @@ export default function MembershipPendingQueuePage() {
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full min-w-[900px] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>{['Member', 'Member code', 'Tier', 'Submitted', 'Due', 'Actions'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                <tr>{['Member', 'Member ID', 'Tier', 'Submitted', 'Due', 'Actions'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.verification.items.map((row) => <tr key={row._id}>
@@ -206,7 +206,7 @@ export default function MembershipPendingQueuePage() {
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full min-w-[1150px] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>{['Member', 'Member code', 'Tier', 'Type', 'Amount paid', 'Paid date', 'Due', 'Action'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                <tr>{['Member', 'Member ID', 'Tier', 'Type', 'Amount paid', 'Paid date', 'Due', 'Action'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.approval.items.map((row) => <tr key={row._id}>
@@ -245,7 +245,7 @@ export default function MembershipPendingQueuePage() {
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full min-w-[950px] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>{['Member', 'Member code', 'Plan', 'Method', 'Amount', 'Reference', 'Date', 'Action'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                <tr>{['Member', 'Member ID', 'Plan', 'Method', 'Amount', 'Reference', 'Date', 'Action'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.payments.items.map((row) => {
@@ -274,17 +274,23 @@ export default function MembershipPendingQueuePage() {
           <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full min-w-[900px] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>{['Family member', 'Request', 'Member', 'Member code', 'Updated', 'Actions'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                <tr>{['Family member', 'Request', 'Anniversary', 'Member', 'Member ID', 'Updated', 'Actions'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.family.items.map((row) => {
                   const membership = row.membership;
                   const id = membershipId(membership);
+                  const hasPendingAnniversary = row.pendingAction === 'update'
+                    && Object.hasOwn(row.pendingChanges || {}, 'anniversaryDate');
+                  const anniversaryDate = hasPendingAnniversary
+                    ? row.pendingChanges?.anniversaryDate
+                    : row.anniversaryDate;
                   return <tr key={row._id}>
                     <td className="px-4 py-3.5 text-slate-700">{row.name || row.fullName || 'Family member'}</td>
                     <td className="px-4 py-3.5"><Badge>{String(row.pendingAction || 'request').replaceAll('_', ' ')}</Badge></td>
+                    <td className="px-4 py-3.5 text-slate-700">{anniversaryDate ? formatDate(anniversaryDate) : '—'}</td>
                     <td className="px-4 py-3.5 text-slate-700">{memberLink(id, membership?.user?.firstName || membership?.user?.email || 'Member')}</td>
-                    <td className="px-4 py-3.5 text-slate-700">{membership?.memberCode ? formatMemberCode(membership.memberCode) : membership?.memberNumber || '—'}</td>
+                    <td className="px-4 py-3.5 text-slate-700">{membership?.memberCode ? formatMemberCode(membership.memberCode) : '—'}</td>
                     <td className="px-4 py-3.5 text-slate-700">{formatDate(row.updatedAt || row.createdAt)}</td>
                     <td className="px-4 py-3.5"><div className="flex gap-2">
                       <Button disabled={busy} onClick={() => requestAction({ type: 'approve-family', row })}>Approve</Button>
@@ -292,7 +298,7 @@ export default function MembershipPendingQueuePage() {
                     </div></td>
                   </tr>;
                 })}
-                {!data.family.items.length && <tr><td className="px-4 py-8 text-center text-slate-500" colSpan="6">Nothing pending.</td></tr>}
+                {!data.family.items.length && <tr><td className="px-4 py-8 text-center text-slate-500" colSpan="7">Nothing pending.</td></tr>}
               </tbody>
             </table>
           </div>

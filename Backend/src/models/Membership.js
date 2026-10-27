@@ -1,5 +1,6 @@
 // Phase 2: Keep a member's selected plan and draft lifecycle data.
 import mongoose from 'mongoose';
+import { isStoredMemberCode, isMemberId } from '../utils/memberCode.js';
 
 const membershipSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -26,7 +27,7 @@ const membershipSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: '',
-    match: /^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/,
+    validate: (value) => value === '' || /^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/.test(value) || isStoredMemberCode(value),
   },
   approvalSeq: { type: Number, default: null, min: 1, validate: (value) => value === null || Number.isSafeInteger(value) },
   earlyBird: { type: Boolean, default: false },
@@ -64,8 +65,10 @@ const membershipSchema = new mongoose.Schema({
     default: '',
     validate: (value) => value === '' || /^\d+$/.test(value),
   },
-  memberCode: { type: String, trim: true, match: /^2651\d{8}$/ },
-  memberId: { type: String, default: '' },
+  memberCode: { type: String, trim: true, validate: (value) => value == null || value === '' || isStoredMemberCode(value) },
+  legacyMemberCode: { type: String, trim: true, default: '' },
+  memberId: { type: String, default: '', validate: (value) => value == null || value === '' || isMemberId(value) },
+  familyChildSequence: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
   termNumber: { type: Number, default: 1, min: 1, validate: Number.isSafeInteger },
   pointsBalance: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
   pointsExpiryPendingAmount: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
@@ -129,10 +132,19 @@ membershipSchema.index(
   { memberCode: 1 },
   {
     unique: true,
-    name: 'membership_active_member_code_unique',
-    partialFilterExpression: { status: 'active', memberCode: { $type: 'string', $gt: '' } },
+    name: 'membership_member_code_unique',
+    partialFilterExpression: { memberCode: { $type: 'string', $gt: '' } },
   },
 );
+membershipSchema.index(
+  { memberId: 1 },
+  {
+    unique: true,
+    name: 'membership_member_id_unique',
+    partialFilterExpression: { memberId: { $type: 'string', $gt: '' } },
+  },
+);
+membershipSchema.index({ legacyMemberCode: 1 });
 
 membershipSchema.pre('validate', function syncMemberReferences() {
   this.user ||= this.customer;

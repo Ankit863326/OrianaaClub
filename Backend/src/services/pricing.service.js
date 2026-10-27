@@ -2,6 +2,7 @@ import FamilyMember from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
 import Verification from '../models/Verification.js';
 import { DEFAULT_FAMILY_MEMBERSHIP_CONFIG, getSettings } from '../models/Setting.js';
+import { getFamilyTier } from './family-tier.service.js';
 import ApiError from '../utils/ApiError.js';
 
 function decimalRatio(value, label) {
@@ -35,12 +36,7 @@ function roundAmount(amount, multiplier, label) {
 }
 
 function tierConfig(plan, tiers) {
-  const tierName = String(plan?.tier || plan?.slug || plan?.id || plan?.name || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  const tier = tiers.find((item) => item.tier.toLowerCase() === tierName);
+  const tier = getFamilyTier(plan, tiers);
   if (!tier) throw new ApiError(400, 'A supported membership tier is required.');
   return tier;
 }
@@ -223,18 +219,18 @@ export async function calculateMemberPrice({
         throw new ApiError(400, 'Parent side must be either member or spouse.');
       }
       const parentCount = relatives.filter((item) => ['father', 'mother'].includes(memberTypeOf(item)));
-      if (parentCount.length >= limits.parents) {
+      if (limits.parents != null && parentCount.length >= limits.parents) {
         throw new ApiError(409, `A membership allows up to ${limits.parents} parents.`);
       }
       const sideCount = parentCount.filter((item) => item.parentSide === parentSide).length;
-      if (sideCount >= limits.parentsPerSide) {
+      if (limits.parentsPerSide != null && sideCount >= limits.parentsPerSide) {
         throw new ApiError(409, `A maximum of ${limits.parentsPerSide} parents is allowed per side.`);
       }
       discountPct = config.discounts.parent;
     } else if (memberType === 'child') {
       validateChildAge(dob, purchaseDate, config.childMaxAge);
       const maxChildren = limits.children;
-      if (maxChildren !== null && memberTypeCounts.filter((type) => type === 'child').length >= maxChildren) {
+      if (maxChildren != null && memberTypeCounts.filter((type) => type === 'child').length >= maxChildren) {
         throw new ApiError(409, `A membership allows up to ${maxChildren} children.`);
       }
       discountPct = config.discounts.child;

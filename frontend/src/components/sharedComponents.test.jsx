@@ -22,11 +22,24 @@ describe('shared display components', () => {
     );
     expect(screen.getByRole('heading', { name: 'Signature' })).toBeInTheDocument();
     expect(screen.getByText('20,000')).toBeInTheDocument();
+    expect(screen.getByText('1 Redemption points = 1 Rupee')).toBeInTheDocument();
     expect(screen.getByText('₹1,00,000')).toBeInTheDocument();
     expect(document.querySelector('.mb-card__selected-badge')).toHaveTextContent('Selected');
     expect(screen.getByRole('button', { name: 'Selected' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Selected' }));
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  test('shows the redemption rate but hides an empty tier list', () => {
+    const { container } = render(
+      <PlanCard
+        plan={{ title: 'Plan without tiers', subtitle: 'Term', priceLabel: '₹10' }}
+        buttonLabel="Change Plan"
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('1 Redemption points = 1 Rupee')).toBeInTheDocument();
+    expect(container.querySelector('.mb-card__cohorts')).not.toBeInTheDocument();
   });
 
   test('supports disabled plan selection and route links', () => {

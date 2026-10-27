@@ -1,5 +1,6 @@
 // Phase 2: Store optional family members under the account's membership draft.
 import mongoose from 'mongoose';
+import { isStoredMemberCode, isMemberId } from '../utils/memberCode.js';
 
 const familyMemberSchema = new mongoose.Schema({
   membership: { type: mongoose.Schema.Types.ObjectId, ref: 'Membership', required: true },
@@ -16,8 +17,11 @@ const familyMemberSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: '',
-    match: /^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/,
+    validate: (value) => value === '' || /^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/.test(value) || isStoredMemberCode(value),
   },
+  memberId: { type: String, default: '', validate: (value) => value == null || value === '' || isMemberId(value) },
+  legacyMemberCode: { type: String, trim: true, default: '' },
+  familyChildNumber: { type: Number, default: null, min: 1, validate: (value) => value == null || Number.isSafeInteger(value) },
   approvalSeq: {
     type: Number,
     default: null,
@@ -73,6 +77,10 @@ familyMemberSchema.index(
 familyMemberSchema.index(
   { memberNo: 1 },
   { unique: true, partialFilterExpression: { memberNo: { $type: 'string', $gt: '' } } },
+);
+familyMemberSchema.index(
+  { memberId: 1 },
+  { unique: true, name: 'family_member_id_unique', partialFilterExpression: { memberId: { $type: 'string', $gt: '' } } },
 );
 
 familyMemberSchema.pre('validate', function normalizeFamilyMember() {

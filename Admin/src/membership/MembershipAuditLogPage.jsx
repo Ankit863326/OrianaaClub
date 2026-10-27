@@ -12,6 +12,7 @@ import {
   formatDate,
 } from '../components/ui.jsx';
 import { membershipApi } from '../api/membership.js';
+import { formatMemberCode } from './formatters.js';
 
 const pageSize = 20;
 const emptyFilters = { entityType: '', actor: '', action: '', memberNo: '', from: '', to: '' };
@@ -111,7 +112,7 @@ export default function MembershipAuditLogPage() {
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft">
         <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>{['Date', 'Actor', 'Member code', 'Action', 'Entity', 'Reason', 'Details'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+            <tr>{['Date', 'Actor', 'Member ID', 'Action', 'Entity', 'Reason', 'Details'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.items.map((entry) => <AuditLogRows
@@ -134,7 +135,9 @@ function AuditLogRows({ entry, expanded, onToggle }) {
     <tr>
       <td className="px-4 py-3.5 text-slate-700">{formatDate(entry.createdAt)}</td>
       <td className="px-4 py-3.5 text-slate-700">{actorLabel(entry)}</td>
-      <td className="px-4 py-3.5 text-slate-700">{entry.memberNo ? (entry.memberNo.startsWith('OC-') ? entry.memberNo : `OC-${entry.memberNo}`) : '—'}</td>
+      <td className="px-4 py-3.5 text-slate-700">{/^OC-\d{12,}(?:-(?:S|C\d+|F|M|SF|SM))?$/i.test(entry.memberNo || '')
+        ? formatMemberCode(entry.memberNo)
+        : '—'}</td>
       <td className="px-4 py-3.5 text-slate-700">{entry.action}</td>
       <td className="px-4 py-3.5 text-slate-700">{entry.entityType}{entry.entityId ? <small className="block text-slate-500">{entry.entityId}</small> : null}</td>
       <td className="max-w-80 px-4 py-3.5 text-slate-700">{entry.reason || '—'}</td>

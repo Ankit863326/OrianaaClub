@@ -2,7 +2,13 @@ import mongoose from 'mongoose';
 import Membership from '../src/models/Membership.js';
 import FamilyMember from '../src/models/FamilyMember.js';
 import { getNextMemberNumber } from '../src/services/membership-id.service.js';
-import { formatMemberCode } from '../src/utils/memberCode.js';
+import { allocateFamilyChildNumber } from '../src/services/member-code.service.js';
+import {
+  buildMemberId,
+  formatMemberCode,
+  getMembershipMemberCode,
+  legacyMemberCodeToMemberNumber,
+} from '../src/utils/memberCode.js';
 import Counter from '../src/models/Counter.js';
 import MembershipPlan from '../src/models/MembershipPlan.js';
 import Setting, { getSettings, invalidateSettingsCache } from '../src/models/Setting.js';
@@ -45,6 +51,20 @@ describe('membership foundation', () => {
       nomineesTakeApprovalSeq: true,
     });
     expect(settings.familyMembership.tiers).toHaveLength(8);
+    expect(settings.familyMembership.tiers.map(({ tier }) => tier)).toEqual([
+      'founder-legacy',
+      'platinum-crest',
+      'imperial-signature',
+      'presidential-elite',
+      'chairmans-privilege',
+      'founder-circle',
+      'corporate',
+      'privileged',
+    ]);
+    expect(settings.familyMembership.tiers.filter(({ familyEnabled }) => familyEnabled))
+      .toHaveLength(7);
+    expect(settings.familyMembership.tiers.find(({ tier }) => tier === 'corporate').familyEnabled)
+      .toBe(false);
     expect(settings.familyMembership.tiers.find(({ tier }) => tier === 'founder-legacy').nomineeRoles)
       .toBe('free_text');
     expect(settings.familyMembership.tiers.find(({ tier }) => tier === 'corporate')).toMatchObject({
@@ -66,6 +86,38 @@ describe('membership foundation', () => {
     );
   });
 
+  test('does not reuse child family numbers after a member is removed', async () => {
+    const primary = await Membership.create({
+      customer: new mongoose.Types.ObjectId(),
+      plan: new mongoose.Types.ObjectId(),
+      status: 'active',
+      memberType: 'primary',
+      memberNumber: '1',
+      memberCode: 'OC-0001',
+      memberNo: 'OC-0001',
+    });
+    await FamilyMember.create({
+      membership: primary._id,
+      name: 'Removed child',
+      relation: 'child',
+      memberType: 'child',
+      memberNo: 'OC-0001-C1',
+      status: 'removed',
+    });
+    const nextChild = new FamilyMember({
+      membership: primary._id,
+      name: 'Next child',
+      relation: 'child',
+      memberType: 'child',
+      status: 'active',
+    });
+
+    nextChild.familyChildNumber = await allocateFamilyChildNumber(primary);
+
+    expect(nextChild.familyChildNumber).toBe(2);
+    expect((await Membership.findById(primary._id)).familyChildSequence).toBe(2);
+  });
+
   test('continues the legacy member-number counter without reusing its sequence', async () => {
     await Counter.create({ name: 'memberNumber', value: 42 });
     expect(await getNextMemberNumber()).toBe(43);
@@ -74,14 +126,27 @@ describe('membership foundation', () => {
     expect(counter.seq).toBe(43);
   });
 
-  test('generates unique member codes and formats the approved display shape', async () => {
+  test('generates unique date-based member IDs and formats the approved display shape', async () => {
     const { numbers, codes } = await verifyMembershipIds();
     expect(new Set(numbers).size).toBe(20);
     expect(codes).toHaveLength(20);
     expect(new Set(codes).size).toBe(20);
-    expect(codes.every((code) => /^2651\d{8}$/.test(code))).toBe(true);
+    expect(codes.every((code) => /^OC-265111\d{6,}$/.test(code))).toBe(true);
     expect(formatMemberCode(codes[0])).toBe(codes[0]);
-    expect(formatMemberCode(`${codes[0].slice(0, 4)}-${codes[0].slice(4)}`)).toBe(codes[0]);
+    expect(buildMemberId({
+      activatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      expiresAt: new Date('2051-01-01T00:00:00.000Z'),
+      sequence: 1,
+    })).toBe('OC-265111000001');
+    expect(buildMemberId({
+      activatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      expiresAt: new Date('2051-01-01T00:00:00.000Z'),
+      sequence: 2,
+      suffix: 'S',
+    })).toBe('OC-265111000002-S');
+    expect(legacyMemberCodeToMemberNumber('2651 10100001')).toBe(1);
+    expect(getMembershipMemberCode({ memberCode: '265110100001' })).toBe('');
+    expect(getMembershipMemberCode({ legacyMemberCode: '2651 10100001' })).toBe('');
   });
 
   test('loads the new models and retains the singleton settings key', async () => {
@@ -204,13 +269,13 @@ describe('membership foundation', () => {
     expect((await Counter.findOne({ name: 'approvalSeq' })).value).toBe(0);
   });
 
-  test('keeps active member codes unique and blocks ledger document deletion', async () => {
-    const code = '265110100001';
+  test('keeps member codes unique across cancelled memberships and blocks ledger document deletion', async () => {
+    const code = 'OC-0001';
     const plan = new mongoose.Types.ObjectId();
     await Membership.create({
       customer: new mongoose.Types.ObjectId(),
       plan,
-      status: 'active',
+      status: 'cancelled',
       memberCode: code,
     });
     await expect(Membership.create({

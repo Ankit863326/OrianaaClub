@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const nonNegativeInteger = (value) => Number.isSafeInteger(value) && value >= 0;
 const redemptionSchema = new mongoose.Schema({
   membership: { type: mongoose.Schema.Types.ObjectId, ref: 'Membership', required: true },
-  memberCode: { type: String, required: true, trim: true, match: /^2651\d{8}$/ },
+  memberCode: { type: String, required: true, trim: true, match: /^(?:OC-\d{12,}(?:-(?:S|C\d+|F|M|SF|SM))?|OC-\d{4,}(?:-(?:S|C\d+|F|M|SF|SM))?|2651\d{8})$/ },
   billId: { type: String, required: true, trim: true, unique: true, maxlength: 120 },
   bookingId: { type: String, default: '', trim: true, maxlength: 120 },
   channel: {

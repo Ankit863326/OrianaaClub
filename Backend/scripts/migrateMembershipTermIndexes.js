@@ -14,13 +14,17 @@ const targetIndexes = [
     },
   },
   {
-    name: 'membership_active_member_code_unique',
+    name: 'membership_member_code_unique',
     key: { memberCode: 1 },
     unique: true,
     partialFilterExpression: {
-      status: 'active',
       memberCode: { $type: 'string', $gt: '' },
     },
+  },
+  {
+    name: 'membership_legacy_member_code',
+    key: { legacyMemberCode: 1 },
+    unique: false,
   },
 ];
 
@@ -35,7 +39,7 @@ async function migrateMembershipTermIndexes() {
   const indexes = await collection.indexes();
   for (const target of targetIndexes) {
     const sameKeyIndexes = indexes.filter((index) => (
-      index.unique
+      Boolean(index.unique) === Boolean(target.unique)
       && Object.keys(index.key).length === 1
       && index.key[Object.keys(target.key)[0]] === 1
     ));
@@ -46,8 +50,10 @@ async function migrateMembershipTermIndexes() {
     if (!existingTarget) {
       await collection.createIndex(target.key, {
         name: target.name,
-        unique: true,
-        partialFilterExpression: target.partialFilterExpression,
+        unique: target.unique,
+        ...(target.partialFilterExpression
+          ? { partialFilterExpression: target.partialFilterExpression }
+          : {}),
       });
     }
   }

@@ -19,7 +19,7 @@ const initialFilters = { search: '', tier: '', status: '', memberType: '', rateP
 
 function relationshipLabel(member) {
   const formatted = member.primaryMemberNo ? formatMemberCode(member.primaryMemberNo) : '';
-  const primary = formatted ? (formatted.startsWith('OC-') ? formatted : `OC-${formatted}`) : 'primary member';
+  const primary = formatted && formatted !== '—' ? formatted : 'primary member';
   switch (member.memberType) {
     case 'spouse': return `Spouse of ${primary}`;
     case 'child': return `Child of ${primary}`;
@@ -73,7 +73,7 @@ export default function MembershipMembersPage() {
         event.preventDefault();
         load(1);
       }}>
-        <FormField label="Search name, phone, member code or number" className="sm:col-span-2">
+        <FormField label="Search name, phone, Member ID, sequence digits or legacy code" className="sm:col-span-2">
           <input
             className={controlClass}
             value={filters.search}
@@ -130,14 +130,14 @@ export default function MembershipMembersPage() {
     {data && <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft">
       <table className="w-full min-w-[900px] border-collapse text-left text-sm">
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>{['Member code', 'Name', 'Relationship', 'Tier', 'Status', 'Approval sequence', 'Points rate', 'Aadhaar status', 'Family tree'].map((label) => (
+          <tr>{['Member ID', 'Name', 'Relationship', 'Tier', 'Status', 'Approval sequence', 'Points rate', 'Aadhaar status', 'Family tree'].map((label) => (
             <th key={label} className="px-4 py-3 font-semibold">{label}</th>
           ))}</tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {data.items.map((member) => {
             const name = member.profile?.fullName || member.user?.firstName || '—';
-            const displayCode = member.memberNo || member.memberCode;
+            const displayCode = member.memberCode;
             const code = displayCode ? formatMemberCode(displayCode) : '—';
             return <tr
               key={member._id}
@@ -162,10 +162,10 @@ export default function MembershipMembersPage() {
                 : `${Number(member.pointsMultiplier || 0).toLocaleString('en-IN')}x ${member.ratePhase === 'early_bird' ? 'early bird' : 'default'}`}</td>
               <td className="px-4 py-3.5 capitalize text-slate-700">{String(member.aadhaarStatus || 'not_added').replaceAll('_', ' ')}</td>
               <td className="px-4 py-3.5">
-                {member.memberNo
+                {member.memberCode
                   ? <Link
                     className="font-semibold text-forest underline"
-                    to={`/membership/family-tree/${encodeURIComponent(member.memberNo)}`}
+                    to={`/membership/family-tree/${encodeURIComponent(member.memberCode)}`}
                     onClick={(event) => event.stopPropagation()}
                   >Open</Link>
                   : '—'}

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  optionalAnniversaryDateSchema,
+  validateFamilyAnniversary,
+} from './family-anniversary.schema.js';
 
 const email = z.string().trim().email('Enter a valid email address').transform((value) => value.toLowerCase());
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid membership plan ID.');
@@ -16,6 +20,7 @@ const validateFamilyDraft = (member, context) => {
   if (['father', 'mother'].includes(member.memberType) && !member.parentSide) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['parentSide'], message: 'Choose whose parent this is.' });
   }
+  validateFamilyAnniversary(member, context);
 };
 const familyDraftFields = z.object({
   id: z.string().uuid().optional(),
@@ -27,7 +32,7 @@ const familyDraftFields = z.object({
   memberType: z.enum(['spouse', 'child', 'father', 'mother', 'nominee_gm', 'nominee_hr', 'nominee']).optional(),
   isNominee: formBoolean.optional().default(false),
   parentSide: z.enum(['member', 'spouse']).optional(),
-  anniversaryDate: z.coerce.date().optional().or(z.literal('')),
+  anniversaryDate: optionalAnniversaryDateSchema,
   wantsOwnMembership: formBoolean.optional().default(false),
   nomineeRole: z.string().trim().max(80).optional().default(''),
   designation: z.string().trim().max(120).optional().default(''),

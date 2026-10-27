@@ -127,7 +127,7 @@ export default function MembershipMemberDetailPage() {
         Object.entries(familyDraft).forEach(([key, value]) => {
           if (key === 'photo') {
             if (value) body.append('photo', value);
-          } else if (value !== '') body.append(key, value);
+          } else if (value !== '' || key === 'anniversaryDate') body.append(key, value);
         });
         await membershipApi.addFamily(id, body);
         setFamilyDraft(null);
@@ -137,7 +137,7 @@ export default function MembershipMemberDetailPage() {
         Object.entries(familyEdit.values).forEach(([key, value]) => {
           if (key === 'document') {
             if (value) body.append('document', value);
-          } else if (value !== '') body.append(key, value);
+          } else if (value !== '' || key === 'anniversaryDate') body.append(key, value);
         });
         await membershipApi.updateFamily(familyEdit.id, body);
         setFamilyEdit(null);
@@ -222,11 +222,12 @@ export default function MembershipMemberDetailPage() {
   const familyColumns = () => [
     { key: 'name', label: 'Name', render: (row) => row.name || row.fullName },
     { key: 'relation', label: 'Relation', render: (row) => row.relation || row.relationship },
+    { key: 'anniversaryDate', label: 'Anniversary', render: (row) => row.anniversaryDate ? formatDate(row.anniversaryDate) : '—' },
     { key: 'type', label: 'Type' },
     { key: 'nominee', label: 'Nominee', render: (row) => row.isNominee ? <Badge>Nominee</Badge> : '—' },
     { key: 'actions', label: '', render: (row) => <div className="flex flex-wrap gap-2">
       {!row.isNominee && row.type === 'adult' && <Button variant="secondary" onClick={async () => { try { await membershipApi.setNominee(id, row._id); await refresh('Nominee updated.'); } catch (failure) { setError(errorMessage(failure)); } }}>Set as nominee</Button>}
-      <Button variant="secondary" onClick={() => setFamilyEdit({ id: row._id, values: { name: row.name || row.fullName, relation: row.relation || row.relationship, dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth).toISOString().slice(0, 10) : '', phone: row.phone || '' } })}>Edit</Button>
+      <Button variant="secondary" onClick={() => setFamilyEdit({ id: row._id, values: { name: row.name || row.fullName, relation: row.relation || row.relationship, dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth).toISOString().slice(0, 10) : '', anniversaryDate: row.anniversaryDate ? new Date(row.anniversaryDate).toISOString().slice(0, 10) : '', phone: row.phone || '' } })}>Edit</Button>
       {!row.isPrimary && <Button variant="danger" onClick={() => { setFamilyEdit({ id: row._id, values: {} }); setReason(''); setActionForm('remove-family'); }}>Remove</Button>}
     </div> },
   ];
@@ -246,7 +247,7 @@ export default function MembershipMemberDetailPage() {
   ];
 
   return <section>
-    <PageHeading eyebrow="MEMBERSHIP RECORD" title={data.profile?.fullName || membership.user?.firstName || 'Member'} description={`${membership.formattedMemberCode || 'No member code'} · ${membership.user?.email || ''}`} actions={<Link to="/membership/members" className="text-sm font-semibold text-forest hover:underline">← Membership members</Link>} />
+    <PageHeading eyebrow="MEMBERSHIP RECORD" title={data.profile?.fullName || membership.user?.firstName || 'Member'} description={`${membership.formattedMemberCode || 'No Member ID'} · ${membership.user?.email || ''}`} actions={<Link to="/membership/members" className="text-sm font-semibold text-forest hover:underline">← Membership members</Link>} />
     {error && <Toast kind="error" onDismiss={() => setError('')}>{error}</Toast>}
     {notice && <Toast onDismiss={() => setNotice('')}>{notice}</Toast>}
     <nav className="mb-5 flex gap-2 overflow-x-auto border-b border-slate-200" aria-label="Membership detail sections">
@@ -264,7 +265,7 @@ export default function MembershipMemberDetailPage() {
         <h2 className="font-display text-2xl sm:col-span-2">{membership.plan?.name || membership.plan?.title || 'Membership'}</h2>
         <p>Status: <Badge>{membership.status}</Badge></p><p>Term: {membership.termNumber}</p>
         <p>Points balance: <strong>{formatPoints(membership.pointsBalance)} pts</strong></p><p>Points expiry: {formatDate(membership.pointsExpireAt)}</p>
-        <p>Membership expiry: {formatDate(membership.membershipExpireAt)}</p><p>Member number: {membership.memberNumber || '—'}</p>
+        <p>Membership expiry: {formatDate(membership.membershipExpireAt)}</p><p>Member ID: {membership.memberId || membership.memberCode || '—'}</p>
         <p>Early bird: {membership.earlyBirdApplied ? <Badge>Applied</Badge> : 'No'}</p>
         <div className="flex flex-wrap gap-2 sm:col-span-2">
           {membership.status === 'active' && <Button variant="danger" onClick={() => setActionForm('deactivate')}>Deactivate</Button>}
@@ -275,7 +276,7 @@ export default function MembershipMemberDetailPage() {
       </Panel>
       <Panel className="grid justify-items-center gap-3 text-center">
         {qr && <img src={qr} alt="Membership QR code" className="size-44" />}
-        <strong>{membership.formattedMemberCode || 'Member code not assigned'}</strong>
+        <strong>{membership.formattedMemberCode || 'Member ID not assigned'}</strong>
         <p className="text-sm text-slate-500">{data.nominee ? `Nominee: ${data.nominee.name}` : 'No nominee selected'}</p>
       </Panel>
       {actionForm === 'deactivate' && <Panel className="grid gap-3 xl:col-span-2">
@@ -299,18 +300,25 @@ export default function MembershipMemberDetailPage() {
 
     {tab === 'Family' && <div className="grid gap-5">
       <Panel className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-display text-xl">Family members</h2><p className="text-sm text-slate-500">Maximum six members; at least one adult must remain.</p></div><Button onClick={() => { setFamilyDraft({ name: '', relation: '', dateOfBirth: '', phone: '', linkedUser: '', photo: null }); setActionForm('add-family'); }}>Add family member</Button></Panel>
-      {filteredRequests.length > 0 && <Panel><h3 className="mb-3 font-semibold">Pending family requests</h3><div className="grid gap-3">{filteredRequests.map((request) => <div key={request._id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-3 text-sm"><span>{request.name || request.fullName} · {request.pendingAction}</span><div className="flex gap-2"><Button onClick={() => decideRequest(request._id, true)}>Approve</Button><Button variant="danger" onClick={() => decideRequest(request._id, false)}>Reject</Button></div></div>)}</div></Panel>}
+      {filteredRequests.length > 0 && <Panel><h3 className="mb-3 font-semibold">Pending family requests</h3><div className="grid gap-3">{filteredRequests.map((request) => {
+        const changes = request.pendingChanges || {};
+        const anniversaryDate = Object.hasOwn(changes, 'anniversaryDate') ? changes.anniversaryDate : request.anniversaryDate;
+        return <div key={request._id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-3 text-sm">
+          <span>{request.name || request.fullName} · {request.pendingAction}{anniversaryDate ? ` · Anniversary: ${formatDate(anniversaryDate)}` : ''}</span>
+          <div className="flex gap-2"><Button onClick={() => decideRequest(request._id, true)}>Approve</Button><Button variant="danger" onClick={() => decideRequest(request._id, false)}>Reject</Button></div>
+        </div>;
+      })}</div></Panel>}
       <Panel><h3 className="mb-3 font-semibold">Adults</h3><DataTable columns={familyColumns()} rows={data.family.adults} empty="No adults recorded." /></Panel>
       <Panel><h3 className="mb-3 font-semibold">Children</h3><DataTable columns={familyColumns()} rows={data.family.children} empty="No children recorded." /></Panel>
       {actionForm === 'add-family' && familyDraft && <Panel><form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); run('add-family'); }}>
         <h3 className="font-semibold sm:col-span-2">Add family member</h3>
-        {[['Name', 'name'], ['Relation', 'relation'], ['Date of birth', 'dateOfBirth'], ['Phone', 'phone'], ['Linked member account ID (optional)', 'linkedUser']].map(([label, key]) => <FormField key={key} label={label}><input className={controlClass} type={key === 'dateOfBirth' ? 'date' : 'text'} value={familyDraft[key]} onChange={(event) => setFamilyDraft({ ...familyDraft, [key]: event.target.value })} /></FormField>)}
+        {[['Name', 'name'], ['Relation', 'relation'], ['Date of birth', 'dateOfBirth'], ['Anniversary date (optional)', 'anniversaryDate'], ['Phone', 'phone'], ['Linked member account ID (optional)', 'linkedUser']].map(([label, key]) => <FormField key={key} label={label}><input className={controlClass} type={['dateOfBirth', 'anniversaryDate'].includes(key) ? 'date' : 'text'} max={key === 'anniversaryDate' ? new Date().toISOString().slice(0, 10) : undefined} value={familyDraft[key] || ''} onChange={(event) => setFamilyDraft({ ...familyDraft, [key]: event.target.value })} /></FormField>)}
         <FormField label="Photo (optional)"><input className={controlClass} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFamilyDraft({ ...familyDraft, photo: event.target.files?.[0] || null })} /></FormField>
         <div className="flex gap-2 sm:col-span-2"><Button type="submit" disabled={busy}>Add member</Button><Button type="button" variant="secondary" onClick={() => setActionForm('')}>Cancel</Button></div>
       </form></Panel>}
       {familyEdit && actionForm !== 'remove-family' && <Panel><form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); run('save-family'); }}>
         <h3 className="font-semibold sm:col-span-2">Edit family member</h3>
-        {Object.entries({ name: 'Name', relation: 'Relation', dateOfBirth: 'Date of birth', phone: 'Phone' }).map(([key, label]) => <FormField key={key} label={label}><input className={controlClass} type={key === 'dateOfBirth' ? 'date' : 'text'} value={familyEdit.values[key]} onChange={(event) => setFamilyEdit({ ...familyEdit, values: { ...familyEdit.values, [key]: event.target.value } })} /></FormField>)}
+        {Object.entries({ name: 'Name', relation: 'Relation', dateOfBirth: 'Date of birth', anniversaryDate: 'Anniversary date (optional)', phone: 'Phone' }).map(([key, label]) => <FormField key={key} label={label}><input className={controlClass} type={['dateOfBirth', 'anniversaryDate'].includes(key) ? 'date' : 'text'} max={key === 'anniversaryDate' ? new Date().toISOString().slice(0, 10) : undefined} value={familyEdit.values[key] || ''} onChange={(event) => setFamilyEdit({ ...familyEdit, values: { ...familyEdit.values, [key]: event.target.value } })} /></FormField>)}
         <FormField label="ID proof (private, optional)"><input className={controlClass} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => setFamilyEdit({ ...familyEdit, values: { ...familyEdit.values, document: event.target.files?.[0] || null } })} /></FormField>
         <div className="flex gap-2 sm:col-span-2"><Button type="submit" disabled={busy}>Save</Button><Button type="button" variant="secondary" onClick={() => { setFamilyEdit(null); setActionForm(''); }}>Cancel</Button></div>
       </form></Panel>}

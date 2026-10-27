@@ -8,6 +8,7 @@ import * as familyController from '../controllers/family.controller.js';
 import {
   familyMemberParamsSchema,
   familyMemberSchema,
+  familyMemberUpdateSchema,
   nomineeSchema,
 } from '../validators/family.schema.js';
 import * as memberReadController from '../controllers/member-read.controller.js';
@@ -41,6 +42,12 @@ router.get(
 );
 router.get('/family', familyController.listMine);
 router.post('/family', familyPhotoUpload, validate(familyMemberSchema), familyController.requestAdd);
+router.put(
+  '/family/:familyId',
+  validate(familyMemberParamsSchema, 'params'),
+  validate(familyMemberUpdateSchema),
+  familyController.requestUpdate,
+);
 router.delete(
   '/family/:familyId',
   validate(familyMemberParamsSchema, 'params'),
