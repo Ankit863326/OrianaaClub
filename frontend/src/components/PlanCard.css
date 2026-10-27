@@ -156,25 +156,33 @@
   padding: 13px 20px;
   border-radius: 999px;
   font-family: var(--mb-sans, inherit);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .mb-card__btn--green {
-  background: var(--mb-green, #0d4a39);
-  color: #fff;
-  border: 1px solid var(--mb-green, #0d4a39);
+  background: #0d4a39;
+  color: #e2ad32;
+  border: 1px solid rgba(226, 173, 50, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45);
 }
 
 .mb-card__btn--green:hover:not(:disabled) {
-  background: var(--mb-green-hover, #125e49);
-  border-color: var(--mb-green-hover, #125e49);
+  background: #0b4531;
+  color: #f1d99c;
+  border-color: rgba(223, 204, 158, 0.82);
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(13, 74, 57, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .mb-card--featured {
@@ -204,17 +212,24 @@
 }
 
 .mb-card__btn--white {
-  background: #fff;
-  color: var(--mb-green, #0d4a39);
-  border: 1px solid #fff;
+  background: #0d4a39;
+  color: #e2ad32;
+  border: 1px solid rgba(226, 173, 50, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45);
 }
 
 .mb-card__btn--white:hover:not(:disabled) {
-  background: var(--mb-gold-light, #f1d99c);
-  color: var(--mb-ink, #111310);
-  border-color: var(--mb-gold-light, #f1d99c);
+  background: #0b4531;
+  color: #f1d99c;
+  border-color: rgba(223, 204, 158, 0.82);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .mb-card__btn:disabled {

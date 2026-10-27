@@ -839,14 +839,25 @@
 }
 
 .axd-step-two-page__next-btn {
-  background: linear-gradient(145deg, hsl(43, 74%, 48%), hsl(38, 85%, 55%));
-  color: hsl(220, 35%, 10%);
-  border: none;
+  background: #0d4a39;
+  color: #e2ad32;
+  border: 1px solid rgba(226, 173, 50, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45);
+  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .axd-step-two-page__next-btn:hover {
+  background: #0b4531;
+  color: #f1d99c;
+  border-color: rgba(223, 204, 158, 0.82);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px hsla(43, 74%, 40%, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 /* ═══════════ RESPONSIVE ═══════════ */

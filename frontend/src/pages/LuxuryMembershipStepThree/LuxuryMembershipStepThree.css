@@ -922,16 +922,25 @@
 }
 
 .axd-review-page__btn--primary {
-  background: linear-gradient(135deg, hsl(220, 50%, 18%), hsl(220, 45%, 25%), hsl(220, 50%, 20%));
-  color: hsl(43, 80%, 65%);
-  border: 1px solid hsla(43, 74%, 49%, 0.3);
-  box-shadow: 0 4px 16px hsla(220, 50%, 20%, 0.3);
+  background: #0d4a39;
+  color: #e2ad32;
+  border: 1px solid rgba(226, 173, 50, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45);
+  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .axd-review-page__btn--primary:hover:not(.axd-review-page__btn--disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px hsla(220, 50%, 20%, 0.4);
-  border-color: hsl(43, 74%, 49%);
+  background: #0b4531;
+  color: #f1d99c;
+  border-color: rgba(223, 204, 158, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .axd-review-page__btn--primary:active:not(.axd-review-page__btn--disabled) {

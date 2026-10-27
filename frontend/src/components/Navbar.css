@@ -381,11 +381,13 @@
 }
 
 .home-nav__membership {
-  border-color: transparent;
-  background: #0d4a39;
-  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.18), 0 2px 2px rgba(0, 0, 0, 0.15);
-  color: #e2ad32;
-  cursor: pointer;
+  border-radius: 999px !important;
+  border: 1px solid rgba(226, 173, 50, 0.35) !important;
+  background: #0d4a39 !important;
+  box-shadow: 0 0 0 1px rgba(226, 173, 50, 0.35), 0 12px 35px rgba(13, 74, 57, 0.45) !important;
+  color: #e2ad32 !important;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 .home-nav__register {
@@ -407,13 +409,23 @@
 }
 
 .home-nav__membership:hover {
-  background: #0b4531;
+  background: #0b4531 !important;
   box-shadow:
-    0 0 0 1px rgba(213, 187, 124, 0.42),
-    0 6px 22px rgba(183, 155, 99, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  color: #f1d99c;
-  transform: translateY(-1px);
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+  border-color: rgba(223, 204, 158, 0.82) !important;
+  color: #f1d99c !important;
+  transform: translateY(-2px) !important;
+}
+
+.home-nav__membership svg {
+  transition: transform 0.25s ease;
+}
+
+.home-nav__membership:hover svg {
+  transform: translateX(4px);
 }
 
 .home-nav__menu-toggle,
@@ -811,9 +823,9 @@
 }
 
 .navbar__joinBtn {
-  background: #c8cdc0;
-  color: #1f1f1f;
-  border: none;
+  background: #0d4a39;
+  color: #e2ad32;
+  border: 1px solid rgba(226, 173, 50, 0.35);
   border-radius: 999px;
   padding: 14px 28px;
   font-size: 15px;
@@ -821,11 +833,22 @@
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: 0.25s ease;
+  box-shadow:
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45);
+  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .navbar__joinBtn:hover {
-  background: #b8beb0;
+  background: #0b4531;
+  color: #f1d99c;
+  border-color: rgba(223, 204, 158, 0.82);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 /* hide hamburger on desktop */

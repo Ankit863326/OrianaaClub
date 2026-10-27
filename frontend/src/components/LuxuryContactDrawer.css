@@ -670,16 +670,18 @@
   width: 100%;
   justify-content: center;
   min-height: 3.25rem;
-  border-radius: 11px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(226, 173, 50, 0.35) !important;
   font-family: var(--sans, "Inter", system-ui, sans-serif) !important;
   font-size: 0.95rem !important;
   font-weight: 600 !important;
   letter-spacing: 0.11em !important;
   text-transform: uppercase !important;
+  color: #e2ad32 !important;
   background: linear-gradient(135deg, #0d4a39 0%, #083d30 100%) !important;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 6px 22px rgba(13, 74, 57, 0.35);
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45) !important;
   position: relative;
   overflow: hidden;
   transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1) !important;
@@ -701,10 +703,13 @@
 
 .lux-contact__submit:hover {
   transform: translateY(-2px);
+  color: #f1d99c !important;
+  border-color: rgba(223, 204, 158, 0.82) !important;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 12px 34px rgba(13, 74, 57, 0.45),
-    0 0 0 1px rgba(226, 173, 50, 0.35);
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
 }
 
 .lux-contact__submit:hover::before {
