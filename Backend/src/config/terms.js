@@ -57,9 +57,9 @@ export async function buildTermsManifest(directory = termsDirectory) {
     const pdfSha256 = pdf ? createHash('sha256').update(pdf).digest('hex') : null;
 
     if (html) {
-      const sectionIds = [...html.toString('utf8').matchAll(/<h[1-6]\b[^>]*\bid=["']s(\d{1,2})["'][^>]*>/gi)]
+      const sectionIds = [...html.toString('utf8').matchAll(/<h[1-6]\b[^>]*\bid=["']s(\d+)["'][^>]*>/gi)]
         .map((match) => Number(match[1]));
-      if (sectionIds.length !== 21 || sectionIds.some((id, index) => id !== index + 1)) {
+      if (sectionIds.length < 21 || sectionIds.some((id, index) => id !== index + 1)) {
         throw new Error(`Membership terms HTML for "${code}" must contain section ids s1 through s21 in order.`);
       }
     }

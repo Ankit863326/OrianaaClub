@@ -9,6 +9,7 @@ import validate from '../../middleware/validate.js';
 import {
   familyDecisionSchema,
   adminFamilyMemberSchema,
+  adminFamilyMemberUpdateSchema,
   familyMemberParamsSchema,
   familyMemberSchema,
   familyRequestsQuerySchema,
@@ -84,7 +85,7 @@ router.patch(
   '/family/:familyId',
   validate(familyMemberParamsSchema, 'params'),
   optionalFamilyIdProofUpload,
-  validate(adminFamilyMemberSchema.partial()),
+  validate(adminFamilyMemberUpdateSchema),
   familyController.updateFamily,
 );
 router.delete(

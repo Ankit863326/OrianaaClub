@@ -133,7 +133,7 @@ export const membershipQr = asyncHandler(async (request, response) => {
   const membership = await Membership.findById(request.validated.params.id).select('memberCode memberNumber');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
   const memberCode = getMembershipMemberCode(membership);
-  if (!memberCode) throw new ApiError(409, 'A member code is not assigned yet.');
+  if (!memberCode) throw new ApiError(409, 'A Member ID is not assigned yet.');
   const qr = await QRCode.toBuffer(memberCode, { type: 'png', margin: 2 });
   response.set({
     'Content-Type': 'image/png',
@@ -244,7 +244,7 @@ export const exportBills = asyncHandler(async (request, response) => {
   }
   const cursor = Redemption.find(filter).sort({ createdAt: -1 }).cursor();
   writeCsvHeader(response, 'membership-bills.csv', [
-    'Date', 'Member code', 'Service', 'Booking ID', 'Bill ID',
+    'Date', 'Member ID', 'Service', 'Booking ID', 'Bill ID',
     'Channel', 'Bill amount', 'Discounted amount', 'Points used', 'Balance after',
     'Status', 'Refunded points',
   ]);

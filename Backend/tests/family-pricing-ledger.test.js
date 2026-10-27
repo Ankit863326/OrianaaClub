@@ -11,6 +11,7 @@ import Setting, {
 import {
   calculateMemberPrice,
 } from '../src/services/pricing.service.js';
+import { getFamilyTier } from '../src/services/family-tier.service.js';
 import {
   assignApprovalSeq,
   assignSeqBatch,
@@ -51,6 +52,17 @@ async function transaction(run) {
 
 describe('family membership pricing', () => {
   afterEach(() => invalidateSettingsCache());
+
+  test('matches configured tier labels to the stored plan identity, ignoring stale tier text', () => {
+    expect(getFamilyTier({
+      tier: 'unsupported-stale-tier',
+      slug: 'imperial-signature',
+      name: 'Different display value',
+    }, [{ tier: 'Imperial Signature', familyEnabled: true }])).toMatchObject({
+      tier: 'Imperial Signature',
+      familyEnabled: true,
+    });
+  });
 
   test.each([
     ['spouse', { memberType: 'spouse' }, { baseAmount: 150000, gstAmount: 27000, totalPayable: 177000, discountPct: 50 }],

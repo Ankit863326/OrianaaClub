@@ -16,7 +16,7 @@
     "db:migrate:membership-terms": "node scripts/migrateMembershipTermIndexes.js",
     "db:migrate:family-membership": "node scripts/migrateFamilyMembership.js",
     "db:migrate:terms-consents": "node scripts/migrateTermsConsents.js",
-    "db:migrate:member-codes": "node scripts/migrateMemberCodes.js",
+    "db:dry-run:member-ids": "node scripts/dryRunMemberCodes.js",
     "seed:plans": "node scripts/seedPlans.js",
     "seed:membership": "node scripts/seedMembership.js",
     "reset:membership-test": "node scripts/resetMembershipTest.js",

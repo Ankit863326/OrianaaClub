@@ -1,5 +1,5 @@
 // Keep the six-step membership application synchronized with the member API.
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 // ESLint's core unused-vars rule does not detect the JSX member expression below.
 /* eslint-disable-next-line no-unused-vars */
@@ -174,6 +174,134 @@ function IdentityFileField({ label, file, previewUrl, onSelect, onRemove, disabl
   );
 }
 
+class MembershipErrorBoundary extends Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Membership flow failed to render.', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="join-membership-page">
+          <section className="jm-application-card" aria-labelledby="membership-render-error">
+            <p id="membership-render-error" className="jm-api-message jm-api-message--error" role="alert">
+              Something went wrong while loading your membership application. You can return to the previous step and try again.
+            </p>
+            <button
+              className="jm-btn-submit"
+              type="button"
+              onClick={() => {
+                this.setState({ hasError: false });
+                this.props.onBack();
+              }}
+            >
+              Back to previous step
+            </button>
+          </section>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default function MembershipAll() {
+  const { user, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const userIdentity = user?._id || user?.id || user?.email || null;
+  const [membershipCheckRetry, setMembershipCheckRetry] = useState(0);
+  const [membershipCheck, setMembershipCheck] = useState({
+    key: null,
+    membership: null,
+    error: '',
+  });
+  const membershipCheckKey = userIdentity ? `${userIdentity}:${membershipCheckRetry}` : null;
+  const currentStep = Math.min(6, Math.max(1, Number(searchParams.get('step')) || 1));
+  const handleBack = () => navigate(`/luxury-membership?step=${Math.max(1, currentStep - 1)}`);
+  const isUpgradeSelection = searchParams.get('step') === '2'
+    && searchParams.get('mode') === 'upgrade';
+
+  useEffect(() => {
+    if (authLoading || !user) return undefined;
+    let active = true;
+    getMyMembership()
+      .then((membership) => {
+        if (active) setMembershipCheck({ key: membershipCheckKey, membership, error: '' });
+      })
+      .catch((requestError) => {
+        if (!active) return;
+        if (requestError.status === 404) {
+          setMembershipCheck({ key: membershipCheckKey, membership: null, error: '' });
+        } else {
+          setMembershipCheck({
+            key: membershipCheckKey,
+            membership: null,
+            error: requestError.message || 'We could not check your membership status.',
+          });
+        }
+      });
+    return () => { active = false; };
+  }, [authLoading, membershipCheckKey, user]);
+
+  if (authLoading || (user && membershipCheck.key !== membershipCheckKey)) {
+    return <main className="join-membership-page jm-loading" role="status" aria-busy="true">
+      Checking your membership status…
+    </main>;
+  }
+
+  if (user && membershipCheck.error) {
+    return (
+      <main className="join-membership-page">
+        <section className="jm-application-card" aria-labelledby="membership-status-error">
+          <p id="membership-status-error" className="jm-api-message jm-api-message--error" role="alert">
+            {membershipCheck.error}
+          </p>
+          <button className="jm-btn-submit" type="button" onClick={() => setMembershipCheckRetry((count) => count + 1)}>
+            Try again
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (user && membershipCheck.membership?.status === 'active' && !isUpgradeSelection) {
+    return (
+      <main className="join-membership-page">
+        <section className="jm-application-card" aria-labelledby="already-member-heading">
+          <h1 id="already-member-heading" className="jm-plans-header__title">You’re already a member</h1>
+          <p><strong>Current plan:</strong> {membershipCheck.membership.tier || 'Orianaa Club membership'}</p>
+          <div className="jm-family-actions">
+            <button
+              className="jm-btn-submit"
+              type="button"
+              onClick={() => navigate('/luxury-membership?step=2&mode=upgrade')}
+            >
+              Upgrade plan
+            </button>
+            <button className="jm-btn-pill-outline" type="button" onClick={() => navigate('/dashboard')}>
+              Go to dashboard
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <MembershipErrorBoundary onBack={handleBack}>
+      <MembershipFlow upgradeMode={Boolean(user && membershipCheck.membership?.status === 'active' && isUpgradeSelection)} />
+    </MembershipErrorBoundary>
+  );
+}
+
 function loadRazorpayCheckout() {
   if (window.Razorpay) return Promise.resolve();
   const existingScript = document.querySelector('script[data-razorpay-checkout]');
@@ -203,6 +331,14 @@ function dateInputValue(value) {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+}
+
+function formatPlainDate(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(date);
 }
 
 function familyMemberType(member = {}) {
@@ -237,7 +373,7 @@ function priceForFamilyMember(member, prices) {
   return priceType ? prices?.prices?.[priceType] || null : null;
 }
 
-export default function MembershipAll() {
+function MembershipFlow({ upgradeMode = false }) {
   const { user } = useAuth();
   const isLoggedIn = Boolean(user);
   const userIdentity = user?._id || user?.id || user?.email || null;
@@ -282,6 +418,8 @@ export default function MembershipAll() {
   const [familyPricesRetry, setFamilyPricesRetry] = useState(0);
   const [parentAnniversaries, setParentAnniversaries] = useState({ member: '', spouse: '' });
   const [loading, setLoading] = useState(true);
+  const [applicationLoadError, setApplicationLoadError] = useState('');
+  const [applicationLoadRetry, setApplicationLoadRetry] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [paymentMembership, setPaymentMembership] = useState(null);
@@ -319,6 +457,7 @@ export default function MembershipAll() {
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
+  const [quoteRetry, setQuoteRetry] = useState(0);
   const [companyDetails, setCompanyDetails] = useState({
     companyName: '',
     gstNumber: '',
@@ -349,12 +488,12 @@ export default function MembershipAll() {
   }, [otpResendSeconds, passwordLinkResendSeconds]);
 
   const selectedPlan = useMemo(
-    () => plans.find((plan) => plan._id === membership?.plan?._id
-      || plan.slug === membership?.plan?.slug
-      || plan._id === paymentMembership?.plan?._id
-      || plan.slug === paymentMembership?.plan?.slug
-      || plan.name === paymentMembership?.plan?.name
-      || plan.title === paymentMembership?.plan?.name) || null,
+    () => (plans ?? []).find((plan) => plan?._id === membership?.plan?._id
+      || plan?.slug === membership?.plan?.slug
+      || plan?._id === paymentMembership?.plan?._id
+      || plan?.slug === paymentMembership?.plan?.slug
+      || plan?.name === paymentMembership?.plan?.name
+      || plan?.title === paymentMembership?.plan?.name) || null,
     [plans, membership, paymentMembership],
   );
   useEffect(() => {
@@ -425,7 +564,9 @@ export default function MembershipAll() {
     setPlansLoading(true);
     setPlansError('');
     try {
-      setPlans(await getPlans());
+      const availablePlans = await getPlans();
+      if (!Array.isArray(availablePlans)) throw new Error('Membership plans could not be loaded.');
+      setPlans(availablePlans);
     } catch (requestError) {
       setPlansError(requestError.message || 'We could not load membership plans.');
     } finally {
@@ -434,6 +575,8 @@ export default function MembershipAll() {
   }, []);
 
   useEffect(() => {
+    setLoading(true);
+    setApplicationLoadError('');
     let active = true;
     const loadApplication = isLoggedIn
       ? Promise.all([getMember(), getIdentityVerification()]).then(([memberData, identityData]) => ({
@@ -444,7 +587,10 @@ export default function MembershipAll() {
         draft,
         memberData: {
           profile: draft.profile,
-          family: (draft.family || []).map((member) => ({ ...member, _id: member._id || member.id })),
+          family: (draft.family ?? []).map((member) => ({
+            ...(member ?? {}),
+            _id: member?._id || member?.id,
+          })),
           membership: draft.planId ? { status: 'draft', plan: { _id: draft.planId } } : null,
         },
         identityData: draft.identity,
@@ -471,7 +617,10 @@ export default function MembershipAll() {
           }
         }
         setMembership(memberData.membership);
-        setFamily((memberData.family || []).map((member) => ({ ...member, _id: member._id || member.id })));
+        setFamily((memberData.family ?? []).map((member) => ({
+          ...(member ?? {}),
+          _id: member?._id || member?.id,
+        })));
         setIdentityVerification(identityData);
         if (memberData.profile && !draft) {
           setProfile({
@@ -490,13 +639,13 @@ export default function MembershipAll() {
           setDraftEmailVerified(false);
           return;
         }
-        setError(requestError.message || 'Could not load your application.');
+        setApplicationLoadError(requestError.message || 'Could not load your application.');
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [isLoggedIn, setSearchParams, user?.email]);
+  }, [applicationLoadRetry, isLoggedIn, setSearchParams, user?.email]);
 
   useEffect(() => {
     const applicationId = user?._id || user?.id || '';
@@ -523,7 +672,9 @@ export default function MembershipAll() {
     let active = true;
     getPaymentMembership(membershipId)
       .then((details) => {
-        if (active && details.payment?.method) setPaymentSubmittedMethod(details.payment.method);
+        if (!active) return;
+        setPaymentMembership(details);
+        if (details.payment?.method) setPaymentSubmittedMethod(details.payment.method);
       })
       .catch((requestError) => {
         if (active) setPaymentError(requestError.message || 'Could not load your payment status.');
@@ -657,7 +808,7 @@ export default function MembershipAll() {
       if (active) setQuoteLoading(false);
     });
     return () => { active = false; };
-  }, [isLoggedIn, selectedPlan?._id, step]);
+  }, [isLoggedIn, quoteRetry, selectedPlan?._id, step]);
 
   function moveTo(nextStep) {
     setStep(nextStep);
@@ -818,6 +969,7 @@ export default function MembershipAll() {
   }
 
   async function choosePlan(plan) {
+    if (upgradeMode) return;
     setSaving(true);
     setError('');
     try {
@@ -885,33 +1037,33 @@ export default function MembershipAll() {
     }
     if (!isNominee && familyTab === 'spouse'
       && existingRelatives.filter((member) => familyMemberType(member) === 'spouse').length
-        >= familyPrices.limits.spouse) {
-      setError(`This tier allows up to ${familyPrices.limits.spouse} spouse.`);
+        >= (familyPrices.limits?.spouse ?? 0)) {
+      setError(`This tier allows up to ${familyPrices.limits?.spouse ?? 0} spouse.`);
       return;
     }
     if (!isNominee && familyTab === 'extended') {
       const existingParents = existingRelatives.filter((member) => (
         ['father', 'mother'].includes(familyMemberType(member))
       ));
-      if (existingParents.length >= familyPrices.limits.parents) {
-        setError(`This tier allows up to ${familyPrices.limits.parents} parents.`);
+      if (existingParents.length >= (familyPrices.limits?.parents ?? 0)) {
+        setError(`This tier allows up to ${familyPrices.limits?.parents ?? 0} parents.`);
         return;
       }
       if (existingParents.filter((member) => member.parentSide === familyForm.parentSide).length
-        >= familyPrices.limits.parentsPerSide) {
-        setError(`A maximum of ${familyPrices.limits.parentsPerSide} parents is allowed on that side.`);
+        >= (familyPrices.limits?.parentsPerSide ?? 0)) {
+        setError(`A maximum of ${familyPrices.limits?.parentsPerSide ?? 0} parents is allowed on that side.`);
         return;
       }
     }
     if (!isNominee && memberType === 'child') {
       const currentChildren = existingRelatives.filter((member) => familyMemberType(member) === 'child').length;
-      if (familyPrices.limits.children !== null && currentChildren >= familyPrices.limits.children) {
-        setError(`This tier allows up to ${familyPrices.limits.children} children.`);
+      if (familyPrices.limits?.children !== null && currentChildren >= (familyPrices.limits?.children ?? 0)) {
+        setError(`This tier allows up to ${familyPrices.limits?.children ?? 0} children.`);
         return;
       }
       const age = ageOnPurchaseDate(dob);
-      if (age === null || age > familyPrices.childMaxAge) {
-        setError(`This child is over ${familyPrices.childMaxAge} and needs their own membership.`);
+      if (age === null || age > (familyPrices.childMaxAge ?? 0)) {
+        setError(`This child is over ${familyPrices.childMaxAge ?? 0} and needs their own membership.`);
         return;
       }
     }
@@ -953,9 +1105,22 @@ export default function MembershipAll() {
           ? await addFamilyMember(values, familyPhoto)
           : await addMembershipDraftFamily(values, familyPhoto));
       const normalizedSaved = { ...saved, _id: saved._id || saved.id };
-      setFamily((current) => editingFamilyId
-        ? current.map((member) => (member._id === normalizedSaved._id ? normalizedSaved : member))
-        : [...current, normalizedSaved]);
+      const isParent = memberType === 'father' || memberType === 'mother';
+      const parentSide = familyForm.parentSide || 'member';
+      const coupleAnniversary = values.anniversaryDate || '';
+      setFamily((current) => {
+        const next = editingFamilyId
+          ? current.map((member) => (member._id === normalizedSaved._id ? normalizedSaved : member))
+          : [...current, normalizedSaved];
+        return isParent
+          ? next.map((member) => (
+            ['father', 'mother'].includes(familyMemberType(member))
+            && (member.parentSide || 'member') === parentSide
+              ? { ...member, anniversaryDate: coupleAnniversary }
+              : member
+          ))
+          : next;
+      });
       resetFamilyForm();
     } catch (requestError) {
       setError(requestError.message);
@@ -998,9 +1163,16 @@ export default function MembershipAll() {
       phone: member.phone || '',
     });
     if (tab === 'extended') {
+      const side = member.parentSide || 'member';
+      const coupleAnniversary = family.find((item) => (
+        item._id !== member._id
+        && ['father', 'mother'].includes(familyMemberType(item))
+        && (item.parentSide || 'member') === side
+        && item.anniversaryDate
+      ))?.anniversaryDate;
       setParentAnniversaries((current) => ({
         ...current,
-        [member.parentSide || 'member']: dateInputValue(member.anniversaryDate),
+        [side]: dateInputValue(member.anniversaryDate || coupleAnniversary),
       }));
     }
     setFamilyPhoto(null);
@@ -1366,7 +1538,24 @@ export default function MembershipAll() {
   }
 
   if (loading) {
-    return <main className="join-membership-page jm-loading">Loading your membership application…</main>;
+    return <main className="join-membership-page jm-loading" role="status" aria-busy="true">
+      Loading your membership application…
+    </main>;
+  }
+  if (applicationLoadError) {
+    return <main className="join-membership-page">
+      <section className="jm-application-card" aria-labelledby="membership-load-error">
+        <p id="membership-load-error" className="jm-api-message jm-api-message--error" role="alert">
+          {applicationLoadError}
+        </p>
+        <button className="jm-btn-submit" type="button" onClick={() => setApplicationLoadRetry((count) => count + 1)}>
+          Try again
+        </button>
+        <button className="jm-btn-pill-outline" type="button" onClick={() => moveTo(Math.max(1, step - 1))}>
+          Back to previous step
+        </button>
+      </section>
+    </main>;
   }
 
   const membershipGateLoading = isLoggedIn
@@ -1397,10 +1586,11 @@ export default function MembershipAll() {
     : existingMembership?.status === 'pending_payment'
       ? 'Your membership payment is pending admin confirmation'
       : '';
-  const familyNominees = family.filter((member) => (
+  const familyMembers = (family ?? []).filter(Boolean);
+  const familyNominees = familyMembers.filter((member) => (
     ['nominee', 'nominee_gm', 'nominee_hr'].includes(familyMemberType(member))
   ));
-  const familyRelatives = family.filter((member) => !familyNominees.includes(member));
+  const familyRelatives = familyMembers.filter((member) => !familyNominees.includes(member));
   const spouseCount = familyRelatives.filter((member) => familyMemberType(member) === 'spouse').length;
   const parentMembers = familyRelatives.filter((member) => ['father', 'mother'].includes(familyMemberType(member)));
   const childCount = familyRelatives.filter((member) => familyMemberType(member) === 'child').length;
@@ -1408,12 +1598,12 @@ export default function MembershipAll() {
     || String(selectedPlan?.slug || selectedPlan?.id || '').toLowerCase() === 'corporate';
   const nomineeLimit = familyPrices?.maxNominees ?? 0;
   const familyLimits = familyPrices?.limits;
-  const familyTotal = family.reduce((sum, member) => {
+  const familyTotal = familyMembers.reduce((sum, member) => {
     const price = priceForFamilyMember(member, familyPrices);
-    return sum + (price?.totalPayable || 0);
+    return sum + (price?.totalPayable ?? 0);
   }, 0);
 
-  if (isLoggedIn && !user?.onboarding && (isLockedActiveMembership || isRenewableMembership || pendingMessage)) {
+  if (isLoggedIn && !upgradeMode && !user?.onboarding && (isLockedActiveMembership || isRenewableMembership || pendingMessage)) {
     return <main className="join-membership-page">
       <section className="jm-application-card">
         {isLockedActiveMembership
@@ -1695,6 +1885,14 @@ export default function MembershipAll() {
           )}
 
           {step === 2 && (
+            upgradeMode && (
+              <p className="jm-api-message" role="status">
+                Plan comparison is available below, but upgrading an active membership is not connected to this flow yet. The existing renewal option in Dashboard is only available when your membership is eligible to renew.
+              </p>
+            )
+          )}
+
+          {step === 2 && (
             plansLoading ? (
               <div className="jm-plans-loading-grid" aria-label="Loading membership plans" aria-busy="true">
                 {Array.from({ length: 4 }, (_, index) => (
@@ -1717,10 +1915,11 @@ export default function MembershipAll() {
                     key={plan.slug}
                     plan={mapPlanToCard(plan)}
                     index={index}
-                    buttonLabel="Select Plan"
+                    featured
+                    buttonLabel={upgradeMode ? 'Upgrade unavailable' : 'Select Plan'}
                     onSelect={() => choosePlan(plan)}
                     selected={selectedPlan?.slug === plan.slug}
-                    disabled={saving}
+                    disabled={saving || upgradeMode}
                   />
                 ))}
               </div>
@@ -1895,8 +2094,8 @@ export default function MembershipAll() {
                         onChange={(event) => setFamilyForm({ ...familyForm, dob: event.target.value })} />
                     </label>
                     {familyTab === 'spouse' && (
-                      <label className="jm-field">Anniversary date (for the couple)
-                        <input className="jm-input" type="date" value={familyForm.anniversaryDate}
+                      <label className="jm-field">Anniversary date (optional)
+                        <input className="jm-input" type="date" max={new Date().toISOString().slice(0, 10)} value={familyForm.anniversaryDate}
                           onChange={(event) => setFamilyForm({ ...familyForm, anniversaryDate: event.target.value })} />
                       </label>
                     )}
@@ -1905,6 +2104,7 @@ export default function MembershipAll() {
                         <input
                           className="jm-input"
                           type="date"
+                          max={new Date().toISOString().slice(0, 10)}
                           value={parentAnniversaries[familyForm.parentSide]}
                           onChange={(event) => setParentAnniversaries((current) => ({
                             ...current,
@@ -1942,12 +2142,12 @@ export default function MembershipAll() {
 
               <section className="jm-family-list jm-family-added" aria-labelledby="jm-family-added-title">
                 <div className="jm-family-added__heading">
-                  <h3 id="jm-family-added-title">Added ({family.length})</h3>
-                  {family.length > 0 && !corporateTier && <strong>Family profiles: {money(familyTotal)}</strong>}
+                  <h3 id="jm-family-added-title">Added ({familyMembers.length})</h3>
+                  {familyMembers.length > 0 && !corporateTier && <strong>Family profiles: {money(familyTotal)}</strong>}
                 </div>
-                {family.length === 0 ? (
+                {familyMembers.length === 0 ? (
                   <p>No family profiles or nominees added yet.</p>
-                ) : family.map((member) => {
+                ) : familyMembers.map((member) => {
                   const type = familyMemberType(member);
                   const price = priceForFamilyMember(member, familyPrices);
                   const isNominee = ['nominee', 'nominee_gm', 'nominee_hr'].includes(type);
@@ -1992,16 +2192,12 @@ export default function MembershipAll() {
 
           {step === 4 && (
             <div className="jm-review-layout">
-              <section className="jm-review-plan-card" aria-label="Selected membership plan">
-                <h2 className="jm-review-plan-card__title">{selectedPlan?.title || 'Selected plan'}</h2>
-                <div className="jm-review-plan-card__price">
-                  <span>Plan price</span>
-                  <strong>{money(selectedPlan?.price)}</strong>
-                </div>
-                <button className="jm-review-plan-card__change" type="button" onClick={() => moveTo(2)}>
-                  Change Plan
-                </button>
-              </section>
+              <PlanCard
+                plan={mapPlanToCard(selectedPlan ?? {})}
+                featured
+                buttonLabel="Change Plan"
+                onSelect={() => moveTo(2)}
+              />
 
               <div className="jm-review-right">
                 <section className="jm-review-card" aria-readonly="true">
@@ -2016,27 +2212,38 @@ export default function MembershipAll() {
 
                 <section className="jm-review-card" aria-label="Family profiles and nominees">
                   <h2 className="jm-review-card__title">Family profiles &amp; nominees</h2>
-                  {family.length === 0 ? (
+                  {familyPricesLoading && <p className="jm-quote-status" role="status">Loading family prices…</p>}
+                  {familyPricesError && (
+                    <div className="jm-family-price-error" role="alert">
+                      <span>{familyPricesError}</span>
+                      <button
+                        className="jm-btn-pill-outline"
+                        type="button"
+                        onClick={() => setFamilyPricesRetry((count) => count + 1)}
+                      >Retry</button>
+                    </div>
+                  )}
+                  {familyMembers.length === 0 ? (
                     <p>No family profiles or nominees added.</p>
                   ) : (
                     <div className="jm-family-review-list">
-                      {family.map((member) => {
+                      {familyMembers.map((member) => {
                         const type = familyMemberType(member);
                         const price = priceForFamilyMember(member, familyPrices);
                         const isNominee = ['nominee', 'nominee_gm', 'nominee_hr'].includes(type);
                         return (
-                          <div className="jm-family-review-item" key={member._id}>
-                            <strong>{member.fullName}</strong>
-                            <span>{isNominee ? `Nominee · ${member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : member.relationship}</span>
+                          <div className="jm-family-review-item" key={member?._id || member?.id || member?.fullName}>
+                            <strong>{member?.fullName || 'Family member'}</strong>
+                            <span>{isNominee ? `Nominee · ${member?.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : member?.relationship || 'Family member'}</span>
                             {isNominee ? (
                               <span>No extra cost</span>
                             ) : price ? (
                               <>
-                                <span className="jm-family-discount">{price.discountPct}% discount</span>
+                                <span className="jm-family-discount">{price.discountPct ?? 0}% discount</span>
                                 <dl>
-                                  <div><dt>Base</dt><dd>{money(price.baseAmount)}</dd></div>
-                                  <div><dt>GST</dt><dd>{money(price.gstAmount)}</dd></div>
-                                  <div><dt>Total</dt><dd>{money(price.totalPayable)}</dd></div>
+                                  <div><dt>Base</dt><dd>{money(price.baseAmount ?? 0)}</dd></div>
+                                  <div><dt>GST</dt><dd>{money(price.gstAmount ?? 0)}</dd></div>
+                                  <div><dt>Total</dt><dd>{money(price.totalPayable ?? 0)}</dd></div>
                                 </dl>
                               </>
                             ) : <span>Price unavailable</span>}
@@ -2052,20 +2259,25 @@ export default function MembershipAll() {
                   {quoteLoading ? (
                     <p className="jm-quote-status" role="status">Calculating your payment details…</p>
                   ) : quoteError ? (
-                    <p className="jm-quote-status jm-quote-status--error" role="alert">{quoteError}</p>
+                    <div className="jm-quote-status jm-quote-status--error" role="alert">
+                      <p>{quoteError}</p>
+                      <button className="jm-btn-pill-outline" type="button" onClick={() => setQuoteRetry((count) => count + 1)}>
+                        Retry
+                      </button>
+                    </div>
                   ) : quote ? (
                     <div className="jm-fee-rows">
                       <div className="jm-fee-row">
                         <span className="jm-fee-row__label">Plan fee</span>
-                        <strong>{money(quote.planFee / 100)}</strong>
+                        <strong>{money((quote?.planFee ?? 0) / 100)}</strong>
                       </div>
-                      {quote.gstEnabled && <div className="jm-fee-row">
-                        <span className="jm-fee-row__label">{quote.gstLabel} ({quote.gstPercent}%)</span>
-                        <strong>{money(quote.gst / 100)}</strong>
+                      {quote?.gstEnabled && <div className="jm-fee-row">
+                        <span className="jm-fee-row__label">{quote.gstLabel || 'GST'} ({quote.gstPercent ?? 0}%)</span>
+                        <strong>{money((quote?.gst ?? 0) / 100)}</strong>
                       </div>}
                       <div className="jm-fee-row jm-fee-row--total">
                         <span className="jm-fee-row__label">Total</span>
-                        <strong>{money(quote.total / 100)}</strong>
+                        <strong>{money((quote?.total ?? 0) / 100)}</strong>
                       </div>
                     </div>
                   ) : (
@@ -2305,6 +2517,9 @@ export default function MembershipAll() {
                   ? 'Payment received.'
                   : 'Payment submitted, awaiting confirmation.'}
               </p>
+              {paymentMembership?.status === 'active' && (paymentMembership.memberId || paymentMembership.memberCode)
+                ? <p className="mt-3">Member ID: <strong>{paymentMembership.memberId || paymentMembership.memberCode}</strong></p>
+                : <p className="mt-3">Member ID: <strong>—</strong> (assigned after membership approval)</p>}
               <form className="jm-password-link-form mt-4" onSubmit={requestPasswordLink}>
                 <label className="jm-field" htmlFor="password-link-email">
                   Email

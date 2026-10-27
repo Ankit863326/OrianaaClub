@@ -50,6 +50,23 @@ describe('formatting and display helpers', () => {
       .toEqual({ displayAmount: '500', label: 'Child' });
   });
 
+  test('prefers canonical points tiers and formats member ranges', () => {
+    const mapped = mapPlanToCard({
+      pointsTiers: [
+        { points: 600000, label: 'First 1,000 members', fromMember: 1, toMember: 1000 },
+        { points: 480000, label: 'Next members only', fromMember: 1001, toMember: null },
+        { points: 420000, fromMember: 1001 },
+      ],
+      benefitsCohorts: [{ points: 1, label: 'Stale cohort' }],
+    });
+    expect(mapped.cohorts).toEqual([
+      { displayAmount: '6,00,000', label: 'First 1,000 members' },
+      { displayAmount: '4,80,000', label: 'Next members only' },
+      { displayAmount: '4,20,000', label: 'Members 1,001 onwards' },
+    ]);
+    expect(mapPlanToCard({ pointsTiers: [] }).cohorts).toEqual([]);
+  });
+
   test('joins conditional classes and builds upload URLs safely', () => {
     expect(cn('base', false, { active: true })).toBe('base active');
     expect(apiFileUrl('/uploads/photo.jpg')).toBe('http://localhost:5000/media/photo.jpg');

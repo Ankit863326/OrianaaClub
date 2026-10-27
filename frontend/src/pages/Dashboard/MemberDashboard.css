@@ -141,6 +141,34 @@
   letter-spacing: .08em;
 }
 
+.member-hub__validity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.member-hub__validity-box {
+  display: grid;
+  gap: 3px;
+  min-width: 150px;
+  border: 1px solid var(--hub-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8faf8;
+}
+
+.member-hub__validity-box span,
+.member-hub__validity-box small {
+  color: var(--hub-muted);
+  font-size: 12px;
+}
+
+.member-hub__validity-box strong {
+  color: var(--hub-green-dark);
+  font-size: 14px;
+}
+
 .member-hub__qr {
   display: block;
   width: 116px;
@@ -176,6 +204,12 @@
 .member-hub__points-equivalent {
   margin-top: 8px;
   color: #edf2ed;
+}
+
+.member-hub__points-validity {
+  margin-top: 6px;
+  color: #edf2ed;
+  font-size: 12px;
 }
 
 .member-hub__progress {

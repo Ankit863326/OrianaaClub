@@ -34,7 +34,7 @@ function normalizeMembershipSearchQuery(query) {
 
 export const membershipIdParamsSchema = z.object({ id: membershipId });
 export const familyTreeParamsSchema = z.object({
-  memberNo: z.string().trim().min(1).max(40).regex(/^(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?$/i, 'Invalid member number.'),
+  memberNo: z.string().trim().min(1).max(60).regex(/^(?:(?:\d+)(?:-(?:S|C\d+|F|M|SF|SM|GM|HR|N\d+))?|OC-\d{4,}(?:-(?:S|C\d+|F|M|SF|SM))?)$/i, 'Invalid member number.'),
 });
 export const membershipPlanIdParamsSchema = z.object({ id: objectId });
 export const membershipSearchQuerySchema = z.preprocess(

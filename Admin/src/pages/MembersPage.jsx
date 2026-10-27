@@ -94,6 +94,7 @@ export default function MembersPage() {
     { key: 'plan', label: 'Plan', render: (row) => row.membership?.plan?.name || row.membership?.plan?.title || '—' },
     { key: 'pointsBalance', label: 'Points balance', render: (row) => row.membership ? formatPoints(row.membership.pointsBalance) : '—' },
     { key: 'pointsExpireAt', label: 'Points expiry', render: (row) => row.membership ? formatDate(row.membership.pointsExpireAt) : '—' },
+    { key: 'membershipExpireAt', label: 'Membership expiry', render: (row) => row.membership ? formatDate(row.membership.membershipExpireAt || row.membership.endDate) : '—' },
   ];
   return <section>
     <PageHeading eyebrow="MEMBER DIRECTORY" title="Members" actions={<>
@@ -126,7 +127,7 @@ export default function MembersPage() {
       <Button type="submit" disabled={offline && !gstSettings} className="sm:col-span-2 sm:justify-self-start">Create member</Button>
     </form></Panel>}
     <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(220px,1fr)_180px_180px_180px_auto]">
-      <input className={controlClass} aria-label="Search members" placeholder="Search name, email, 12-digit member ID or phone" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value, page: 1 })} />
+      <input className={controlClass} aria-label="Search members" placeholder="Search name, email, Member ID, sequence digits, legacy code or phone" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value, page: 1 })} />
       <select className={controlClass} aria-label="Filter by status" value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value, page: 1 })}><option value="">All statuses</option><option value="draft">Draft</option><option value="pending_payment">Pending payment</option><option value="pending_verification">Pending verification</option><option value="active">Active</option><option value="expired">Expired</option><option value="cancelled">Cancelled</option></select>
       <select className={controlClass} aria-label="Filter by plan" value={filters.plan} onChange={(event) => setFilters({ ...filters, plan: event.target.value, page: 1 })}><option value="">All plans</option>{membershipPlans.map((plan) => <option key={plan._id} value={plan._id}>{plan.name}</option>)}</select>
       <select className={controlClass} aria-label="Filter password status" value={filters.notActivated} onChange={(event) => setFilters({ ...filters, notActivated: event.target.value, page: 1 })}><option value="">All password-link states</option><option value="true">Password not set</option></select>

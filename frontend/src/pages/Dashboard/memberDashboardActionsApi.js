@@ -17,6 +17,10 @@ export async function requestFamilyMember(values, photo) {
   return getData(await apiClient.postForm('/me/family', formData));
 }
 
+export async function requestFamilyMemberUpdate(memberId, values) {
+  return getData(await apiClient.put(`/me/family/${encodeURIComponent(memberId)}`, values));
+}
+
 export async function requestFamilyRemoval(memberId) {
   return getData(await apiClient.delete(`/me/family/${encodeURIComponent(memberId)}`));
 }

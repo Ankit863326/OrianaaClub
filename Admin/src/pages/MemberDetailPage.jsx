@@ -46,7 +46,8 @@ export default function MemberDetailPage() {
   }
   async function saveFamily(event) {
     event.preventDefault();
-    const body = Object.fromEntries([...new FormData(event.currentTarget).entries()].filter(([, value]) => String(value).trim()));
+    const body = Object.fromEntries([...new FormData(event.currentTarget).entries()]
+      .filter(([key, value]) => key === 'anniversaryDate' || String(value).trim()));
     try { await adminApi.updateFamily(userId, familyEdit._id, body); setFamilyEdit(null); setNotice('Family member updated.'); await load(); }
     catch (failure) { setError(errorMessage(failure)); }
   }
@@ -65,6 +66,7 @@ export default function MemberDetailPage() {
   const familyColumns = [
     { key: 'fullName', label: 'Name' }, { key: 'relationship', label: 'Relationship' }, { key: 'gender', label: 'Gender' },
     { key: 'dob', label: 'Date of birth', render: (row) => formatDate(row.dob) },
+    { key: 'anniversaryDate', label: 'Anniversary', render: (row) => row.anniversaryDate ? formatDate(row.anniversaryDate) : '—' },
     { key: 'actions', label: '', render: (row) => <div className="flex gap-2"><Button variant="secondary" onClick={() => setFamilyEdit(row)}>Edit</Button><Button variant="danger" onClick={() => setFamilyDelete(row._id)}>Delete</Button></div> },
   ];
   return <section>
@@ -97,6 +99,7 @@ export default function MemberDetailPage() {
       <FormField label="Relationship"><input className={controlClass} name="relationship" required defaultValue={familyEdit.relationship} /></FormField>
       <FormField label="Gender"><select className={controlClass} name="gender" defaultValue={familyEdit.gender}><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></FormField>
       <FormField label="Date of birth"><input className={controlClass} name="dob" type="date" defaultValue={familyEdit.dob ? new Date(familyEdit.dob).toISOString().slice(0, 10) : ''} /></FormField>
+      <FormField label="Anniversary date (optional)"><input className={controlClass} name="anniversaryDate" type="date" max={new Date().toISOString().slice(0, 10)} defaultValue={familyEdit.anniversaryDate ? new Date(familyEdit.anniversaryDate).toISOString().slice(0, 10) : ''} /></FormField>
       <div className="flex gap-2"><Button type="submit">Save family member</Button><Button type="button" variant="secondary" onClick={() => setFamilyEdit(null)}>Cancel</Button></div>
     </form></Panel>}</>}
     {tab === 'Payments' && <DataTable columns={paymentColumns} rows={data.payments || []} empty="No payments are associated with this member." />}

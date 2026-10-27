@@ -14,6 +14,15 @@ export const requestAdd = asyncHandler(async (request, response) => {
   response.status(201).json({ success: true, data: member, message: 'Family member request submitted.' });
 });
 
+export const requestUpdate = asyncHandler(async (request, response) => {
+  const member = await familyService.requestUpdateFamilyMember(
+    request.user._id,
+    request.validated.params.familyId,
+    request.validated.body,
+  );
+  response.json({ success: true, data: member, message: 'Family member update request submitted.' });
+});
+
 export const requestRemove = asyncHandler(async (request, response) => {
   const member = await familyService.requestRemoveFamilyMember(request.user._id, request.validated.params.familyId);
   response.json({ success: true, data: member, message: 'Family removal request submitted.' });

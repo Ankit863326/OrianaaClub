@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import ApiError from '../utils/ApiError.js';
+import { getMembershipMemberCode, isMemberId } from '../utils/memberCode.js';
 import AuditLog from '../models/AuditLog.js';
 import FamilyMember from '../models/FamilyMember.js';
 import IdentityVerification from '../models/IdentityVerification.js';
@@ -145,11 +146,19 @@ async function appendAudit(record, { actorId = null, actorType, action, reason =
   };
   record.auditLog.push(entry);
   await record.save();
-  const familyMember = await FamilyMember.findById(record.memberId).select('name fullName memberNo membership').lean();
+  const familyMember = await FamilyMember.findById(record.memberId)
+    .select('name fullName memberNo memberId membership isNominee memberType')
+    .lean();
   const membership = familyMember?.membership
-    ? await Membership.findById(familyMember.membership).select('memberNo').lean()
+    ? await Membership.findById(familyMember.membership)
+      .select('memberNo memberCode memberId memberNumber legacyMemberCode')
+      .lean()
     : null;
-  const memberNo = familyMember?.memberNo || membership?.memberNo || '';
+  const memberNo = familyMember?.isNominee || String(familyMember?.memberType || '').startsWith('nominee')
+    ? ''
+    : isMemberId(familyMember?.memberId || familyMember?.memberNo)
+      ? familyMember.memberId || familyMember.memberNo
+      : getMembershipMemberCode(membership);
   await AuditLog.create({
     actorType,
     actorId,
@@ -720,7 +729,9 @@ export async function getAdminFamilyVerificationQueue(now = new Date()) {
   }).select('_id membership name fullName relation relationship').lean();
   const primaryIds = [...new Set(familyMembers.map((member) => String(member.membership)))];
   const primaries = primaryIds.length
-    ? await Membership.find({ _id: { $in: primaryIds } }).select('_id memberNo memberCode').lean()
+    ? await Membership.find({ _id: { $in: primaryIds } })
+      .select('_id memberNo memberCode memberNumber legacyMemberCode')
+      .lean()
     : [];
   const primaryById = new Map(primaries.map((membership) => [String(membership._id), membership]));
   const byId = new Map(familyMembers.map((member) => [String(member._id), member]));
@@ -729,7 +740,9 @@ export async function getAdminFamilyVerificationQueue(now = new Date()) {
     memberName: byId.get(String(record.memberId))?.name || byId.get(String(record.memberId))?.fullName || '',
     relation: record.relation || byId.get(String(record.memberId))?.relation || byId.get(String(record.memberId))?.relationship || '',
     membershipId: String(byId.get(String(record.memberId))?.membership || ''),
-    primaryMemberNo: primaryById.get(String(byId.get(String(record.memberId))?.membership))?.memberNo || '',
+    primaryMemberNo: getMembershipMemberCode(
+      primaryById.get(String(byId.get(String(record.memberId))?.membership)),
+    ),
     status: record.status,
     dueAt: record.dueAt,
     overdue: Boolean(record.overdueAt || (record.dueAt && record.dueAt <= now)),
@@ -788,13 +801,17 @@ export async function getAdminFamilyVerificationDetail(adminId, familyMemberId) 
       name: context.member.name,
       relation: record.relation || context.member.relation || context.member.relationship,
       parentSide: context.member.parentSide || null,
-      memberNo: context.member.memberNo || '',
+      memberNo: context.member.isNominee
+        ? ''
+        : (isMemberId(context.member.memberId || context.member.memberNo)
+          ? context.member.memberId || context.member.memberNo
+          : ''),
       email: context.member.email,
       dob: context.member.dob || context.member.dateOfBirth,
     },
     primary: {
       name: context.profile?.fullName || '',
-      memberNo: context.membership.memberNo || '',
+      memberNo: getMembershipMemberCode(context.membership),
       aadhaar: checks.primaryAadhaar,
     },
     verification: {
@@ -842,12 +859,18 @@ export async function readSignedFamilyVerificationDocument(adminId, token, ip = 
     ip,
   });
   const familyMember = await FamilyMember.findById(access.familyMemberId)
-    .select('name fullName memberNo membership')
+    .select('name fullName memberNo memberId membership isNominee memberType')
     .lean();
   const primaryMembership = familyMember?.membership
-    ? await Membership.findById(familyMember.membership).select('memberNo').lean()
+    ? await Membership.findById(familyMember.membership)
+      .select('memberNo memberCode memberId memberNumber legacyMemberCode')
+      .lean()
     : null;
-  const memberNo = familyMember?.memberNo || primaryMembership?.memberNo || '';
+  const memberNo = familyMember?.isNominee || String(familyMember?.memberType || '').startsWith('nominee')
+    ? ''
+    : isMemberId(familyMember?.memberId || familyMember?.memberNo)
+      ? familyMember.memberId || familyMember.memberNo
+      : getMembershipMemberCode(primaryMembership);
   await AuditLog.create({
     actorType: 'admin',
     actorId: adminId,
@@ -900,6 +923,11 @@ export async function decideFamilyVerification(adminId, familyMemberId, decision
     at: verification.reviewedAt,
   });
   await verification.save();
+  const memberNo = member.isNominee
+    ? ''
+    : isMemberId(member.memberId || member.memberNo)
+      ? member.memberId || member.memberNo
+      : getMembershipMemberCode(membership);
   await AuditLog.create({
     actorType: 'admin',
     actorId: adminId,
@@ -907,8 +935,8 @@ export async function decideFamilyVerification(adminId, familyMemberId, decision
     action: `family.verification.${action}`,
     entityType: 'family_verification',
     entityId: String(member._id),
-    memberNo: member.memberNo || membership.memberNo || '',
-    summary: `Family verification ${action.replaceAll('_', ' ')} for ${member.name || member.fullName || 'family member'} (${membership.memberNo || 'primary membership'}).`,
+    memberNo,
+    summary: `Family verification ${action.replaceAll('_', ' ')} for ${member.name || member.fullName || 'family member'} (${memberNo || 'primary membership'}).`,
     before: { status: before },
     after: { status: verification.status, discountReleased: decision === 'approve' },
     reason,

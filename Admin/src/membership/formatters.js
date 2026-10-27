@@ -16,11 +16,8 @@ export function formatPointChannel(channel) {
 }
 
 export function formatMemberCode(code) {
-  const normalized = String(code || '').replace(/^OC-/i, '').replace(/[\s-]/g, '').toUpperCase();
-  if (/^2651\d{8}$/.test(normalized)) return `${normalized.slice(0, 4)} ${normalized.slice(4)}`;
-  if (normalized.length === 8) return `OC-${normalized.slice(0, 4)}-${normalized.slice(4)}`;
-  if (normalized.length === 10) return `OC-${normalized.slice(0, 5)}-${normalized.slice(5)}`;
-  return String(code || '');
+  const value = String(code || '').trim().toUpperCase();
+  return /^OC-\d{12,}(?:-(?:S|C\d+|F|M|SF|SM))?$/.test(value) ? value : '—';
 }
 
 export function formatMembershipDate(value) {

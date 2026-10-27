@@ -152,7 +152,8 @@ describe('admin member services', () => {
     await approveMembership(membership._id, admin.user._id);
     const approvedMembership = await Membership.findById(membership._id);
     expect(approvedMembership.status).toBe('active');
-    expect(approvedMembership.memberNo).toMatch(/^\d+$/);
+    expect(approvedMembership.memberNo).toMatch(/^OC-\d{12}$/);
+    expect(approvedMembership.memberNo).toBe(approvedMembership.memberCode);
     expect(approvedMembership.approvalSeq).toBe(1);
     expect(approvedMembership.pointsBalance).toBe(600000);
     expect(await PointsLedger.findOne({ memberId: membership._id })).toMatchObject({ points: 600000 });

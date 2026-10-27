@@ -10,10 +10,12 @@ import { getSettings } from '../models/Setting.js';
 import Payment from '../models/Payment.js';
 import Profile from '../models/Profile.js';
 import ApiError from '../utils/ApiError.js';
+import { allocateFamilyChildNumber } from './member-code.service.js';
 import { invalidateVerificationAfterProfileChange } from './family-verification.service.js';
 import { getPayableAmount } from '../utils/money.js';
 import { publicMediaDirectory } from '../utils/uploadDirectories.js';
 import { calculateFamilyPriceQuotes } from './pricing.service.js';
+import { getMembershipMemberCode } from '../utils/memberCode.js';
 import {
   normalizeFamilyProfile,
   validateFamilyProfileSet,
@@ -208,9 +210,26 @@ export async function getMembershipCheckoutQuote(planId) {
   };
 }
 
-export async function getFamilyPriceBreakdown(planId) {
-  let plan = await Plan.findOne({ _id: planId, isActive: true }).lean();
-  if (!plan) plan = await MembershipPlan.findOne({ _id: planId, isActive: true }).lean();
+export async function getFamilyPriceBreakdown(userId, planId) {
+  const activeMembership = await Membership.findOne({
+    user: userId,
+    memberType: 'primary',
+    linkedTo: null,
+    status: 'active',
+  }).select('plan planModel').lean();
+  let plan = null;
+  if (activeMembership?.plan) {
+    const PlanModel = activeMembership.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
+    plan = await PlanModel.findOne({ _id: activeMembership.plan, isActive: true }).lean();
+    if (!plan) {
+      const FallbackPlanModel = PlanModel === Plan ? MembershipPlan : Plan;
+      plan = await FallbackPlanModel.findOne({ _id: activeMembership.plan, isActive: true }).lean();
+    }
+    if (!plan) throw new ApiError(409, 'Your active membership plan could not be loaded.');
+  } else {
+    plan = await Plan.findOne({ _id: planId, isActive: true }).lean();
+    if (!plan) plan = await MembershipPlan.findOne({ _id: planId, isActive: true }).lean();
+  }
   if (!plan) throw new ApiError(404, 'Membership plan was not found.');
   return calculateFamilyPriceQuotes(plan);
 }
@@ -245,6 +264,7 @@ export async function getPaymentMembership(userId, membershipId) {
   return {
     id: String(membership._id),
     status: membership.status,
+    memberCode: getMembershipMemberCode(membership),
     plan: {
       id: String(membership.plan._id),
       name: membership.plan.name || membership.plan.title,
@@ -294,14 +314,37 @@ export async function listFamilyMembers(userId) {
 export async function addFamilyMember(userId, values, photo) {
   const membership = await requireDraftMembership(userId);
   const currentMembers = await FamilyMember.find({ membership: membership._id }).lean();
-  const profileValues = normalizeFamilyProfile(values);
+  let profileValues = normalizeFamilyProfile(values);
+  if (['father', 'mother'].includes(profileValues.memberType)) {
+    const side = profileValues.parentSide || 'member';
+    const counterpart = currentMembers.find((item) => (
+      ['father', 'mother'].includes(item.memberType)
+      && (item.parentSide || 'member') === side
+      && item.anniversaryDate
+    ));
+    if (!profileValues.anniversaryDate && counterpart?.anniversaryDate) {
+      profileValues = { ...profileValues, anniversaryDate: counterpart.anniversaryDate };
+    }
+  }
   await validateFamilyProfileSet({
     plan: membership.plan,
     members: [...currentMembers, profileValues],
   });
+  if (profileValues.memberType === 'child' && !profileValues.isNominee) {
+    profileValues.familyChildNumber = await allocateFamilyChildNumber(membership);
+  }
   const photoUrl = await savePhoto(photo);
   try {
-    return await FamilyMember.create({ ...profileValues, photoUrl, membership: membership._id });
+    const member = await FamilyMember.create({ ...profileValues, photoUrl, membership: membership._id });
+    if (['father', 'mother'].includes(member.memberType) && member.anniversaryDate) {
+      await FamilyMember.updateMany({
+        membership: membership._id,
+        parentSide: member.parentSide || 'member',
+        memberType: { $in: ['father', 'mother'] },
+        _id: { $ne: member._id },
+      }, { $set: { anniversaryDate: member.anniversaryDate } });
+    }
+    return member;
   } catch (error) {
     if (photo) await discardNewPhoto(photoUrl, error);
     throw error;
@@ -331,6 +374,14 @@ export async function updateFamilyMember(userId, memberId, values, photo) {
   } catch (error) {
     if (photo) await discardNewPhoto(photoUrl, error);
     throw error;
+  }
+  if (['father', 'mother'].includes(member.memberType)) {
+    await FamilyMember.updateMany({
+      membership: membership._id,
+      parentSide: member.parentSide || 'member',
+      memberType: { $in: ['father', 'mother'] },
+      _id: { $ne: member._id },
+    }, { $set: { anniversaryDate: member.anniversaryDate || null } });
   }
   await invalidateVerificationAfterProfileChange(member, before, userId, 'member');
   if (photo && previousPhotoUrl) await removeUploadedPhoto(previousPhotoUrl);

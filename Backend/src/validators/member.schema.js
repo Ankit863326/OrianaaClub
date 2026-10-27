@@ -1,5 +1,9 @@
 // Phase 2: Validate profile details and family-member changes sent by members.
 import { z } from 'zod';
+import {
+  optionalAnniversaryDateSchema,
+  validateFamilyAnniversary,
+} from './family-anniversary.schema.js';
 
 const genderSchema = z.enum(['male', 'female', 'other', 'prefer_not_to_say']);
 const formBooleanSchema = z.union([
@@ -48,7 +52,7 @@ export const familyMemberSchema = z.object({
   ]).optional(),
   isNominee: formBooleanSchema.optional().default(false),
   parentSide: z.enum(['member', 'spouse']).optional(),
-  anniversaryDate: z.coerce.date().optional().or(z.literal('')),
+  anniversaryDate: optionalAnniversaryDateSchema,
   wantsOwnMembership: formBooleanSchema.optional().default(false),
 }).superRefine((member, context) => {
   const isNominee = member.isNominee || ['nominee', 'nominee_gm', 'nominee_hr'].includes(member.memberType);
@@ -61,6 +65,7 @@ export const familyMemberSchema = z.object({
   if (['father', 'mother'].includes(member.memberType) && !member.parentSide) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['parentSide'], message: 'Choose whose parent this is.' });
   }
+  validateFamilyAnniversary(member, context);
 });
 
 export const familyIdSchema = z.object({

@@ -443,6 +443,7 @@ export async function saveMembershipDraftFamily(draft, values) {
     ...normalizeFamilyProfile(item),
     photoUrl: item.photoUrl || '',
   }));
+  syncDraftParentAnniversaries(family);
   const plan = await MembershipPlan.findOne({ _id: draft.plan, isActive: true }).lean();
   await validateFamilyProfileSet({ plan, members: family });
   draft.family = family;
@@ -453,7 +454,26 @@ export async function saveMembershipDraftFamily(draft, values) {
 export async function addMembershipDraftFamily(draft, values, photo) {
   if (!draft.emailVerifiedAt) throw new ApiError(403, 'Verify your email before continuing.');
   const plan = await MembershipPlan.findOne({ _id: draft.plan, isActive: true }).lean();
-  const profileValues = normalizeFamilyProfile(values);
+  let profileValues = normalizeFamilyProfile(values);
+  if (['father', 'mother'].includes(profileValues.memberType)) {
+    const side = profileValues.parentSide || 'member';
+    const counterpart = draft.family.find((item) => (
+      ['father', 'mother'].includes(item.memberType)
+      && (item.parentSide || 'member') === side
+      && item.anniversaryDate
+    ));
+    if (!profileValues.anniversaryDate && counterpart?.anniversaryDate) {
+      profileValues = { ...profileValues, anniversaryDate: counterpart.anniversaryDate };
+    }
+    if (profileValues.anniversaryDate) {
+      draft.family.forEach((item) => {
+        if (['father', 'mother'].includes(item.memberType)
+          && (item.parentSide || 'member') === side) {
+          item.anniversaryDate = profileValues.anniversaryDate;
+        }
+      });
+    }
+  }
   await validateFamilyProfileSet({
     plan,
     members: [...draft.family.map((member) => member.toObject()), profileValues],
@@ -480,10 +500,32 @@ export async function updateMembershipDraftFamily(draft, familyId, values, photo
   await validateFamilyProfileSet({ plan, members: [...family, profileValues] });
   const oldPhoto = member.photoUrl;
   Object.assign(member, profileValues);
+  if (['father', 'mother'].includes(member.memberType)) {
+    const side = member.parentSide || 'member';
+    draft.family.forEach((item) => {
+      if (['father', 'mother'].includes(item.memberType)
+        && (item.parentSide || 'member') === side) {
+        item.anniversaryDate = member.anniversaryDate || null;
+      }
+    });
+  }
   if (photo) member.photoUrl = await savePublicPhoto(photo);
   await saveDraftAtStep(draft, 3);
   if (photo && oldPhoto) await removePublicPhoto(oldPhoto);
   return { ...member.toObject(), _id: member.id };
+}
+
+function syncDraftParentAnniversaries(family) {
+  for (const side of ['member', 'spouse']) {
+    const parents = family.filter((member) => (
+      ['father', 'mother'].includes(member.memberType)
+      && (member.parentSide || 'member') === side
+    ));
+    const anniversaryDate = parents.find((member) => member.anniversaryDate)?.anniversaryDate || null;
+    parents.forEach((member) => {
+      member.anniversaryDate = anniversaryDate;
+    });
+  }
 }
 
 export async function deleteMembershipDraftFamily(draft, familyId) {
