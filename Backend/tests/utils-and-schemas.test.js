@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import ApiError from '../src/utils/ApiError.js';
 import asyncHandler from '../src/utils/asyncHandler.js';
 import { calculateGst, getPayableAmount, paiseToRupees, rupeesToPaise } from '../src/utils/money.js';
-import memberId from '../src/utils/memberId.js';
+import { buildMemberId } from '../src/utils/memberCode.js';
 import { safeCsvCell, writeCsvHeader, writeCsvRow } from '../src/utils/csv.js';
 import * as auth from '../src/validators/auth.schema.js';
 import * as member from '../src/validators/member.schema.js';
@@ -166,11 +166,15 @@ describe('utility functions', () => {
       .toContain('pan_back');
   });
 
-  test('formats member numbers and rejects invalid sequences', () => {
-    expect(memberId(1)).toBe('OC-000001');
-    expect(memberId(1234567)).toBe('OC-1234567');
+  test('formats date-based member IDs and rejects invalid sequences', () => {
+    const dates = {
+      activatedAt: new Date('2026-10-27T00:00:00.000Z'),
+      expiresAt: new Date('2051-10-27T00:00:00.000Z'),
+    };
+    expect(buildMemberId({ ...dates, sequence: 1 })).toBe('OC-265111000001');
+    expect(buildMemberId({ ...dates, sequence: 1234567 })).toBe('OC-2651111234567');
     for (const value of [0, -1, 1.2, Number.MAX_SAFE_INTEGER + 1, '1']) {
-      expect(() => memberId(value)).toThrow(TypeError);
+      expect(() => buildMemberId({ ...dates, sequence: value })).toThrow(TypeError);
     }
   });
 
