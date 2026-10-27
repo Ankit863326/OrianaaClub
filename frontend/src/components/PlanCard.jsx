@@ -46,12 +46,14 @@ export default function PlanCard({
   to,
   selected = false,
   disabled = false,
+  featured,
 }) {
   const cardRef = useRef(null);
   const isInView = useInView(cardRef, { once: true, margin: '-60px' });
-  const isFeatured = Boolean(plan.isFeatured);
+  const isFeatured = featured ?? Boolean(plan.isFeatured);
   const buttonClassName = `mb-card__btn ${isFeatured ? 'mb-card__btn--white' : 'mb-card__btn--green'}`;
   const label = selected ? 'Selected' : buttonLabel;
+  const cohorts = Array.isArray(plan.cohorts) ? plan.cohorts : [];
 
   return (
     <motion.article
@@ -68,10 +70,11 @@ export default function PlanCard({
       <div className="mb-card__header">
         <h3 className="mb-card__title">{plan.title}</h3>
         <p className="mb-card__subtitle">{plan.subtitle}</p>
+        <p className="mb-card__redemption-rate">1 Redemption points = 1 Rupee</p>
       </div>
 
-      <div className="mb-card__cohorts">
-        {plan.cohorts.map((cohort, cohortIndex) => (
+      {cohorts.length > 0 && <div className="mb-card__cohorts">
+        {cohorts.map((cohort, cohortIndex) => (
           <div key={`${cohort.label}-${cohortIndex}`} className="mb-card__cohort-item">
             <TierEmblemIcon isDark={isFeatured} />
             <div className="mb-card__cohort-info">
@@ -80,7 +83,7 @@ export default function PlanCard({
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="mb-card__footer">
         <div className="mb-card__price">{plan.priceLabel}</div>

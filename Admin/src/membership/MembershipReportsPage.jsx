@@ -32,7 +32,7 @@ function ExpiringMembersTable({ title, data }) {
       ? <div className="overflow-x-auto rounded-2xl border border-slate-200">
         <table className="w-full min-w-[680px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>{['Member code', 'Name', 'Points balance', 'Points expiry'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+            <tr>{['Member ID', 'Name', 'Points balance', 'Points expiry'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.items.map((member) => <tr key={member._id}>

@@ -10,6 +10,10 @@ import { DEFAULT_FAMILY_MEMBERSHIP_CONFIG, getSettings } from '../models/Setting
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import { assignApprovalSeq, assignSeqBatch } from './approval-sequence.service.js';
+import { getNextMemberNumber } from './membership-id.service.js';
+import { assignFamilyMemberId } from './member-code.service.js';
+import { allocateMemberId } from './member-id.service.js';
+import { getMembershipMemberCode } from '../utils/memberCode.js';
 import { creditPoints } from './points-ledger.service.js';
 import { sendMail } from './mail.service.js';
 
@@ -17,14 +21,10 @@ function nomineeRole(member) {
   return String(member.nomineeRole || '').trim().toUpperCase();
 }
 
-function familySuffix(member, index = 1) {
-  if (member.memberType === 'spouse') return '-S';
-  if (member.memberType === 'child') return `-C${index}`;
-  if (member.memberType === 'father') return member.parentSide === 'spouse' ? '-SF' : '-F';
-  if (member.memberType === 'mother') return member.parentSide === 'spouse' ? '-SM' : '-M';
-  if (member.memberType === 'nominee_gm') return '-GM';
-  if (member.memberType === 'nominee_hr') return '-HR';
-  return `-N${index}`;
+function addUtcYears(date, years) {
+  const result = new Date(date);
+  result.setUTCFullYear(result.getUTCFullYear() + years);
+  return result;
 }
 
 async function getTierAndName(membership, session) {
@@ -36,27 +36,6 @@ async function getTierAndName(membership, session) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
   return { tier, planName: plan.title || plan.name || 'Orianaa Club' };
-}
-
-async function makeMemberNumber(session, member, primary, nominees = []) {
-  if (member.memberType === 'primary' || !member.linkedTo) return String(member.approvalSeq);
-  if (member.memberType === 'nominee' || member.memberType === 'nominee_gm' || member.memberType === 'nominee_hr') {
-    const role = nomineeRole(member);
-    const index = nominees.findIndex((item) => item._id.toString() === member._id.toString()) + 1;
-    return `${primary.memberNo}${familySuffix(member, role === 'GM' || role === 'HR' ? 1 : Math.max(1, index))}`;
-  }
-
-  let index = 1;
-  if (member.memberType === 'child') {
-    const siblings = await Membership.find({
-      _id: { $ne: member._id },
-      linkedTo: primary._id,
-      memberType: 'child',
-      memberNo: { $ne: '' },
-    }).session(session).select('_id').lean();
-    index = siblings.length + 1;
-  }
-  return `${primary.memberNo}${familySuffix(member, index)}`;
 }
 
 async function emailDetails(member, planName) {
@@ -77,7 +56,7 @@ async function emailDetails(member, planName) {
     data: {
       firstName,
       planName,
-      memberId: member.memberNo || '',
+      memberId: getMembershipMemberCode(member) || '',
     },
   };
 }
@@ -130,7 +109,7 @@ export async function getMembershipApprovalQueue({ page = 1, limit = 20 } = {}, 
     items: items.map((membership) => ({
       ...membership,
       memberName: profileByUser.get(String(membership.user?._id))?.fullName || membership.user?.firstName || membership.user?.email || 'Member',
-      memberCode: membership.memberNo || membership.memberCode || '',
+      memberCode: getMembershipMemberCode(membership),
       amountPaid: {
         baseAmount: membership.baseAmount || 0,
         gstAmount: membership.gstAmount || 0,
@@ -217,9 +196,49 @@ export async function approveMembership(membershipId, adminId, now = new Date())
       membership.status = 'active';
       membership.approvalOverdueAt = null;
       membership.approvalOverdueNotifiedAt = null;
-      membership.memberNo = await makeMemberNumber(session, membership, primary, nominees);
-      if (membership.memberType === 'primary' || !membership.linkedTo) {
-        membership.memberNo = String(primarySeq);
+      if (String(membership.memberType || '').startsWith('nominee')) {
+        membership.memberNo = '';
+        membership.memberCode = '';
+        membership.memberId = '';
+      } else if (membership.memberType === 'primary' || !membership.linkedTo) {
+        const memberNumber = await getNextMemberNumber(session);
+        membership.memberNumber = String(memberNumber);
+        const membershipExpireAt = addUtcYears(now, settings.membershipValidityYears);
+        membership.memberId = await allocateMemberId({
+          activatedAt: now,
+          expiresAt: membershipExpireAt,
+          session,
+        });
+        membership.memberCode = membership.memberId;
+        membership.memberNo = membership.memberCode;
+        membership.activatedAt = now;
+        membership.startDate = now;
+        membership.endDate = membershipExpireAt;
+        membership.membershipExpireAt = membershipExpireAt;
+      } else if (membership.familyMember) {
+        const familyProfile = await FamilyMember.findOne({
+          _id: membership.familyMember,
+          membership: primary._id,
+        }).session(session);
+        if (!familyProfile) throw new ApiError(409, 'The linked family profile could not be found.');
+        const primaryExpiry = primary.membershipExpireAt || primary.endDate
+          || addUtcYears(primary.activatedAt || primary.startDate || now, settings.membershipValidityYears);
+        membership.memberId = await assignFamilyMemberId(
+          primary,
+          familyProfile,
+          now,
+          primaryExpiry,
+          session,
+        );
+        if (!membership.memberId) {
+          throw new ApiError(409, 'A member ID could not be assigned to this family member.');
+        }
+        membership.memberNo = membership.memberId;
+        membership.memberCode = membership.memberNo;
+        membership.activatedAt = now;
+        membership.startDate = now;
+        membership.endDate = primaryExpiry;
+        membership.membershipExpireAt = primaryExpiry;
       }
       await membership.save({ session });
       const ledgerEntry = await creditPoints(session, membership, primarySeq);
@@ -243,6 +262,7 @@ export async function approveMembership(membershipId, adminId, now = new Date())
         }
         familyMember.status = 'active';
         familyMember.memberNo = membership.memberNo;
+        familyMember.memberId = membership.memberId;
         familyMember.approvalSeq = primarySeq;
         familyMember.approvedAt = now;
         familyMember.approvedBy = adminId;
@@ -264,6 +284,7 @@ export async function approveMembership(membershipId, adminId, now = new Date())
             status: 'active',
             approvalSeq: primarySeq,
             memberNo: familyMember.memberNo,
+            memberId: familyMember.memberId,
           },
         }], { session });
       }
@@ -294,6 +315,7 @@ export async function approveMembership(membershipId, adminId, now = new Date())
             phone: profile?.mobile || '',
             photoUrl: profile?.photoUrl || '',
             memberNo: membership.memberNo,
+            memberId: membership.memberId,
             approvalSeq: primarySeq,
             approvedAt: now,
             approvedBy: adminId,
@@ -303,6 +325,7 @@ export async function approveMembership(membershipId, adminId, now = new Date())
           }], { session });
         } else {
           primaryFamilyMember.memberNo = membership.memberNo;
+          primaryFamilyMember.memberId = membership.memberId;
           primaryFamilyMember.approvalSeq = primarySeq;
           primaryFamilyMember.approvedAt = now;
           primaryFamilyMember.approvedBy = adminId;
@@ -323,6 +346,7 @@ export async function approveMembership(membershipId, adminId, now = new Date())
           after: {
             membership: String(membership._id),
             memberNo: primaryFamilyMember.memberNo,
+            memberId: primaryFamilyMember.memberId,
             approvalSeq: primaryFamilyMember.approvalSeq,
             isPrimary: true,
           },
@@ -353,10 +377,7 @@ export async function approveMembership(membershipId, adminId, now = new Date())
         nominee.status = 'active';
         nominee.approvedAt = now;
         nominee.approvedBy = adminId;
-        const addedOrder = nominees.findIndex((item) => item._id.toString() === nominee._id.toString()) + 1;
-        nominee.memberNo = takesNomineeSeq
-          ? `${membership.memberNo}${familySuffix(nominee, addedOrder)}`
-          : '';
+        nominee.memberNo = '';
         if (takesNomineeSeq) nominee.approvalSeq = sequences[index + 1];
         await nominee.save({ session });
         activatedNominees.push(nominee);
@@ -420,12 +441,11 @@ export async function confirmNomineeEmail(nomineeId, confirmedAt = new Date()) {
           isNominee: true,
           status: { $ne: 'removed' },
         }).session(session).sort({ createdAt: 1, _id: 1 });
-        const addedOrder = nominees.findIndex((item) => item._id.toString() === nominee._id.toString()) + 1;
         if (config.nomineesTakeApprovalSeq && nominee.approvalSeq == null) {
           const [sequence] = await assignSeqBatch(session, 1);
           nominee.approvalSeq = sequence;
-          nominee.memberNo = `${primary.memberNo}${familySuffix(nominee, addedOrder)}`;
         }
+        nominee.memberNo = '';
         newlyActivated = nominee.status !== 'active' || !nominee.approvedAt;
         nominee.status = 'active';
         nominee.approvedAt ||= confirmedAt;
@@ -505,7 +525,7 @@ export async function runApprovalOverdueJob(now = new Date()) {
         data: {
           firstName: membership.user?.firstName || 'Member',
           planName: tier,
-          memberId: membership.memberNo || String(membership._id),
+          memberId: String(membership._id),
           approvalDueAt: membership.approvalDueAt?.toISOString() || '',
         },
       });

@@ -190,7 +190,7 @@ export default function RenewDashboardTab() {
     setMessage('');
     try {
       await startMembershipRenewal(selectedPlanId, paymentMethod);
-      setMessage('Pending admin confirmation. Please contact the club with your member code and arrange payment using the selected method.');
+      setMessage('Pending admin confirmation. Please contact the club with your Member ID and arrange payment using the selected method.');
       setPendingPaymentId('');
       setPendingPlanId('');
       await load();
@@ -257,7 +257,7 @@ export default function RenewDashboardTab() {
                 {processing ? 'Submitting…' : 'Request offline renewal'}
               </button>
             </form>
-            <p className="member-hub__subtle">Offline renewals remain pending until an admin confirms payment. Contact the club with your member code and payment reference.</p>
+            <p className="member-hub__subtle">Offline renewals remain pending until an admin confirms payment. Contact the club with your Member ID and payment reference.</p>
           </div>}
         </>}
     <button className="member-hub__retry" type="button" onClick={load} disabled={processing}>Refresh renewal status</button>

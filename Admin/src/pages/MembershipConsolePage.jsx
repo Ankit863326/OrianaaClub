@@ -77,7 +77,7 @@ export default function MembershipConsolePage({ section }) {
 
   const billColumns = [
     { key: 'createdAt', label: 'Date', render: (row) => formatDate(row.createdAt) },
-    { key: 'memberCode', label: 'Member code', render: (row) => row.formattedMemberCode || row.memberCode },
+    { key: 'memberCode', label: 'Member ID', render: (row) => row.formattedMemberCode || row.memberCode || '—' },
     { key: 'serviceType', label: 'Service' },
     { key: 'billId', label: 'Bill ID' },
     { key: 'billAmount', label: 'Bill', render: (row) => formatRupees(row.billAmount) },
@@ -132,7 +132,7 @@ export default function MembershipConsolePage({ section }) {
         <FormField label="To"><input className={controlClass} type="date" value={filters.to} onChange={(event) => updateFilter(setFilters, filters, 'to', event.target.value)} /></FormField>
         <FormField label="Service type"><select className={controlClass} value={filters.serviceType} onChange={(event) => updateFilter(setFilters, filters, 'serviceType', event.target.value)}><option value="">All services</option>{services.map((item) => <option key={item}>{item}</option>)}</select></FormField>
         <FormField label="Status"><select className={controlClass} value={filters.status} onChange={(event) => updateFilter(setFilters, filters, 'status', event.target.value)}><option value="">All statuses</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select></FormField>
-        <FormField label="Member code"><input className={controlClass} value={filters.memberCode} onChange={(event) => updateFilter(setFilters, filters, 'memberCode', event.target.value)} /></FormField>
+        <FormField label="Member ID"><input className={controlClass} value={filters.memberCode} onChange={(event) => updateFilter(setFilters, filters, 'memberCode', event.target.value)} /></FormField>
         <Button className="sm:col-span-2 xl:col-span-5" variant="secondary" onClick={() => downloadMembershipBills(filters).catch((failure) => setError(errorMessage(failure)))}>Export CSV</Button>
       </Panel>
       <DataTable columns={billColumns} rows={asItems(data)} empty="No bills match these filters." />
@@ -142,7 +142,7 @@ export default function MembershipConsolePage({ section }) {
     {section === 'queue' && data && <div className="grid gap-5">
       <Panel><h2 className="mb-3 font-display text-xl">Pending verification and payments</h2><DataTable columns={[
         { key: 'member', label: 'Member', render: (row) => row.user?.firstName || row.user?.email || '—' },
-        { key: 'memberCode', label: 'Member code', render: (row) => row.formattedMemberCode || row.memberCode || '—' },
+        { key: 'memberCode', label: 'Member ID', render: (row) => row.formattedMemberCode || row.memberCode || '—' },
         { key: 'plan', label: 'Tier', render: (row) => row.plan?.name || '—' },
         { key: 'status', label: 'Status', render: (row) => <Badge>{row.status}</Badge> },
         { key: 'price', label: 'Price', render: (row) => formatRupees(row.plan?.price) },
@@ -155,7 +155,7 @@ export default function MembershipConsolePage({ section }) {
       <Panel><h2 className="mb-3 font-display text-xl">Pending family requests</h2><DataTable columns={[
         { key: 'name', label: 'Member', render: (row) => row.name || row.fullName || '—' },
         { key: 'pendingAction', label: 'Request' },
-        { key: 'membership', label: 'Membership', render: (row) => row.membership?.memberCode || row.membership?.memberNumber || '—' },
+        { key: 'membership', label: 'Membership', render: (row) => row.membership?.memberCode || '—' },
         { key: 'action', label: '', render: (row) => <div className="flex gap-2"><Button onClick={() => decideFamilyRequest(row._id, true)}>Approve</Button><Button variant="danger" onClick={() => decideFamilyRequest(row._id, false)}>Reject</Button></div> },
       ]} rows={queueFamily} empty="No family requests are waiting for approval." /></Panel>
       <Pagination info={data.membershipPagination} onPage={setQueuePage} />
@@ -196,7 +196,7 @@ export default function MembershipConsolePage({ section }) {
         { key: 'totalAmount', label: 'Total', render: (row) => formatRupees(Number(row.totalAmount || 0) / 100) },
       ]} rows={data.paymentsByMethod} empty="No confirmed payments." /></Panel>
       <Panel className="sm:col-span-2 xl:col-span-4"><h2 className="mb-3 font-display text-xl">Points expiring soon</h2><DataTable columns={[
-        { key: 'memberCode', label: 'Member code', render: (row) => row.formattedMemberCode || row.memberCode },
+        { key: 'memberCode', label: 'Member ID', render: (row) => row.formattedMemberCode || row.memberCode || '—' },
         { key: 'pointsBalance', label: 'Points', render: (row) => `${formatPoints(row.pointsBalance)} pts` },
         { key: 'pointsExpireAt', label: 'Expiry', render: (row) => formatDate(row.pointsExpireAt) },
       ]} rows={data.expiring90.items} empty="No points are expiring in the next 90 days." /></Panel>

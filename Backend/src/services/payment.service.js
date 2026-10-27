@@ -12,7 +12,7 @@ import AuditLog from '../models/AuditLog.js';
 import Counter from '../models/Counter.js';
 import { getNextMemberNumber } from './membership-id.service.js';
 import { getSettings } from '../models/Setting.js';
-import { generateMemberCode, getMembershipMemberCode } from '../utils/memberCode.js';
+import { getMembershipMemberCode } from '../utils/memberCode.js';
 import User from '../models/User.js';
 import Plan from '../models/Plan.js';
 import { sendMail } from './mail.service.js';
@@ -23,6 +23,7 @@ import { env } from '../config/env.js';
 import { requireCurrentTermsConsent } from './terms.service.js';
 import Verification from '../models/Verification.js';
 import { calculateMemberPrice } from './pricing.service.js';
+import { allocateMemberId } from './member-id.service.js';
 
 const activeMembershipBlockedMessage = 'You already have an active membership. Renewal or upgrade opens when your points are fully used or expired.';
 const renewableMembershipMessage = 'Your points are fully used (or expired). You can renew or upgrade your plan.';
@@ -771,19 +772,7 @@ async function activateMembershipInTransaction(
     if (previous.pointsBalance > 0 && (!previous.pointsExpireAt || previous.pointsExpireAt > now)) {
       throw new ApiError(409, 'Renewal cannot be activated while unexpired points remain.');
     }
-    const previousMemberNumber = Number(previous.memberNumber);
-    if (Number.isSafeInteger(previousMemberNumber) && previousMemberNumber > 0) {
-      memberNumber = String(previousMemberNumber);
-    } else {
-      memberNumber = String(await getNextMemberNumber(session));
-      previous.memberNumber = memberNumber;
-    }
-    memberCode = generateMemberCode(memberNumber);
-    if (previous.memberCode !== memberCode) {
-      previous.memberCode = memberCode;
-      previous.memberNumber = memberNumber;
-      await previous.save({ session });
-    }
+    memberNumber = String(await getNextMemberNumber(session));
     pointsGranted = plan.renewalPoints;
     if (previous.status === 'active') {
       const expiredPrevious = await Membership.updateOne(
@@ -805,11 +794,15 @@ async function activateMembershipInTransaction(
     memberNumber = String(sequence);
     earlyBirdApplied = sequence <= settings.earlyBirdLimit;
     pointsGranted = earlyBirdApplied ? plan.earlyBirdPoints : plan.defaultPoints;
-    memberCode = generateMemberCode(sequence);
   }
 
   const pointsExpireAt = addUtcYears(now, settings.pointsValidityYears);
   const membershipExpireAt = addUtcYears(now, settings.membershipValidityYears);
+  memberCode = await allocateMemberId({
+    activatedAt: now,
+    expiresAt: membershipExpireAt,
+    session,
+  });
   const activation = await Membership.updateOne(
     { _id: membership._id, status: fromStatus },
     {
@@ -823,6 +816,8 @@ async function activateMembershipInTransaction(
         earlyBirdApplied,
         memberNumber,
         memberCode,
+        memberNo: memberCode,
+        memberId: memberCode,
         startDate: now,
         endDate: membershipExpireAt,
       },
@@ -869,6 +864,8 @@ async function activateMembershipInTransaction(
         phone: profile?.mobile || '',
         photoUrl: profile?.photoUrl || '',
         isPrimary: true,
+        memberNo: memberCode,
+        memberId: memberCode,
         addedBy: 'system',
         status: 'active',
       }], { session });
@@ -884,6 +881,10 @@ async function activateMembershipInTransaction(
           isPrimary: true,
         },
       }], { session });
+    } else {
+      existingPrimary.memberNo = memberCode;
+      existingPrimary.memberId = memberCode;
+      await existingPrimary.save({ session });
     }
   }
 

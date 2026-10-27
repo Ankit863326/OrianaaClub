@@ -119,6 +119,7 @@ export default function FamilyCheckoutPage() {
         <p className="family-verify__eyebrow">Payment received</p>
         <h2 id="family-payment-success">Payment verified</h2>
         <p>The family membership payment was confirmed. It is now waiting for membership approval.</p>
+        <p>Member ID: <strong>—</strong> (assigned after membership approval).</p>
         <Link className="family-verify__secondary-link" to="/dashboard?tab=Family">Return to Family</Link>
       </section> : quote && <section className="family-verify__card" aria-labelledby="family-payment-summary">
         <h2 id="family-payment-summary">{quote.name || 'Family member'}</h2>

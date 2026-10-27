@@ -351,7 +351,11 @@ describe('points and payment services', () => {
     expect(getMembershipCohort(plan, 7).amount).toBe(100000);
     expect(getMembershipCohort(plan, 11).amount).toBe(50000);
     expect(getMembershipCohort(plan, 0)).toBeNull();
-    expect(formatMemberId(12)).toBe('265110100012');
+    expect(formatMemberId({
+      activatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      expiresAt: new Date('2051-01-01T00:00:00.000Z'),
+      sequence: 12,
+    })).toBe('OC-265111000012');
   });
 
   test('credits and debits points atomically, supports idempotency, and blocks overspending', async () => {

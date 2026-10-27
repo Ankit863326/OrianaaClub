@@ -80,10 +80,7 @@ export default function Dashboard() {
                 <>
                   <h2>{membership.plan?.title || 'Orianaa Club Membership'}</h2>
                   <p>{membership.plan?.subtitle}</p>
-                  {membership.memberId && <p className="dashboard-member-id">Member ID <strong>{membership.memberId}</strong></p>}
-                  {!membership.memberId && membership.memberNumber && (
-                    <p className="dashboard-member-id">Member number <strong>{membership.memberNumber}</strong></p>
-                  )}
+                  <p className="dashboard-member-id">Member ID <strong>{membership.memberId || '—'}</strong></p>
                 </>
               ) : (
                 <div className="dashboard-empty-membership">

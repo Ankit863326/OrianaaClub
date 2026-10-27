@@ -1,13 +1,6 @@
 import { DEFAULT_FAMILY_MEMBERSHIP_CONFIG, getSettings } from '../models/Setting.js';
+import { getFamilyTier } from './family-tier.service.js';
 import ApiError from '../utils/ApiError.js';
-
-function normalizeTier(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 function memberTypeOf(member = {}) {
   if (member.isNominee || ['nominee', 'nominee_gm', 'nominee_hr'].includes(member.memberType)) {
@@ -72,8 +65,8 @@ export async function validateFamilyProfileSet({ plan, members, purchaseDate = n
   if (!plan) throw new ApiError(409, 'Select a membership plan before adding family profiles.');
   const settings = await getSettings({ forceRefresh: true });
   const config = settings.familyMembership || DEFAULT_FAMILY_MEMBERSHIP_CONFIG;
-  const tierName = normalizeTier(plan.tier || plan.slug || plan.id || plan.name || plan.title);
-  const tier = config.tiers.find((item) => normalizeTier(item.tier) === tierName);
+  const limits = config.limits || {};
+  const tier = getFamilyTier(plan, config.tiers);
   if (!tier) throw new ApiError(400, 'A supported membership tier is required.');
 
   const categorized = members
@@ -90,8 +83,8 @@ export async function validateFamilyProfileSet({ plan, members, purchaseDate = n
   }
 
   const spouseCount = relatives.filter(({ type }) => type === 'spouse').length;
-  if (spouseCount > config.limits.spouse) {
-    throw new ApiError(409, `This tier allows up to ${config.limits.spouse} spouse.`);
+  if (limits.spouse != null && spouseCount > limits.spouse) {
+    throw new ApiError(409, `This tier allows up to ${limits.spouse} spouse.`);
   }
 
   const parents = relatives.filter(({ type }) => ['father', 'mother'].includes(type));
@@ -102,20 +95,20 @@ export async function validateFamilyProfileSet({ plan, members, purchaseDate = n
   ))) {
     throw new ApiError(400, 'Choose whether each parent is from the member or spouse side.');
   }
-  if (parents.length > config.limits.parents) {
-    throw new ApiError(409, `This tier allows up to ${config.limits.parents} parents.`);
+  if (limits.parents != null && parents.length > limits.parents) {
+    throw new ApiError(409, `This tier allows up to ${limits.parents} parents.`);
   }
   for (const side of ['member', 'spouse']) {
-    if (parents.filter(({ member }) => (
+    if (limits.parentsPerSide != null && parents.filter(({ member }) => (
       (member.parentSide || 'member') === side
-    )).length > config.limits.parentsPerSide) {
-      throw new ApiError(409, `A maximum of ${config.limits.parentsPerSide} parents is allowed per side.`);
+    )).length > limits.parentsPerSide) {
+      throw new ApiError(409, `A maximum of ${limits.parentsPerSide} parents is allowed per side.`);
     }
   }
 
   const children = relatives.filter(({ type }) => type === 'child');
-  if (config.limits.children !== null && children.length > config.limits.children) {
-    throw new ApiError(409, `This tier allows up to ${config.limits.children} children.`);
+  if (limits.children != null && children.length > limits.children) {
+    throw new ApiError(409, `This tier allows up to ${limits.children} children.`);
   }
   for (const { member } of children) {
     if (!member.dob && !member.dateOfBirth) {

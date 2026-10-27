@@ -31,7 +31,10 @@ export const getMembershipCheckoutQuote = asyncHandler(async (request, response)
 });
 
 export const getFamilyPriceBreakdown = asyncHandler(async (request, response) => {
-  const data = await memberService.getFamilyPriceBreakdown(request.validated.query.planId);
+  const data = await memberService.getFamilyPriceBreakdown(
+    request.user._id,
+    request.validated.query.planId,
+  );
   response.json({ success: true, data, message: 'Family prices loaded.' });
 });
 

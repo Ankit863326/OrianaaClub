@@ -1,5 +1,6 @@
 // Phase 5a: Validate admin search, member, family, and plan request payloads.
 import { z } from 'zod';
+import { optionalAnniversaryDateSchema } from './family-anniversary.schema.js';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i);
 const gender = z.enum(['male', 'female', 'other', 'prefer_not_to_say']);
@@ -99,6 +100,7 @@ export const familyPatchSchema = z.object({
   gender: gender.optional(),
   relationship: z.string().trim().min(1).max(40).optional(),
   dob: dateOfBirth.optional(),
+  anniversaryDate: optionalAnniversaryDateSchema,
 }).refine((values) => Object.keys(values).length > 0, 'At least one family field is required.');
 
 export const paymentsQuerySchema = paginationSchema.extend({

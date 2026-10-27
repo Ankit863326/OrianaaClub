@@ -16,7 +16,12 @@ import { applyPointsChange } from './point-change.service.js';
 import { findMemberMatches, memberSearchError } from './member-search.service.js';
 
 const hashApiKey = (key) => createHash('sha256').update(key).digest('hex');
-const normalizeMemberCode = (code) => code.trim().toUpperCase().replace(/^OC-/, '').replace(/[\s-]/g, '');
+const legacyCodePattern = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 8
+    ? new RegExp(`^${digits.split('').join('\\s*')}$`, 'i')
+    : /$a/;
+};
 const ledgerChannel = (channel = 'counter') => (
   channel === 'counter' ? 'billing_counter' : channel
 );
@@ -43,9 +48,8 @@ function datesEqual(left, right) {
   return new Date(left).getTime() === new Date(right).getTime();
 }
 
-function sameRedemption(redemption, membershipId, input, memberCode) {
+function sameRedemption(redemption, membershipId, input) {
   return String(redemption.membership) === String(membershipId)
-    && redemption.memberCode === memberCode
     && redemption.bookingId === (input.bookingId || '')
     && redemption.serviceType === input.serviceType
     && datesEqual(redemption.eventDate, input.eventDate)
@@ -66,7 +70,7 @@ async function findMembership({ memberCode, phone }) {
     byPhone = selectBillableMembership(matches);
   }
   if (byCode && byPhone && String(byCode._id) !== String(byPhone._id)) {
-    throw new ApiError(409, 'The member code and phone number refer to different memberships.');
+    throw new ApiError(409, 'The Member ID and phone number refer to different memberships.');
   }
   const membership = byCode || byPhone;
   if (!membership) throw new ApiError(404, 'Active membership was not found.');
@@ -157,12 +161,12 @@ async function validateRedemption(membership, input, session = null) {
   };
 }
 
-async function existingRedemption(billId, membershipId, input, memberCode, session = null) {
+async function existingRedemption(billId, membershipId, input, session = null) {
   const query = Redemption.findOne({ billId });
   if (session) query.session(session);
   const existing = await query;
   if (!existing) return null;
-  if (!sameRedemption(existing, membershipId, input, memberCode)) {
+  if (!sameRedemption(existing, membershipId, input)) {
     throw new ApiError(409, 'This bill ID was already used with different redemption details.');
   }
   return {
@@ -305,7 +309,7 @@ async function compensateFailedRedemption(membershipId, input, amount) {
 export async function redeem(input, apiKeyId) {
   const membership = await findMembership({ memberCode: input.memberCode });
   const memberCode = getMembershipMemberCode(membership);
-  const duplicate = await existingRedemption(input.billId, membership._id, input, memberCode);
+  const duplicate = await existingRedemption(input.billId, membership._id, input);
   if (duplicate) return duplicate;
   const validation = await validateRedemption(membership, input);
   const calculation = {
@@ -315,7 +319,7 @@ export async function redeem(input, apiKeyId) {
 
   try {
     return await executeWithTransaction(async (session) => {
-      const duplicateInTransaction = await existingRedemption(input.billId, membership._id, input, memberCode, session);
+      const duplicateInTransaction = await existingRedemption(input.billId, membership._id, input, session);
       if (duplicateInTransaction) return duplicateInTransaction;
       const latest = await Membership.findById(membership._id).session(session).lean();
       if (!latest) throw new ApiError(404, 'Membership was not found.');
@@ -341,7 +345,7 @@ export async function redeem(input, apiKeyId) {
     });
   } catch (error) {
     if (error?.code === 11000) {
-      const previous = await existingRedemption(input.billId, membership._id, input, memberCode);
+      const previous = await existingRedemption(input.billId, membership._id, input);
       if (previous) return previous;
     }
     throw error;
@@ -476,7 +480,20 @@ export async function listRedemptions(query) {
   } else if (query.channel) {
     filter.channel = query.channel;
   }
-  if (query.memberCode) filter.memberCode = normalizeMemberCode(query.memberCode);
+  if (query.memberCode) {
+    const search = String(query.memberCode).trim();
+    const legacyPattern = legacyCodePattern(search);
+    const memberships = await Membership.find({
+      $or: [
+        { memberCode: search },
+        { memberNo: search },
+        { legacyMemberCode: legacyPattern },
+      ],
+    }).select('_id').lean();
+    const membershipIds = memberships.map((membership) => membership._id);
+    if (membershipIds.length) filter.membership = { $in: membershipIds };
+    else filter.memberCode = { $in: [search, search.replace(/\s+/g, '')] };
+  }
   if (query.from || query.to) {
     filter.createdAt = {};
     if (query.from) filter.createdAt.$gte = new Date(query.from);
@@ -490,7 +507,25 @@ export async function listRedemptions(query) {
     Redemption.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Redemption.countDocuments(filter),
   ]);
-  return { items, page, limit, total, pages: Math.ceil(total / limit) };
+  const memberships = items.length
+    ? await Membership.find({ _id: { $in: items.map((item) => item.membership) } })
+      .select('_id memberCode memberNo memberNumber legacyMemberCode')
+      .lean()
+    : [];
+  const memberCodeById = new Map(memberships.map((membership) => [
+    String(membership._id),
+    getMembershipMemberCode(membership),
+  ]));
+  return {
+    items: items.map((item) => ({
+      ...item,
+      displayMemberCode: memberCodeById.get(String(item.membership)) || '',
+    })),
+    page,
+    limit,
+    total,
+    pages: Math.ceil(total / limit),
+  };
 }
 
 export async function getMembershipLedger(membershipId, query) {
