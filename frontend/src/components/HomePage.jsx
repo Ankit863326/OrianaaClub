@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 // import beachImage from "../assets/beachh.jpg";
 import heroVideo from "../assets/OrianaaClub_promo_video_creation_20261019122757.mp4";
 import LuxuryContactDrawer from "./LuxuryContactDrawer";
+import saptagiriimg from "../assets/Lush Luxury Resort Pool Retreat.jpg.jpeg"
 import "./HomePage.css";
 
 const destinations = [
@@ -13,7 +14,7 @@ const destinations = [
     place: "Yewalewadi, Pune Maharashtra",
     headline: "Room to find your own away",
     image:
-      "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1000&q=85",
+      saptagiriimg,
   },
   {
     name: "Saptagiri Resort",
