@@ -187,44 +187,7 @@ export default function MembershipBenefits() {
         </div>
       </section>
 
-      {/* ══ JOIN THE ORIANAA CLUB ══════════════════════════════ */}
-      <section className="mb-join-section">
-        <div className="mb-join-card">
-          <motion.div
-            className="mb-join-image-wrap"
-            initial={{ opacity: 0, x: -40 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-70px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <img
-              src="https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=85"
-              alt="Orianaa Club bedroom suite"
-              className="mb-join-image"
-            />
-          </motion.div>
-
-          <motion.div
-            className="mb-join-content"
-            initial={{ opacity: 0, x: 40 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-70px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <h2 className="mb-join-title">
-              Join The
-              <br />
-              Orianaa Club
-            </h2>
-            <p className="mb-join-desc">
-              Join our circle for private invitations and stories from the Orianaa world.
-            </p>
-            <Link to="/luxury-membership" className="mb-join-btn">
-              Contact Us
-            </Link>
-          </motion.div>
-        </div>
-      </section>
+      
     </main>
   );
 }

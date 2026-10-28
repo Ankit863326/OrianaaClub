@@ -19,6 +19,13 @@
   --mb-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+.mb-page,
+.mb-page *,
+.mb-page *::before,
+.mb-page *::after {
+  box-sizing: border-box;
+}
+
 .mb-page {
   background: var(--mb-paper);
   color: var(--mb-ink);
@@ -102,7 +109,10 @@
 }
 
 .mb-hero__cta {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   padding: 14px 34px;
   border-radius: 999px;
   background: var(--mb-green);

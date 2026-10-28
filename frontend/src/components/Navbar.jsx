@@ -173,7 +173,7 @@ const Navbar = () => {
               </div>
             ) : (
               <>
-                <Button asChild variant="outline" className={`home-nav__sign-in${activeNav === "sign-in" ? " is-active" : ""}`}>
+                <Button asChild variant="default" className={`home-nav__membership home-nav__sign-in${activeNav === "sign-in" ? " is-active" : ""}`}>
                   <Link to="/login">Login</Link>
                 </Button>
                 <Button variant="default" className={`home-nav__membership${activeNav === "membership" ? " is-active" : ""}`} onClick={handleJoinMembership}>

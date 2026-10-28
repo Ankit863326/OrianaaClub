@@ -267,7 +267,7 @@ export default function Events() {
                 whileHover={{ scale: 1.04, y: -2 }}
                 whileTap={{ scale: 0.97 }}
               >
-                Add Membership
+                Buy Membership
               </Motion.button>
             </div>
           </div>
@@ -437,35 +437,7 @@ export default function Events() {
         </div>
       </section>
 
-      {/* ========================================================
-          FINAL CTA
-      ======================================================== */}
-      <section className="ev2-cta">
-        <Motion.div
-          className="ev2-cta__inner"
-          initial={{ opacity: 0, scale: 0.96 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-        >
-          <p className="ev2-eyebrow ev2-eyebrow--dark">
-            <Sparkles size={12} className="ev2-sparkle-dark" /> Plan Your Escape
-          </p>
-          <h2 className="ev2-cta__heading">Reserve Your Place<br />at the Table</h2>
-          <p className="ev2-cta__sub">
-            Discover resort experiences and create a stay around the celebrations, seasons and moments you love.
-          </p>
-          <Motion.button
-            type="button"
-            className="ev2-cta__btn"
-            onClick={() => navigate("/luxury-membership")}
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.97 }}
-          >
-            Explore Membership <ArrowRight size={15} />
-          </Motion.button>
-        </Motion.div>
-      </section>
+      
     </main>
   );
 }
