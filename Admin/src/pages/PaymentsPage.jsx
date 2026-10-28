@@ -36,10 +36,9 @@ function paymentEditValues(payment) {
 }
 
 function paymentErrorMessage(error) {
-  if ((error.response?.status ?? 0) >= 500) {
-    return 'Payments could not be loaded or updated right now. Please try again shortly.';
-  }
-  return error.response?.data?.message || 'The payment request could not be completed. Please try again.';
+  return error.response?.data?.message
+    || error.message
+    || 'The payment request could not be completed. Please try again.';
 }
 
 export default function PaymentsPage() {
@@ -76,6 +75,7 @@ export default function PaymentsPage() {
       if (action === 'confirm-offline') {
         const result = await adminApi.confirmOfflinePayment(selected._id);
         setAction('');
+        setError('');
         setNotice(result.alreadyConfirmed
           ? 'Payment was already confirmed and the membership is active.'
           : 'Payment confirmed. Membership activated and Member ID assigned.');
@@ -89,6 +89,7 @@ export default function PaymentsPage() {
         await adminApi.changePaymentMethod(selected._id, paymentEdit);
         const fresh = await adminApi.payment(selected._id);
         setAction('');
+        setError('');
         setSelected(fresh);
         setPaymentEdit(paymentEditValues(fresh));
         setNotice('Payment method and details saved.');
@@ -98,6 +99,7 @@ export default function PaymentsPage() {
       if (action === 'approve-membership-verification') {
         await adminApi.approveMembershipVerification(selected.membership._id);
         setAction('');
+        setError('');
         setNotice('Membership verification approved and membership is now active.');
         setSelected(await adminApi.payment(selected._id));
         setFilters({ ...filters });
@@ -107,7 +109,7 @@ export default function PaymentsPage() {
         : action === 'refund' ? { amount: Math.round(Number(amount) * 100), reason, reversePoints }
           : {};
       await adminApi.paymentAction(selected._id, action, body);
-      setAction(''); setReason(''); setNotice('Payment action completed.');
+      setAction(''); setReason(''); setError(''); setNotice('Payment action completed.');
       const fresh = await adminApi.payment(selected._id);
       setSelected(fresh);
       setPaymentEdit(paymentEditValues(fresh));

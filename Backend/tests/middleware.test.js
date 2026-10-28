@@ -146,17 +146,22 @@ describe('request validation and file upload', () => {
 
 describe('error responses and NoSQL input sanitizing', () => {
   test('development errors include a stack but not headers-sent errors are reprocessed', () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
     const response = {
       headersSent: false,
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
     };
-    errorHandler(new Error('broken'), {}, response, jest.fn());
+    errorHandler(new Error('broken Bearer test-secret'), { method: 'GET', path: '/payments' }, response, jest.fn());
     expect(response.json.mock.calls[0][0]).toHaveProperty('stack');
+    expect(response.json.mock.calls[0][0].message).toContain('broken');
+    expect(response.json.mock.calls[0][0].message).not.toContain('test-secret');
+    expect(log.mock.calls[0][0]).toContain('Error: broken Bearer [redacted]');
     expect(response.status).toHaveBeenCalledWith(500);
     const next = jest.fn();
     errorHandler(new Error('late failure'), {}, { headersSent: true }, next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'late failure' }));
+    log.mockRestore();
   });
 
   test('removes operator and dotted keys recursively without damaging raw buffers', () => {

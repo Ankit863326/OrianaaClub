@@ -124,7 +124,12 @@ export const paymentsQuerySchema = paginationSchema.extend({
 export const paymentMethodChangeSchema = z.object({
   method: z.enum(['bank_transfer', 'cheque', 'cash', 'upi', 'netbanking']),
   reference: z.string().trim().max(200).optional().default(''),
-  invoiceNumber: z.string().trim().max(100).optional().default(''),
+  invoiceNumber: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string().trim().min(3).max(100)
+      .regex(/^[A-Z\d][A-Z\d/-]*$/i, 'Enter a valid invoice number.')
+      .optional(),
+  ).transform((value) => value || ''),
   reason: z.string().trim().min(1, 'A reason is required to change payment details.').max(500),
 }).superRefine((body, context) => {
   if (['bank_transfer', 'upi'].includes(body.method) && !body.reference) {

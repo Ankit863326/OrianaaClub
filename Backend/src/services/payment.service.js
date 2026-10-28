@@ -263,6 +263,20 @@ async function incrementCounter(name, session) {
   return counter.value;
 }
 
+async function allocateInvoiceNumber(session, paymentId) {
+  const year = new Date().getUTCFullYear();
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const sequence = await incrementCounter(`invoice-${year}`, session);
+    const invoiceNumber = `INV-${year}-${String(sequence).padStart(6, '0')}`;
+    const duplicate = await Payment.exists({
+      invoiceNumber,
+      ...(paymentId ? { _id: { $ne: paymentId } } : {}),
+    }).session(session);
+    if (!duplicate) return invoiceNumber;
+  }
+  throw new ApiError(503, 'An invoice number could not be allocated. Please retry confirmation.');
+}
+
 function paiseToWholeRupees(paise) {
   if (!Number.isSafeInteger(paise) || paise < 0) {
     throw new ApiError(409, 'The saved payment amount is invalid.');
@@ -302,11 +316,13 @@ export async function finalizePayment(paymentId, options = {}) {
         throw new ApiError(409, 'A verified Razorpay payment is required before confirmation.');
       }
       let invoiceNumber = payment.invoiceNumber;
-      if (!invoiceNumber) {
-        const year = new Date().getUTCFullYear();
-        const invoiceSequence = await incrementCounter(`invoice-${year}`, session);
-        invoiceNumber = `INV-${year}-${String(invoiceSequence).padStart(6, '0')}`;
+      if (invoiceNumber && await Payment.exists({
+        invoiceNumber,
+        _id: { $ne: payment._id },
+      }).session(session)) {
+        invoiceNumber = '';
       }
+      if (!invoiceNumber) invoiceNumber = await allocateInvoiceNumber(session, payment._id);
       const now = new Date();
       if (!['pending_approval', 'active'].includes(membership.status)) {
         const settings = await getSettings({ forceRefresh: true });
@@ -1139,7 +1155,10 @@ export async function changePaymentMethod(paymentId, {
   if (['bank_transfer', 'upi'].includes(method) && !normalizedReference) {
     throw new ApiError(400, 'A UTR or reference number is required for this payment method.');
   }
-  if (utr && await Payment.exists({ _id: { $ne: payment._id }, utr })) {
+  if (utr && await Payment.exists({
+    _id: { $ne: payment._id },
+    $or: [{ utr }, { reference: utr }],
+  })) {
     throw new ApiError(409, 'This UTR or reference number is already assigned to another payment.');
   }
   const before = {
@@ -1151,7 +1170,23 @@ export async function changePaymentMethod(paymentId, {
   payment.reference = normalizedReference;
   payment.utr = utr;
   payment.invoiceNumber = invoiceNumber.trim();
-  await payment.save();
+  if (payment.invoiceNumber && await Payment.exists({
+    _id: { $ne: payment._id },
+    invoiceNumber: payment.invoiceNumber,
+  })) {
+    throw new ApiError(409, 'That invoice number is already assigned to another payment.');
+  }
+  try {
+    await payment.save();
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.utr) {
+      throw new ApiError(409, 'This UTR or reference number is already assigned to another payment.');
+    }
+    if (error.code === 11000 && error.keyPattern?.invoiceNumber) {
+      throw new ApiError(409, 'That invoice number is already assigned to another payment.');
+    }
+    throw error;
+  }
   return {
     ...payment.toObject(),
     methodChange: {
@@ -1177,6 +1212,13 @@ export async function confirmOfflineMembershipPayment(paymentId, adminId) {
   }
   if (['bank_transfer', 'upi'].includes(payment.method) && !(payment.reference || payment.utr)) {
     throw new ApiError(400, 'Enter the UTR or reference number before confirming this payment.');
+  }
+  const referenceNumber = payment.utr || payment.reference;
+  if (['bank_transfer', 'upi'].includes(payment.method) && referenceNumber && await Payment.exists({
+    _id: { $ne: payment._id },
+    $or: [{ utr: referenceNumber }, { reference: referenceNumber }],
+  })) {
+    throw new ApiError(409, 'This UTR or reference number is already assigned to another payment.');
   }
   if (!alreadyConfirmed) {
     await finalizePayment(payment._id, { adminId, markConfirmed: true });

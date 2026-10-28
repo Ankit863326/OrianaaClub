@@ -10,6 +10,7 @@ import User from '../src/models/User.js';
 import MembershipDraft from '../src/models/MembershipDraft.js';
 import Plan from '../src/models/Plan.js';
 import EmailLog from '../src/models/EmailLog.js';
+import Counter from '../src/models/Counter.js';
 
 const app = createApp();
 
@@ -237,7 +238,7 @@ describe('admin member and plan routes', () => {
       .send({
         method: 'bank_transfer',
         reference: 'UTR-QUE-123',
-        invoiceNumber: 'ADMIN-INV-001',
+        invoiceNumber: '',
         reason: 'Corrected payment method after checking the bank statement.',
       });
     expect(changed.status).toBe(200);
@@ -245,23 +246,67 @@ describe('admin member and plan routes', () => {
       method: 'bank_transfer',
       reference: 'UTR-QUE-123',
       utr: 'UTR-QUE-123',
-      invoiceNumber: 'ADMIN-INV-001',
     });
     expect(await AuditLog.findOne({ action: 'payment.method.change', entityId: chequeId })).toMatchObject({
       before: { method: 'cheque' },
       after: { method: 'bank_transfer' },
       reason: 'Corrected payment method after checking the bank statement.',
     });
+    const invoiceOwner = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    await Payment.create({
+      user: invoiceOwner.user._id,
+      membership: invoiceOwner.membership._id,
+      plan: plan._id,
+      method: 'cheque',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+      invoiceNumber: 'INVOICE-ALREADY-USED',
+    });
+    const duplicateInvoice = await adminRequest(admin, 'patch', `/api/admin/payments/${chequeId}/method`)
+      .send({
+        method: 'bank_transfer',
+        reference: 'UTR-QUE-123',
+        invoiceNumber: 'INVOICE-ALREADY-USED',
+        reason: 'Testing duplicate invoice protection.',
+      });
+    expect(duplicateInvoice.status).toBe(409);
 
-    const firstConfirm = await adminRequest(admin, 'patch', `/api/admin/payments/${chequeId}/confirm`);
+    const duplicateReferenceMember = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    await Payment.create({
+      user: duplicateReferenceMember.user._id,
+      membership: duplicateReferenceMember.membership._id,
+      plan: plan._id,
+      method: 'cheque',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+      reference: 'UTR-QUE-123',
+    });
+    const duplicateUtr = await adminRequest(admin, 'patch', `/api/admin/payments/${chequeId}/method`)
+      .send({
+        method: 'upi',
+        reference: 'UTR-QUE-123',
+        reason: 'Testing duplicate UTR protection.',
+      });
+    expect(duplicateUtr.status).toBe(409);
+      await Payment.deleteOne({ membership: duplicateReferenceMember.membership._id });
+
+      const firstConfirm = await adminRequest(admin, 'patch', `/api/admin/payments/${chequeId}/confirm`);
     expect(firstConfirm.status).toBe(200);
     expect(firstConfirm.body.data.payment).toMatchObject({
       status: 'confirmed',
       method: 'bank_transfer',
       reference: 'UTR-QUE-123',
       utr: 'UTR-QUE-123',
-      invoiceNumber: 'ADMIN-INV-001',
     });
+    expect(firstConfirm.body.data.payment.invoiceNumber).toMatch(/^INV-\d{4}-\d{6}$/);
     expect(firstConfirm.body.data.payment.receiptNumber).toMatch(/^OC-R-\d{4}-\d{6}$/);
     expect(firstConfirm.body.data.membership.status).toBe('active');
     expect(firstConfirm.body.data.membership.memberId).toBeTruthy();
@@ -295,6 +340,27 @@ describe('admin member and plan routes', () => {
     const cashRecorded = await adminRequest(admin, 'post', '/api/admin/payments')
       .send({ membershipId: String(cashMember.membership._id), method: 'cash' });
     expect(cashRecorded.status).toBe(201);
+    const year = new Date().getUTCFullYear();
+    const counterName = `invoice-${year}`;
+    await Counter.findOneAndUpdate(
+      { name: counterName },
+      { $set: { value: 1 }, $setOnInsert: { name: counterName } },
+      { upsert: true, new: true },
+    );
+    const collisionMember = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    await Payment.create({
+      user: collisionMember.user._id,
+      membership: collisionMember.membership._id,
+      plan: plan._id,
+      method: 'cheque',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+      invoiceNumber: `INV-${year}-000002`,
+    });
     const cashConfirm = await adminRequest(admin, 'patch', `/api/admin/payments/${cashRecorded.body.data._id}/confirm`);
     expect(cashConfirm.status).toBe(200);
     expect(cashConfirm.body.data.payment).toMatchObject({
@@ -303,7 +369,7 @@ describe('admin member and plan routes', () => {
       reference: '',
       utr: '',
     });
-    expect(cashConfirm.body.data.payment.invoiceNumber).toMatch(/^INV-\d{4}-\d{6}$/);
+    expect(cashConfirm.body.data.payment.invoiceNumber).toBe(`INV-${year}-000003`);
     expect(cashConfirm.body.data.membership.status).toBe('active');
     expect(cashConfirm.body.data.membership.memberId).toBeTruthy();
   });
