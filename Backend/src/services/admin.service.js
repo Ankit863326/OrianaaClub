@@ -283,28 +283,14 @@ export async function listPlans(query) {
 
 export async function listPayments(query) {
   const { page, limit, skip } = pagination(query);
-  const filter = {};
-  if (query.status) filter.status = query.status;
-  if (query.method) filter.method = query.method;
-  if (query.from || query.to) {
-    filter.createdAt = {};
-    if (query.from) filter.createdAt.$gte = new Date(query.from);
-    if (query.to) {
-      const end = new Date(query.to);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) end.setUTCHours(23, 59, 59, 999);
-      filter.createdAt.$lte = end;
-    }
-  }
+  const filter = paymentFilter(query);
   const [items, total] = await Promise.all([
-    Payment.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
-      .populate('user', 'firstName email')
-      .populate('plan', 'title name slug')
-      .populate('membership', 'memberId memberCode memberNo memberNumber status')
-      .lean(),
+    Payment.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     Payment.countDocuments(filter),
   ]);
+  const hydratedItems = await hydratePaymentReferences(items);
   return {
-    items: items.map((payment) => ({
+    items: hydratedItems.map((payment) => ({
       ...payment,
       canDownloadReceipt: payment.status === 'confirmed',
     })),
@@ -316,37 +302,83 @@ export async function listPayments(query) {
 }
 
 export async function getPayment(paymentId) {
-  const payment = await Payment.findById(paymentId)
-    .populate('user', 'firstName email')
-    .populate('plan', 'title name slug')
-    .populate('membership', 'memberId memberNumber status verificationDocs');
+  const payment = await Payment.findById(paymentId).lean();
   if (!payment) throw new ApiError(404, 'Payment was not found.');
-  return payment;
+  return (await hydratePaymentReferences([payment], { includeVerificationDocs: true }))[0];
 }
 
-export async function streamPaymentsCsv(response, query) {
+function paymentFilter(query = {}) {
   const filter = {};
   if (query.status) filter.status = query.status;
   if (query.method) filter.method = query.method;
   if (query.from || query.to) {
     filter.createdAt = {};
-    if (query.from) filter.createdAt.$gte = new Date(query.from);
-    if (query.to) {
-      const end = new Date(query.to);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) end.setUTCHours(23, 59, 59, 999);
-      filter.createdAt.$lte = end;
-    }
+    if (query.from) filter.createdAt.$gte = new Date(`${query.from}T00:00:00.000Z`);
+    if (query.to) filter.createdAt.$lte = new Date(`${query.to}T23:59:59.999Z`);
   }
+  return filter;
+}
+
+async function hydratePaymentReferences(payments, { includeVerificationDocs = false } = {}) {
+  const validIds = (field) => [...new Set(payments
+    .map((payment) => payment[field])
+    .filter((id) => mongoose.isValidObjectId(id))
+    .map(String))];
+  const userIds = validIds('user');
+  const membershipIds = validIds('membership');
+  const planIds = [...new Set(payments
+    .filter((payment) => mongoose.isValidObjectId(payment.plan))
+    .map((payment) => `${payment.planModel || 'Plan'}:${payment.plan}`))];
+  const legacyPlanIds = planIds.filter((value) => value.startsWith('Plan:')).map((value) => value.slice(5));
+  const membershipPlanIds = planIds.filter((value) => value.startsWith('MembershipPlan:')).map((value) => value.slice(15));
+  const [users, memberships, legacyPlans, membershipPlans] = await Promise.all([
+    userIds.length ? User.find({ _id: { $in: userIds } }).select('firstName email').lean() : [],
+    membershipIds.length ? Membership.find({ _id: { $in: membershipIds } })
+      .select(`memberId memberCode memberNo memberNumber status${includeVerificationDocs ? ' verificationDocs' : ''}`).lean() : [],
+    legacyPlanIds.length ? Plan.find({ _id: { $in: legacyPlanIds } }).select('title name slug').lean() : [],
+    membershipPlanIds.length ? MembershipPlan.find({ _id: { $in: membershipPlanIds } }).select('title name slug').lean() : [],
+  ]);
+  const userById = new Map(users.map((item) => [String(item._id), item]));
+  const membershipById = new Map(memberships.map((item) => [String(item._id), item]));
+  const planByModelAndId = new Map([
+    ...legacyPlans.map((item) => [`Plan:${item._id}`, item]),
+    ...membershipPlans.map((item) => [`MembershipPlan:${item._id}`, item]),
+  ]);
+  return payments.map((payment) => {
+    const user = userById.get(String(payment.user)) || null;
+    const membership = membershipById.get(String(payment.membership)) || null;
+    const plan = planByModelAndId.get(`${payment.planModel || 'Plan'}:${payment.plan}`) || null;
+    const brokenReferences = [
+      !user && 'user',
+      !membership && 'membership',
+      !plan && 'plan',
+    ].filter(Boolean);
+    return { ...payment, user, membership, plan, brokenReferences };
+  });
+}
+
+export async function streamPaymentsCsv(response, query) {
+  const filter = paymentFilter(query);
   const { writeCsvHeader, writeCsvRow } = await import('../utils/csv.js');
   writeCsvHeader(response, 'oriana-payments.csv', ['Created', 'Member', 'Email', 'Plan', 'Method', 'Status', 'Base (paise)', 'GST (paise)', 'Total (paise)', 'Invoice']);
-  const cursor = Payment.find(filter).sort({ createdAt: -1 }).populate('user', 'firstName email').populate('plan', 'title').lean().cursor();
+  const cursor = Payment.find(filter).sort({ createdAt: -1 }).lean().cursor();
+  let batch = [];
+  const writeBatch = async () => {
+    const payments = await hydratePaymentReferences(batch);
+    for (const payment of payments) {
+      writeCsvRow(response, [
+        payment.createdAt?.toISOString(), payment.user?.firstName, payment.user?.email,
+        payment.plan?.title || payment.plan?.name, payment.method, payment.status, payment.baseAmount,
+        payment.gstAmount, payment.totalAmount, payment.invoiceNumber,
+      ]);
+    }
+    batch = [];
+  };
   for await (const payment of cursor) {
-    writeCsvRow(response, [
-      payment.createdAt?.toISOString(), payment.user?.firstName, payment.user?.email,
-      payment.plan?.title, payment.method, payment.status, payment.baseAmount,
-      payment.gstAmount, payment.totalAmount, payment.invoiceNumber,
-    ]);
+    batch.push(payment);
+    if (batch.length === 100) await writeBatch();
   }
+  if (batch.length) await writeBatch();
   response.end();
 }
 

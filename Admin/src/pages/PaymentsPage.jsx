@@ -2,12 +2,18 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { adminApi, downloadCsv } from '../api/admin.js';
-import { errorMessage } from '../api/client.js';
 import { getImageUrl } from '../api/image.js';
 import { DataTable, FormField, LoadingState, PageHeading, Pagination, Panel, Toast, Button, controlClass, formatPaise, formatDate } from '../components/ui.jsx';
 
 const statuses = ['created', 'pending', 'pending_verification', 'confirmed', 'paid', 'failed', 'rejected', 'refunded', 'partially_refunded'];
 const initialFilters = { page: 1, limit: 20, status: '', method: '', from: '', to: '' };
+
+function paymentErrorMessage(error) {
+  if ((error.response?.status ?? 0) >= 500) {
+    return 'Payments could not be loaded or updated right now. Please try again shortly.';
+  }
+  return error.response?.data?.message || 'The payment request could not be completed. Please try again.';
+}
 
 export default function PaymentsPage() {
   const [filters, setFilters] = useState(initialFilters);
@@ -26,12 +32,12 @@ export default function PaymentsPage() {
     setData(null);
     setError('');
     adminApi.payments(filters).then((result) => { if (active) setData(result); })
-      .catch((failure) => { if (active) setError(errorMessage(failure)); });
+      .catch((failure) => { if (active) setError(paymentErrorMessage(failure)); });
     return () => { active = false; };
   }, [filters]);
   async function openDetails(row) {
     try { setSelected(await adminApi.payment(row._id)); }
-    catch (failure) { setError(errorMessage(failure)); }
+    catch (failure) { setError(paymentErrorMessage(failure)); }
   }
   async function runAction(event) {
     event.preventDefault();
@@ -70,19 +76,26 @@ export default function PaymentsPage() {
       const fresh = await adminApi.payment(selected._id);
       setSelected(fresh);
       setFilters({ ...filters });
-    } catch (failure) { setError(errorMessage(failure)); }
+    } catch (failure) { setError(paymentErrorMessage(failure)); }
   }
+  const downloadPayments = () => downloadCsv('/admin/payments/export', filters)
+    .catch((failure) => setError(paymentErrorMessage(failure)));
   const columns = [
     { key: 'createdAt', label: 'Date', render: (row) => formatDate(row.createdAt) },
     { key: 'user', label: 'Member', render: (row) => row.user?.firstName || '—' },
     { key: 'plan', label: 'Plan', render: (row) => row.plan?.title || row.plan?.name || '—' },
     { key: 'method', label: 'Method', render: (row) => row.method === 'rtgs' ? 'RTGS' : row.method },
+    { key: 'references', label: 'Reference status', render: (row) => row.brokenReferences?.length
+      ? <span className="text-sm text-red-700" title={`Missing ${row.brokenReferences.join(', ')} reference`}>
+        Missing {row.brokenReferences.join(', ')}
+      </span>
+      : '—' },
     { key: 'status', label: 'Status' },
     { key: 'totalAmount', label: 'Total', render: (row) => formatPaise(row.totalAmount) },
     { key: 'details', label: '', render: (row) => <Button variant="secondary" onClick={() => openDetails(row)}>Review</Button> },
   ];
   return <section>
-    <PageHeading eyebrow="COLLECTIONS" title="Payments" description="Review bank-transfer proofs and track payment decisions." actions={<Button variant="secondary" onClick={() => downloadCsv('/admin/payments/export', filters).catch((failure) => setError(errorMessage(failure)))}>Export CSV</Button>} />
+    <PageHeading eyebrow="COLLECTIONS" title="Payments" description="Review bank-transfer proofs and track payment decisions." actions={<Button variant="secondary" onClick={downloadPayments}>Export CSV</Button>} />
     {error && <Toast kind="error" onDismiss={() => setError('')}>{error}</Toast>}{notice && <Toast onDismiss={() => setNotice('')}>{notice}</Toast>}
     <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <select className={controlClass} aria-label="Filter status" value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value, page: 1 })}><option value="">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
@@ -96,6 +109,9 @@ export default function PaymentsPage() {
       <button className="float-right text-sm font-semibold text-forest" onClick={() => setSelected(null)}>Close ×</button>
       <p className="mb-1 text-xs font-bold uppercase tracking-widest text-gold">Payment review</p><h2 className="font-display text-2xl">{selected.user?.firstName || 'Member'} · {selected.plan?.title || selected.plan?.name}</h2>
       <p className="my-2 text-sm text-slate-500">{selected.status} · {selected.method === 'rtgs' ? 'RTGS' : selected.method}</p>
+      {selected.brokenReferences?.length > 0 && <p className="my-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        Some linked records are unavailable: {selected.brokenReferences.join(', ')}. Payment details remain available for review.
+      </p>}
       <Panel className="my-4 grid gap-2 text-sm">
         <p>Plan fee {formatPaise(selected.baseAmount)}</p>
         {(selected.gstEnabled ?? selected.gstAmount > 0) && <p>
@@ -115,7 +131,7 @@ export default function PaymentsPage() {
         }) : <p className="mt-2 text-sm text-slate-600">The member has not uploaded proof yet.</p>}
       </section>}
       <div className="mt-5 flex flex-wrap gap-2">
-        {selected.status === 'pending'
+        {selected.status === 'pending' && selected.membership && selected.plan
           && ['bank_transfer', 'netbanking', 'cheque', 'cash', 'manual'].includes(selected.method)
           && <Button onClick={() => {
             setOfflinePayment({
@@ -144,7 +160,7 @@ function PaymentActionForm({ action, reason, setReason, amount, setAmount, rever
     <h2 className="mb-4 font-display text-2xl">{action === 'confirm-offline' ? 'Record offline payment?' : action === 'approve-membership-verification' ? 'Approve membership verification?' : action === 'approve' ? 'Approve transfer?' : action === 'reject' ? 'Reject transfer?' : 'Refund payment?'}</h2>
     {action === 'confirm-offline' && <>
       <FormField label="Amount (INR)"><input className={controlClass} type="number" min="0.01" step="0.01" required value={offlinePayment.amount} onChange={(event) => setOfflinePayment({ ...offlinePayment, amount: event.target.value })} /></FormField>
-      <FormField label={['bank_transfer', 'netbanking', 'cheque', 'rtgs'].includes(offlinePayment.method) ? 'Bank reference / cheque number / UTR' : 'Reference'}><input className={controlClass} required={['bank_transfer', 'netbanking', 'cheque', 'rtgs'].includes(offlinePayment.method)} value={offlinePayment.reference} onChange={(event) => setOfflinePayment({ ...offlinePayment, reference: event.target.value })} /></FormField>
+      <FormField label={['bank_transfer', 'netbanking', 'cheque', 'rtgs'].includes(offlinePayment.method) ? 'Bank reference / cheque number / UTR (if available)' : 'Reference'}><input className={controlClass} required={['bank_transfer', 'rtgs'].includes(offlinePayment.method)} value={offlinePayment.reference} onChange={(event) => setOfflinePayment({ ...offlinePayment, reference: event.target.value })} /></FormField>
       <FormField label="Payment date"><input className={controlClass} type="date" value={offlinePayment.paymentDate} onChange={(event) => setOfflinePayment({ ...offlinePayment, paymentDate: event.target.value })} /></FormField>
       <FormField label="Note"><textarea className={controlClass} value={offlinePayment.note} onChange={(event) => setOfflinePayment({ ...offlinePayment, note: event.target.value })} /></FormField>
       <p className="my-3 text-sm text-slate-600">Confirm only after funds have been received and any cheque has cleared.</p>
