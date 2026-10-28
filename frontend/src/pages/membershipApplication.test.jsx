@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AuthContext from '../context/auth-context.js';
+import AgreementReaderModal from '../components/AgreementReaderModal.jsx';
 import MembershipAll from './LuxuryMembershipStepOne/MembershipAll.jsx';
 
 const jsonResponse = (body, status = 200) => ({
@@ -28,9 +29,9 @@ const userId = '64a000000000000000000001';
 const termsManifest = {
   version: 'v1',
   effectiveFrom: '2026-10-20',
-  languages: ['hi', 'mr', 'gu'].map((code, index) => ({
+  languages: ['en', 'hi', 'mr', 'gu'].map((code, index) => ({
     code,
-    label: ['Hindi', 'Marathi', 'Gujarati'][index],
+    label: ['English', 'हिन्दी', 'मराठी', 'ગુજરાતી'][index],
     pdfUrl: `/terms/v1/${code}.pdf`,
     htmlUrl: `/terms/v1/${code}.html`,
     sha256: code.repeat(32),
@@ -42,9 +43,12 @@ const termsManifest = {
     'The AMC is the annual maintenance charge described in the agreement.',
   ],
 };
-const termsHtml = `<main>${Array.from({ length: 21 }, (_, index) => (
-  `<h2 id="s${index + 1}">Section ${index + 1}</h2>`
-)).join('')}</main>`;
+const termsHtml = (language) => {
+  const sectionName = { en: 'Section', hi: 'धारा', mr: 'कलम', gu: 'કલમ' }[language];
+  return `<main>${Array.from({ length: 21 }, (_, index) => (
+    `<h2 id="s${index + 1}">${sectionName} ${index + 1}</h2>`
+  )).join('')}</main>`;
+};
 
 function setUpApi(identityStatus = 'verified', {
   membership: currentMembership = member.membership,
@@ -52,7 +56,7 @@ function setUpApi(identityStatus = 'verified', {
   family: currentFamily = member.family,
 } = {}) {
   fetch.mockImplementation(async (url, options = {}) => {
-    const requestUrl = new URL(url);
+    const requestUrl = new URL(url, window.location.href);
     const path = requestUrl.pathname;
     const method = options.method || 'GET';
     if (path.endsWith('/terms/current')) return jsonResponse(termsManifest);
@@ -68,8 +72,9 @@ function setUpApi(identityStatus = 'verified', {
         language: body.language,
       } }, 201);
     }
-    if (/\/terms\/v1\/(hi|mr|gu)\.html$/.test(path)) {
-      return { ok: true, status: 200, text: async () => termsHtml };
+    const agreementPath = path.match(/\/terms\/v1\/(en|hi|mr|gu)\.html$/);
+    if (agreementPath) {
+      return { ok: true, status: 200, text: async () => termsHtml(agreementPath[1]) };
     }
     if (path.endsWith('/member/me')) return jsonResponse({
       data: { ...member, membership: currentMembership, family: currentFamily },
@@ -245,6 +250,25 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
     let agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
     let agreementText = agreementDialog.querySelector('.terms-modal__text');
+    await waitFor(() => {
+      expect(agreementDialog.querySelector('.terms-agreement-content #s1')).toHaveTextContent('धारा 1');
+      expect(agreementDialog.querySelectorAll('.terms-modal__sections li')).toHaveLength(21);
+    });
+    for (const [code, label] of [
+      ['en', 'English'],
+      ['hi', 'हिन्दी'],
+      ['mr', 'मराठी'],
+      ['gu', 'ગુજરાતી'],
+    ]) {
+      fireEvent.click(within(agreementDialog).getByRole('tab', { name: label }));
+      const expectedUrl = `http://localhost:5000/terms/v1/${code}.html`;
+      const expectedSectionName = { en: 'Section', hi: 'धारा', mr: 'कलम', gu: 'કલમ' }[code];
+      await waitFor(() => {
+        expect(fetch.mock.calls.some(([url]) => url === expectedUrl)).toBe(true);
+        expect(agreementDialog.querySelector('.terms-agreement-content #s1'))
+          .toHaveTextContent(`${expectedSectionName} 1`);
+      });
+    }
     expect(agreementText).toHaveStyle({ fontSize: '18px', lineHeight: '1.8' });
     fireEvent.click(screen.getByRole('button', { name: 'Increase agreement text size' }));
     expect(agreementText).toHaveStyle({ fontSize: '20px' });
@@ -253,6 +277,9 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
     agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
     agreementText = agreementDialog.querySelector('.terms-modal__text');
+    await waitFor(() => {
+      expect(agreementDialog.querySelector('.terms-agreement-content #s1')).toHaveTextContent('धारा 1');
+    });
     expect(agreementText).toHaveStyle({ fontSize: '20px' });
     Object.defineProperty(agreementText, 'clientHeight', { configurable: true, value: 100 });
     Object.defineProperty(agreementText, 'scrollHeight', { configurable: true, value: 500 });
@@ -268,6 +295,7 @@ describe('integrated membership application and payment flow', () => {
       fireEvent.click(confirmPayment);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+
     expect(fetch.mock.calls.some(([url, options]) => (
       String(url).endsWith('/terms-consent') && options?.method === 'POST'
     ))).toBe(true);
@@ -294,6 +322,37 @@ describe('integrated membership application and payment flow', () => {
     expect(await screen.findByText('Member dashboard destination')).toBeInTheDocument();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/membership/razorpay/verify'))).toBe(true);
     expect(container).toBeInTheDocument();
+  });
+
+  test('shows and logs an agreement content load error instead of an empty modal', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    fetch.mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '',
+    }));
+
+    render(
+      <AgreementReaderModal
+        languages={termsManifest.languages}
+        version="v1"
+        initialLanguage="en"
+        onClose={jest.fn()}
+        onRead={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Agreement content could not be loaded. Please retry.',
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      'Agreement content failed to load.',
+      expect.objectContaining({
+        language: 'en',
+        url: 'http://localhost:5000/terms/v1/en.html',
+        error: expect.any(Error),
+      }),
+    );
   });
 
   test('blocks over-age child profiles and lets nominees be added without family pricing fields', async () => {
