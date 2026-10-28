@@ -1,6 +1,6 @@
 // Accept JPG, PNG, or WebP images up to 10 MB and verify their actual file signature.
 import multer from 'multer';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import sharp from 'sharp';

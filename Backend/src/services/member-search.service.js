@@ -1,4 +1,5 @@
 import Membership from '../models/Membership.js';
+import FamilyMember from '../models/FamilyMember.js';
 import '../models/MembershipPlan.js';
 import '../models/Plan.js';
 import Profile from '../models/Profile.js';
