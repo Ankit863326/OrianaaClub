@@ -5,6 +5,7 @@ import '../models/Plan.js';
 import Profile from '../models/Profile.js';
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
+import logger from '../utils/logger.js';
 import { getMembershipMemberCode } from '../utils/memberCode.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -31,6 +32,15 @@ function membershipPriority(membership) {
     expired: 4,
     cancelled: 5,
   }[membership.status] ?? 6;
+}
+
+async function findFamilyMembers(filter) {
+  try {
+    return await FamilyMember.find(filter).select('membership').lean();
+  } catch (error) {
+    logger.error(`Family-member lookup failed during member search: ${error.stack || error.message || error}`);
+    return [];
+  }
 }
 
 export async function findMemberMatches(value) {
@@ -94,9 +104,7 @@ export async function findMemberMatches(value) {
     directMembershipFilters.length
       ? Membership.find({ $or: directMembershipFilters }).lean()
       : [],
-    codeFamilyFilter
-      ? FamilyMember.find(codeFamilyFilter).select('membership').lean()
-      : [],
+    codeFamilyFilter ? findFamilyMembers(codeFamilyFilter) : [],
     databaseId
       ? User.findOne({ _id: search, role: 'member', deletedAt: null }).select('_id').lean()
       : null,

@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import { createAdmin, createMember, createPlan } from './helpers/factories.js';
 import { createApp } from './helpers/createApp.js';
@@ -22,6 +23,45 @@ function adminRequest(admin, method, path) {
 
 // Admin success paths verify the same privileged operations protected by the route matrix.
 describe('admin member and plan routes', () => {
+  test('member lookup keeps direct and phone matches when family lookup fails', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const member = await createMember({
+      profile: { fullName: 'Lookup Member', mobile: '9876543210' },
+      membership: {
+        plan: plan._id,
+        memberNo: 'OC-265111000001',
+        status: 'active',
+      },
+    });
+    const familyLookup = jest.spyOn(FamilyMember, 'find').mockImplementationOnce(() => {
+      throw new Error('test family query failure');
+    });
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const byMemberId = await adminRequest(
+        admin,
+        'get',
+        '/api/admin/memberships/lookup?q=OC-265111000001',
+      );
+      expect(byMemberId.status).toBe(200);
+      expect(byMemberId.body.data.id).toBe(String(member.membership._id));
+      expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('test family query failure'));
+
+      const byPhone = await adminRequest(
+        admin,
+        'get',
+        '/api/admin/memberships/lookup?q=9876543210',
+      );
+      expect(byPhone.status).toBe(200);
+      expect(byPhone.body.data.id).toBe(String(member.membership._id));
+    } finally {
+      familyLookup.mockRestore();
+      errorLog.mockRestore();
+    }
+  });
+
   test('member and membership detail reads flag stale polymorphic plan references', async () => {
     const admin = await createAdmin();
     const plan = await createPlan();
