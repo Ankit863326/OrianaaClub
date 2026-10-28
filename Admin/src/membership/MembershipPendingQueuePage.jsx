@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { errorMessage } from '../api/client.js';
 import {
   Badge,
   Button,
@@ -35,6 +34,13 @@ function paymentAmount(payment) {
   return payment.totalAmount
     ? Number(payment.totalAmount) / 100
     : Number(payment.amount || 0);
+}
+
+function queueErrorMessage(error) {
+  if ((error.response?.status ?? 0) >= 500) {
+    return 'The pending queue could not be loaded or updated right now. Please try again shortly.';
+  }
+  return error.response?.data?.message || 'The pending queue request could not be completed. Please try again.';
 }
 
 export default function MembershipPendingQueuePage() {
@@ -90,7 +96,7 @@ export default function MembershipPendingQueuePage() {
       });
       setPages(nextPages);
     } catch (failure) {
-      if (!silent) setError(errorMessage(failure));
+      if (!silent) setError(queueErrorMessage(failure));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -144,7 +150,7 @@ export default function MembershipPendingQueuePage() {
       setPages(firstPages);
       await load(firstPages);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(queueErrorMessage(failure));
     } finally {
       setBusy(false);
     }

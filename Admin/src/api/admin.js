@@ -37,6 +37,7 @@ export const adminApi = {
   points: (body) => data(api.post(`/admin/points/${body.filter || body.membershipIds ? 'bulk-credit' : body.type}`, body)),
   payments: (filters = {}) => data(api.get(`/admin/payments${query(filters)}`)),
   recordOfflinePayment: (body) => data(api.post('/admin/payments', body)),
+  changePaymentMethod: (id, body) => data(api.patch(`/admin/payments/${encodeURIComponent(id)}/method`, body)),
   confirmOfflinePayment: (id) => data(api.patch(`/admin/payments/${encodeURIComponent(id)}/confirm`, {})),
   approveMembershipVerification: (id) => data(api.patch(`/admin/memberships/${encodeURIComponent(id)}/approve-verification`, {})),
   payment: (id) => data(api.get(`/admin/payments/${id}`)),

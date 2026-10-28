@@ -331,14 +331,16 @@ async function hydratePaymentReferences(payments, { includeVerificationDocs = fa
     .map((payment) => `${payment.planModel || 'Plan'}:${payment.plan}`))];
   const legacyPlanIds = planIds.filter((value) => value.startsWith('Plan:')).map((value) => value.slice(5));
   const membershipPlanIds = planIds.filter((value) => value.startsWith('MembershipPlan:')).map((value) => value.slice(15));
-  const [users, memberships, legacyPlans, membershipPlans] = await Promise.all([
+  const [users, profiles, memberships, legacyPlans, membershipPlans] = await Promise.all([
     userIds.length ? User.find({ _id: { $in: userIds } }).select('firstName email').lean() : [],
+    userIds.length ? Profile.find({ user: { $in: userIds } }).select('user fullName').lean() : [],
     membershipIds.length ? Membership.find({ _id: { $in: membershipIds } })
       .select(`memberId memberCode memberNo memberNumber status${includeVerificationDocs ? ' verificationDocs' : ''}`).lean() : [],
     legacyPlanIds.length ? Plan.find({ _id: { $in: legacyPlanIds } }).select('title name slug').lean() : [],
     membershipPlanIds.length ? MembershipPlan.find({ _id: { $in: membershipPlanIds } }).select('title name slug').lean() : [],
   ]);
   const userById = new Map(users.map((item) => [String(item._id), item]));
+  const profileByUser = new Map(profiles.map((item) => [String(item.user), item]));
   const membershipById = new Map(memberships.map((item) => [String(item._id), item]));
   const planByModelAndId = new Map([
     ...legacyPlans.map((item) => [`Plan:${item._id}`, item]),
@@ -346,14 +348,16 @@ async function hydratePaymentReferences(payments, { includeVerificationDocs = fa
   ]);
   return payments.map((payment) => {
     const user = userById.get(String(payment.user)) || null;
+    const profile = profileByUser.get(String(payment.user)) || null;
     const membership = membershipById.get(String(payment.membership)) || null;
     const plan = planByModelAndId.get(`${payment.planModel || 'Plan'}:${payment.plan}`) || null;
     const brokenReferences = [
       !user && 'user',
+      user && !profile && 'profile',
       !membership && 'membership',
       !plan && 'plan',
     ].filter(Boolean);
-    return { ...payment, user, membership, plan, brokenReferences };
+    return { ...payment, user, profile, membership, plan, brokenReferences };
   });
 }
 

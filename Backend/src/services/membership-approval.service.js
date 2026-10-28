@@ -28,6 +28,48 @@ function addUtcYears(date, years) {
   return result;
 }
 
+async function hydrateApprovalMemberships(memberships) {
+  const userIds = [...new Set(memberships
+    .map((membership) => membership.user || membership.customer)
+    .filter((id) => mongoose.isValidObjectId(id))
+    .map(String))];
+  const planReferences = [...new Map(memberships
+    .filter((membership) => mongoose.isValidObjectId(membership.plan))
+    .map((membership) => [
+      `${membership.planModel || 'Plan'}:${membership.plan}`,
+      { model: membership.planModel || 'Plan', id: String(membership.plan) },
+    ])).values()];
+  const [users, legacyPlans, membershipPlans] = await Promise.all([
+    userIds.length
+      ? User.find({ _id: { $in: userIds } }).select('firstName email').lean()
+      : [],
+    planReferences.some((item) => item.model === 'Plan')
+      ? Plan.find({ _id: { $in: planReferences.filter((item) => item.model === 'Plan').map((item) => item.id) } }).lean()
+      : [],
+    planReferences.some((item) => item.model === 'MembershipPlan')
+      ? MembershipPlan.find({ _id: { $in: planReferences.filter((item) => item.model === 'MembershipPlan').map((item) => item.id) } }).lean()
+      : [],
+  ]);
+  const userById = new Map(users.map((user) => [String(user._id), user]));
+  const planByReference = new Map([
+    ...legacyPlans.map((plan) => [`Plan:${plan._id}`, plan]),
+    ...membershipPlans.map((plan) => [`MembershipPlan:${plan._id}`, plan]),
+  ]);
+  return memberships.map((membership) => {
+    const user = userById.get(String(membership.user || membership.customer)) || null;
+    const plan = planByReference.get(`${membership.planModel || 'Plan'}:${membership.plan}`) || null;
+    return {
+      ...membership,
+      user,
+      plan,
+      brokenReferences: [
+        !user && 'member',
+        !plan && 'plan',
+      ].filter(Boolean),
+    };
+  });
+}
+
 async function getTierAndName(membership, session) {
   const PlanModel = membership.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
   const plan = await PlanModel.findById(membership.plan).session(session).lean();
@@ -97,16 +139,15 @@ export async function getMembershipApprovalQueue({ page = 1, limit = 20 } = {}, 
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
   const filter = { status: 'pending_approval', paymentConfirmedAt: { $ne: null } };
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     Membership.find(filter)
       .sort({ approvalDueAt: 1, paymentConfirmedAt: 1, _id: 1 })
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit)
-      .populate('user', 'firstName email')
-      .populate('plan')
       .lean(),
     Membership.countDocuments(filter),
   ]);
+  const items = await hydrateApprovalMemberships(rawItems);
   const primaryIds = items.filter((membership) => membership.memberType === 'primary').map((membership) => membership._id);
   const nominees = primaryIds.length
     ? await FamilyMember.find({ membership: { $in: primaryIds }, isNominee: true, status: { $ne: 'removed' } })
@@ -126,9 +167,10 @@ export async function getMembershipApprovalQueue({ page = 1, limit = 20 } = {}, 
     items: items.map((membership) => ({
       ...membership,
       brokenReferences: [
-        !membership.user && 'member',
-        !membership.plan && 'plan',
+        ...membership.brokenReferences,
+        ...(membership.user && !profileByUser.has(String(membership.user._id)) ? ['profile'] : []),
       ].filter(Boolean),
+      profile: profileByUser.get(String(membership.user?._id)) || null,
       memberName: profileByUser.get(String(membership.user?._id))?.fullName || membership.user?.firstName || membership.user?.email || 'Member',
       memberCode: getMembershipMemberCode(membership),
       amountPaid: {

@@ -87,8 +87,16 @@ describe('utility functions', () => {
       expect(offlinePaymentSchema.safeParse({
         membershipId: planId,
         method: paymentMethod,
-      }).success).toBe(false);
+      }).success).toBe(true);
     }
+    expect(offlinePaymentSchema.safeParse({
+      membershipId: planId,
+      method: 'cheque',
+    }).success).toBe(true);
+    expect(offlinePaymentSchema.safeParse({
+      membershipId: planId,
+      method: 'bank_transfer',
+    }).success).toBe(false);
     for (const method of ['bank_transfer', 'cheque']) {
       expect(offlinePaymentSchema.safeParse({
         membershipId: planId,
@@ -107,6 +115,26 @@ describe('utility functions', () => {
       method: 'rtgs',
       reference: 'AB',
       paymentDate: '2026-04-10',
+    }).success).toBe(false);
+  });
+
+  test('requires a reason and transfer reference when an admin changes payment details', () => {
+    const change = admin.paymentMethodChangeSchema;
+    expect(change.safeParse({
+      method: 'bank_transfer',
+      reference: 'UTR-123456',
+      reason: 'Corrected method',
+    }).success).toBe(true);
+    expect(change.safeParse({
+      method: 'bank_transfer',
+      reason: 'Corrected method',
+    }).success).toBe(false);
+    expect(change.safeParse({
+      method: 'cheque',
+      reason: 'Corrected method',
+    }).success).toBe(true);
+    expect(change.safeParse({
+      method: 'cash',
     }).success).toBe(false);
   });
 
