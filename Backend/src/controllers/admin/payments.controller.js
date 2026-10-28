@@ -1,6 +1,11 @@
 // Phase 5a: Serve payment review actions and audit each administrator decision.
 import * as adminService from '../../services/admin.service.js';
-import { approveBankTransfer, refundPayment, rejectBankTransfer } from '../../services/payment.service.js';
+import {
+  approveBankTransfer,
+  changePaymentMethod,
+  refundPayment,
+  rejectBankTransfer,
+} from '../../services/payment.service.js';
 import { createPaymentReceipt } from '../../services/receipt.service.js';
 import { recordRequestAction } from '../../services/audit.service.js';
 import asyncHandler from '../../utils/asyncHandler.js';
@@ -13,6 +18,24 @@ export const list = asyncHandler(async (request, response) => {
 export const details = asyncHandler(async (request, response) => {
   const data = await adminService.getPayment(request.validated.params.id);
   response.json({ success: true, data, message: 'Payment details loaded.' });
+});
+
+export const changeMethod = asyncHandler(async (request, response) => {
+  const payment = await changePaymentMethod(
+    request.validated.params.id,
+    request.validated.body,
+  );
+  await recordRequestAction(request, {
+    action: 'payment.method.change',
+    entityType: 'payment',
+    entityId: payment._id,
+    summary: `Changed payment method from ${payment.methodChange.before.method} to ${payment.method}.`,
+    before: payment.methodChange.before,
+    after: payment.methodChange.after,
+    reason: request.validated.body.reason,
+  });
+  const { methodChange, ...data } = payment;
+  response.json({ success: true, data, message: 'Payment details updated.' });
 });
 
 export const downloadReceipt = asyncHandler(async (request, response) => {

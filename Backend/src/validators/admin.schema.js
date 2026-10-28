@@ -105,7 +105,7 @@ export const familyPatchSchema = z.object({
 
 export const paymentsQuerySchema = paginationSchema.extend({
   status: z.enum(['created', 'pending', 'pending_verification', 'confirmed', 'paid', 'failed', 'rejected', 'refunded', 'partially_refunded']).optional(),
-  method: z.enum(['razorpay', 'bank_transfer', 'netbanking', 'cheque', 'rtgs', 'cash', 'manual']).optional(),
+  method: z.enum(['razorpay', 'upi', 'card', 'bank_transfer', 'netbanking', 'cheque', 'rtgs', 'cash', 'manual']).optional(),
   from: z.preprocess((value) => value === '' ? undefined : value,
     z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
   to: z.preprocess((value) => value === '' ? undefined : value,
@@ -120,6 +120,26 @@ export const paymentsQuerySchema = paginationSchema.extend({
     && isValidDate(query.to)
     && (!query.from || !query.to || query.from <= query.to);
 }, 'Payment date range must contain valid dates in chronological order.');
+
+export const paymentMethodChangeSchema = z.object({
+  method: z.enum(['bank_transfer', 'cheque', 'cash', 'upi', 'netbanking']),
+  reference: z.string().trim().max(200).optional().default(''),
+  invoiceNumber: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string().trim().min(3).max(100)
+      .regex(/^[A-Z\d][A-Z\d/-]*$/i, 'Enter a valid invoice number.')
+      .optional(),
+  ).transform((value) => value || ''),
+  reason: z.string().trim().min(1, 'A reason is required to change payment details.').max(500),
+}).superRefine((body, context) => {
+  if (['bank_transfer', 'upi'].includes(body.method) && !body.reference) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reference'],
+      message: 'A UTR or reference number is required for this payment method.',
+    });
+  }
+});
 
 export const refundBodySchema = z.object({
   amount: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),

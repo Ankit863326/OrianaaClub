@@ -26,6 +26,7 @@ import { requireCurrentTermsConsent } from './terms.service.js';
 import Verification from '../models/Verification.js';
 import { calculateMemberPrice } from './pricing.service.js';
 import { allocateMemberId } from './member-id.service.js';
+import { approveMembership } from './membership-approval.service.js';
 
 const activeMembershipBlockedMessage = 'You already have an active membership. Renewal or upgrade opens when your points are fully used or expired.';
 const renewableMembershipMessage = 'Your points are fully used (or expired). You can renew or upgrade your plan.';
@@ -262,6 +263,20 @@ async function incrementCounter(name, session) {
   return counter.value;
 }
 
+async function allocateInvoiceNumber(session, paymentId) {
+  const year = new Date().getUTCFullYear();
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const sequence = await incrementCounter(`invoice-${year}`, session);
+    const invoiceNumber = `INV-${year}-${String(sequence).padStart(6, '0')}`;
+    const duplicate = await Payment.exists({
+      invoiceNumber,
+      ...(paymentId ? { _id: { $ne: paymentId } } : {}),
+    }).session(session);
+    if (!duplicate) return invoiceNumber;
+  }
+  throw new ApiError(503, 'An invoice number could not be allocated. Please retry confirmation.');
+}
+
 function paiseToWholeRupees(paise) {
   if (!Number.isSafeInteger(paise) || paise < 0) {
     throw new ApiError(409, 'The saved payment amount is invalid.');
@@ -301,11 +316,13 @@ export async function finalizePayment(paymentId, options = {}) {
         throw new ApiError(409, 'A verified Razorpay payment is required before confirmation.');
       }
       let invoiceNumber = payment.invoiceNumber;
-      if (!invoiceNumber) {
-        const year = new Date().getUTCFullYear();
-        const invoiceSequence = await incrementCounter(`invoice-${year}`, session);
-        invoiceNumber = `INV-${year}-${String(invoiceSequence).padStart(6, '0')}`;
+      if (invoiceNumber && await Payment.exists({
+        invoiceNumber,
+        _id: { $ne: payment._id },
+      }).session(session)) {
+        invoiceNumber = '';
       }
+      if (!invoiceNumber) invoiceNumber = await allocateInvoiceNumber(session, payment._id);
       const now = new Date();
       if (!['pending_approval', 'active'].includes(membership.status)) {
         const settings = await getSettings({ forceRefresh: true });
@@ -391,11 +408,17 @@ export async function finalizePayment(paymentId, options = {}) {
           }], { session });
         }
       }
-      payment.status = payment.status === 'paid'
+      if (options.markConfirmed === true) {
+        payment.status = 'confirmed';
+      } else if (
+        payment.status === 'paid'
         || options.adminId
         || (options.markPaid === true && env.nodeEnv !== 'production')
-        ? 'paid'
-        : 'confirmed';
+      ) {
+        payment.status = 'paid';
+      } else {
+        payment.status = 'confirmed';
+      }
       payment.invoiceNumber = invoiceNumber;
       const settings = await getSettings({ forceRefresh: true });
       payment.invoiceGstin ||= settings.receiptGstin || settings.gstin || '';
@@ -1122,29 +1145,102 @@ export async function recordOfflineMembershipPayment(adminId, {
   return payment;
 }
 
-export async function confirmOfflineMembershipPayment(paymentId, adminId) {
-  const payment = await Payment.findOne({
-    _id: paymentId,
-    method: { $in: ['bank_transfer', 'cheque', 'rtgs', 'cash', 'manual', 'netbanking'] },
-  });
-  if (!payment) throw new ApiError(404, 'Offline payment was not found.');
-  if (['confirmed', 'paid'].includes(payment.status)) {
-    const membership = await Membership.findById(payment.membership);
-    if (!membership) throw new ApiError(409, 'The payment membership could not be found.');
-    return { payment, membership, status: membership.status, alreadyConfirmed: true };
+export async function changePaymentMethod(paymentId, {
+  method, reference = '', invoiceNumber = '',
+}) {
+  const payment = await Payment.findOne({ _id: paymentId, status: 'pending' });
+  if (!payment) throw new ApiError(404, 'Pending payment was not found.');
+  const normalizedReference = reference.trim();
+  const utr = ['bank_transfer', 'upi'].includes(method) ? normalizedReference : '';
+  if (['bank_transfer', 'upi'].includes(method) && !normalizedReference) {
+    throw new ApiError(400, 'A UTR or reference number is required for this payment method.');
   }
-  if (payment.status !== 'pending') throw new ApiError(404, 'Pending offline payment was not found.');
-  const result = await settleMembershipPayment(payment._id, { adminId });
-  await sendOfflinePaymentConfirmation(result.payment, adminId);
+  if (utr && await Payment.exists({
+    _id: { $ne: payment._id },
+    $or: [{ utr }, { reference: utr }],
+  })) {
+    throw new ApiError(409, 'This UTR or reference number is already assigned to another payment.');
+  }
+  const before = {
+    method: payment.method,
+    reference: payment.reference || '',
+    invoiceNumber: payment.invoiceNumber || '',
+  };
+  payment.method = method;
+  payment.reference = normalizedReference;
+  payment.utr = utr;
+  payment.invoiceNumber = invoiceNumber.trim();
+  if (payment.invoiceNumber && await Payment.exists({
+    _id: { $ne: payment._id },
+    invoiceNumber: payment.invoiceNumber,
+  })) {
+    throw new ApiError(409, 'That invoice number is already assigned to another payment.');
+  }
+  try {
+    await payment.save();
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.utr) {
+      throw new ApiError(409, 'This UTR or reference number is already assigned to another payment.');
+    }
+    if (error.code === 11000 && error.keyPattern?.invoiceNumber) {
+      throw new ApiError(409, 'That invoice number is already assigned to another payment.');
+    }
+    throw error;
+  }
   return {
-    payment: result.payment,
-    membership: result.membership,
-    status: result.status,
-    alreadyConfirmed: false,
+    ...payment.toObject(),
+    methodChange: {
+      before,
+      after: {
+        method: payment.method,
+        reference: payment.reference,
+        invoiceNumber: payment.invoiceNumber,
+      },
+    },
   };
 }
 
-async function sendOfflinePaymentConfirmation(payment, adminId) {
+export async function confirmOfflineMembershipPayment(paymentId, adminId) {
+  const payment = await Payment.findOne({
+    _id: paymentId,
+    method: { $in: ['bank_transfer', 'cheque', 'rtgs', 'cash', 'manual', 'netbanking', 'upi'] },
+  });
+  if (!payment) throw new ApiError(404, 'Offline payment was not found.');
+  const alreadyConfirmed = ['confirmed', 'paid'].includes(payment.status);
+  if (!alreadyConfirmed && payment.status !== 'pending') {
+    throw new ApiError(404, 'Pending offline payment was not found.');
+  }
+  if (['bank_transfer', 'upi'].includes(payment.method) && !(payment.reference || payment.utr)) {
+    throw new ApiError(400, 'Enter the UTR or reference number before confirming this payment.');
+  }
+  const referenceNumber = payment.utr || payment.reference;
+  if (['bank_transfer', 'upi'].includes(payment.method) && referenceNumber && await Payment.exists({
+    _id: { $ne: payment._id },
+    $or: [{ utr: referenceNumber }, { reference: referenceNumber }],
+  })) {
+    throw new ApiError(409, 'This UTR or reference number is already assigned to another payment.');
+  }
+  if (!alreadyConfirmed) {
+    await finalizePayment(payment._id, { adminId, markConfirmed: true });
+  }
+  let membership = await Membership.findById(payment.membership);
+  if (!membership) throw new ApiError(409, 'The payment membership could not be found.');
+  if (membership.status === 'pending_approval') {
+    const approval = await approveMembership(membership._id, adminId);
+    membership = approval.membership;
+  }
+  const confirmedPayment = await Payment.findById(payment._id);
+  if (!confirmedPayment) throw new ApiError(409, 'The confirmed payment could not be reloaded.');
+  if (!alreadyConfirmed) await sendOfflinePaymentConfirmation(confirmedPayment, membership, adminId);
+  return {
+    payment: confirmedPayment,
+    membership,
+    status: membership.status,
+    alreadyConfirmed,
+  };
+}
+
+async function sendOfflinePaymentConfirmation(payment, membership, adminId) {
   let user;
   let emailAttempted = false;
   try {
@@ -1160,6 +1256,7 @@ async function sendOfflinePaymentConfirmation(payment, adminId) {
       data: {
         firstName: user.firstName,
         planName: plan?.title || plan?.name || 'Orianaa Club',
+        memberId: membership.memberId || membership.memberNo || '',
         invoiceNumber: payment.invoiceNumber,
         baseAmount: (payment.baseAmount / 100).toFixed(2),
         gstAmount: (payment.gstAmount / 100).toFixed(2),

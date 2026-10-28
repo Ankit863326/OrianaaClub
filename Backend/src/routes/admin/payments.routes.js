@@ -6,6 +6,7 @@ import validate from '../../middleware/validate.js';
 import {
   idParamsSchema,
   paymentsQuerySchema,
+  paymentMethodChangeSchema,
   refundBodySchema,
   rejectPaymentSchema,
 } from '../../validators/admin.schema.js';
@@ -18,6 +19,12 @@ import {
 const router = Router();
 
 router.post('/', validate(offlinePaymentSchema), membershipPaymentsController.recordOfflinePayment);
+router.patch(
+  '/:id/method',
+  validate(paymentIdParamsSchema, 'params'),
+  validate(paymentMethodChangeSchema),
+  paymentsController.changeMethod,
+);
 router.patch('/:id/confirm', validate(paymentIdParamsSchema, 'params'), membershipPaymentsController.confirmOfflinePayment);
 router.get('/:paymentId/receipt', validate(paymentReceiptParamsSchema, 'params'), paymentsController.downloadReceipt);
 router.get('/export', validate(paymentsQuerySchema, 'query'), paymentsController.exportCsv);

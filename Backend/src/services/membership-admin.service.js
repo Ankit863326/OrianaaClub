@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import FamilyMember from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
 import IdentityVerification from '../models/IdentityVerification.js';
@@ -21,6 +22,52 @@ function pagination(query) {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
   return { page, limit, skip: (page - 1) * limit };
+}
+
+async function hydrateMembershipReferences(memberships) {
+  const memberIds = [...new Set(memberships
+    .map((membership) => membership.user || membership.customer)
+    .filter((id) => mongoose.isValidObjectId(id))
+    .map(String))];
+  const planReferences = [...new Map(memberships
+    .filter((membership) => mongoose.isValidObjectId(membership.plan))
+    .map((membership) => [
+      `${membership.planModel || 'Plan'}:${membership.plan}`,
+      { model: membership.planModel || 'Plan', id: String(membership.plan) },
+    ])).values()];
+  const [users, legacyPlans, membershipPlans] = await Promise.all([
+    memberIds.length
+      ? User.find({ _id: { $in: memberIds } })
+        .select('firstName email status activationEmailStatus activationEmailSentAt').lean()
+      : [],
+    planReferences.some((reference) => reference.model === 'Plan')
+      ? Plan.find({ _id: { $in: planReferences.filter((item) => item.model === 'Plan').map((item) => item.id) } })
+        .select('name title price sortOrder slug').lean()
+      : [],
+    planReferences.some((reference) => reference.model === 'MembershipPlan')
+      ? MembershipPlan.find({ _id: { $in: planReferences.filter((item) => item.model === 'MembershipPlan').map((item) => item.id) } })
+        .select('name price').lean()
+      : [],
+  ]);
+  const userById = new Map(users.map((user) => [String(user._id), user]));
+  const planByReference = new Map([
+    ...legacyPlans.map((plan) => [`Plan:${plan._id}`, plan]),
+    ...membershipPlans.map((plan) => [`MembershipPlan:${plan._id}`, plan]),
+  ]);
+  return memberships.map((membership) => {
+    const userId = membership.user || membership.customer;
+    const user = userById.get(String(userId)) || null;
+    const plan = planByReference.get(`${membership.planModel || 'Plan'}:${membership.plan}`) || null;
+    return {
+      ...membership,
+      user,
+      plan,
+      brokenReferences: [
+        !user && 'member',
+        !plan && 'plan',
+      ].filter(Boolean),
+    };
+  });
 }
 
 function legacyCodePattern(value) {
@@ -325,16 +372,14 @@ export async function listMemberships(query) {
     }
   }
   if (filterClauses.length) filter.$and = filterClauses;
-  let membershipsQuery = Membership.find(filter)
-    .sort({ createdAt: -1 })
-    .populate('plan', 'name title price sortOrder')
-    .populate('user', 'firstName email status activationEmailStatus activationEmailSentAt');
+  let membershipsQuery = Membership.find(filter).sort({ createdAt: -1 });
   if (!familyNumberSearch) membershipsQuery = membershipsQuery.skip(skip).limit(limit);
-  const [memberships, total, plans] = await Promise.all([
+  const [rawMemberships, total, plans] = await Promise.all([
     membershipsQuery.lean(),
     Membership.countDocuments(filter),
     MembershipPlan.find().select('name').lean(),
   ]);
+  const memberships = await hydrateMembershipReferences(rawMemberships);
   const ids = memberships.map((membership) => membership.user?._id).filter(Boolean);
   const familyIds = memberships.map((membership) => membership.familyMember).filter(Boolean);
   const primaryPageIds = memberships.filter((membership) => membership.memberType === 'primary').map((membership) => membership._id);
@@ -372,6 +417,10 @@ export async function listMemberships(query) {
   primaryCodesForFamily.forEach(([id, code]) => primaryCodes.set(id, code));
   const items = memberships.map((membership) => ({
     ...membership,
+    brokenReferences: [
+      ...membership.brokenReferences,
+      ...(membership.user && !profileByUser.has(String(membership.user._id)) ? ['profile'] : []),
+    ],
     applicationState: membership.user?.status === 'active' ? 'Active'
       : membership.status === 'draft' ? 'Draft'
         : membership.status === 'pending_payment' ? 'Payment pending'
@@ -661,21 +710,26 @@ export async function getMembershipDetails(membershipId) {
 export async function getMembershipQueue(query = {}) {
   const { page, limit, skip } = pagination(query);
   const membershipFilter = { status: { $in: ['pending_verification', 'pending_payment'] } };
-  const [unpagedMemberships, familyRequests] = await Promise.all([
+  const [rawMemberships, membershipCount, familyRequests] = await Promise.all([
     Membership.find(membershipFilter)
       .sort({ updatedAt: 1 })
-      .populate('user', 'firstName email')
-      .populate('plan', 'name price')
+      .skip(skip)
+      .limit(limit)
       .lean(),
+    Membership.countDocuments(membershipFilter),
     FamilyMember.find({ pendingAction: { $in: ['add', 'update', 'remove', 'nominee'] } })
       .sort({ updatedAt: 1 })
       .limit(limit)
       .populate({ path: 'membership', select: 'memberCode memberId memberNumber user', populate: { path: 'user', select: 'firstName' } })
       .lean(),
   ]);
-  const eligibleMemberships = unpagedMemberships.filter((membership) => membership.user && membership.plan);
-  const membershipCount = eligibleMemberships.length;
-  const memberships = eligibleMemberships.slice(skip, skip + limit);
+  const memberships = await hydrateMembershipReferences(rawMemberships);
+
+  const profiles = memberships.length
+    ? await Profile.find({ user: { $in: memberships.map((membership) => membership.user?._id).filter(Boolean) } })
+      .select('user fullName mobile').lean()
+    : [];
+  const profileByUser = new Map(profiles.map((profile) => [String(profile.user), profile]));
   const payments = await Payment.find({ status: 'pending', membership: { $in: memberships.map((m) => m._id) } })
     .select('_id membership method totalAmount amount reference createdAt')
     .sort({ createdAt: 1 })
@@ -683,6 +737,11 @@ export async function getMembershipQueue(query = {}) {
   return {
     memberships: memberships.map((membership) => ({
       ...membership,
+      profile: profileByUser.get(String(membership.user?._id)) || null,
+      brokenReferences: [
+        ...membership.brokenReferences,
+        ...(membership.user && !profileByUser.has(String(membership.user._id)) ? ['profile'] : []),
+      ],
       memberCode: getMembershipMemberCode(membership),
       memberId: getMembershipMemberCode(membership),
       formattedMemberCode: getMembershipMemberCode(membership)

@@ -68,6 +68,10 @@ paymentSchema.index(
   { unique: true, partialFilterExpression: { receiptNumber: { $type: 'string', $gt: '' } } },
 );
 paymentSchema.index(
+  { invoiceNumber: 1 },
+  { unique: true, partialFilterExpression: { invoiceNumber: { $type: 'string', $gt: '' } } },
+);
+paymentSchema.index(
   { familyMember: 1 },
   {
     unique: true,
