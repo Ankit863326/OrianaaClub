@@ -5,7 +5,7 @@ import FamilyMember from '../src/models/FamilyMember.js';
 import MembershipDraft from '../src/models/MembershipDraft.js';
 import MembershipPlan from '../src/models/MembershipPlan.js';
 import Setting from '../src/models/Setting.js';
-import { createMember, createPlan } from './helpers/factories.js';
+import { createAdmin, createMember, createPlan } from './helpers/factories.js';
 import { adminAddFamilyMember } from '../src/services/family.service.js';
 
 const familyPrices = (planId) => `/api/member/family-prices?planId=${planId}`;
@@ -29,6 +29,270 @@ async function addFamilyProfile(cookie, fields) {
 }
 
 describe('Step 3 family prices and profile rules', () => {
+  test('anniversary dates are optional, validated, and synced with the parent couple on approval', async () => {
+    const plan = await createFamilyPlan();
+    const member = await createMember({
+      membership: { plan: plan._id, status: 'active', memberType: 'primary' },
+    });
+    const submitFamily = (fields) => {
+      const response = request(app).post('/api/me/family').set('Cookie', member.cookie);
+      for (const [key, value] of Object.entries(fields)) response.field(key, String(value));
+      return response;
+    };
+
+    const emptyAnniversary = await submitFamily({
+      name: 'Optional Anniversary Spouse',
+      relation: 'Spouse',
+      dateOfBirth: '1965-01-01',
+      anniversaryDate: '',
+    });
+    expect(emptyAnniversary.status).toBe(201);
+    expect(emptyAnniversary.body.data.anniversaryDate).toBeFalsy();
+
+    const futureAnniversary = await submitFamily({
+      name: 'Future Anniversary Spouse',
+      relation: 'Spouse',
+      dateOfBirth: '1965-01-01',
+      anniversaryDate: '2999-01-01',
+    });
+    expect(futureAnniversary.status).toBe(400);
+
+    const beforeBirth = await submitFamily({
+      name: 'Before Birth Anniversary Spouse',
+      relation: 'Spouse',
+      dateOfBirth: '1965-01-01',
+      anniversaryDate: '1964-12-31',
+    });
+    expect(beforeBirth.status).toBe(400);
+
+    const father = await submitFamily({
+      name: 'Anniversary Father',
+      relation: 'Father',
+      parentSide: 'member',
+      dateOfBirth: '1960-01-01',
+      anniversaryDate: '2000-01-01',
+    });
+    const mother = await submitFamily({
+      name: 'Anniversary Mother',
+      relation: 'Mother',
+      parentSide: 'member',
+      dateOfBirth: '1962-01-01',
+    });
+    expect(father.status).toBe(201);
+    expect(mother.status).toBe(201);
+    expect(new Date(mother.body.data.anniversaryDate).toISOString().slice(0, 10)).toBe('2000-01-01');
+
+    const admin = await createAdmin();
+    for (const profile of [father.body.data, mother.body.data]) {
+      const approval = await request(app)
+        .patch(`/api/admin/family-requests/${profile._id}/approve`)
+        .set('Cookie', admin.cookie)
+        .set('X-Admin-Request', '1')
+        .send({});
+      expect(approval.status).toBe(200);
+    }
+
+    const update = await request(app)
+      .put(`/api/me/family/${father.body.data._id}`)
+      .set('Cookie', member.cookie)
+      .send({
+        name: 'Anniversary Father',
+        relation: 'Father',
+        parentSide: 'member',
+        dateOfBirth: '1960-01-01',
+        anniversaryDate: '2001-02-03',
+      });
+    expect(update.status).toBe(200);
+    expect(update.body.data.pendingAction).toBe('update');
+
+    const approval = await request(app)
+      .patch(`/api/admin/family-requests/${father.body.data._id}/approve`)
+      .set('Cookie', admin.cookie)
+      .set('X-Admin-Request', '1')
+      .send({});
+    expect(approval.status).toBe(200);
+    const savedParents = await FamilyMember.find({
+      membership: father.body.data.membership,
+      parentSide: 'member',
+      memberType: { $in: ['father', 'mother'] },
+    }).sort({ memberType: 1 }).lean();
+    expect(savedParents.map((profile) => profile.anniversaryDate.toISOString().slice(0, 10)))
+      .toEqual(['2001-02-03', '2001-02-03']);
+
+    const clearAnniversary = await request(app)
+      .put(`/api/me/family/${father.body.data._id}`)
+      .set('Cookie', member.cookie)
+      .send({
+        relation: 'Father',
+        parentSide: 'member',
+        anniversaryDate: '',
+      });
+    expect(clearAnniversary.status).toBe(200);
+    const clearApproval = await request(app)
+      .patch(`/api/admin/family-requests/${father.body.data._id}/approve`)
+      .set('Cookie', admin.cookie)
+      .set('X-Admin-Request', '1')
+      .send({});
+    expect(clearApproval.status).toBe(200);
+    expect(await FamilyMember.countDocuments({
+      membership: father.body.data.membership,
+      parentSide: 'member',
+      memberType: { $in: ['father', 'mother'] },
+      anniversaryDate: { $ne: null },
+    })).toBe(0);
+  });
+
+  test('draft member family profiles inherit and synchronize parent anniversary dates', async () => {
+    const plan = await createFamilyPlan();
+    const member = await createMember({
+      membership: { plan: plan._id, status: 'draft', memberType: 'primary' },
+    });
+    const saveProfile = (fields) => {
+      const response = request(app).post('/api/member/family').set('Cookie', member.cookie);
+      for (const [key, value] of Object.entries(fields)) response.field(key, String(value));
+      return response;
+    };
+    const father = await saveProfile({
+      fullName: 'Draft Father',
+      gender: 'male',
+      relationship: 'Father',
+      memberType: 'father',
+      parentSide: 'member',
+      dob: '1960-01-01',
+      anniversaryDate: '2000-01-01',
+    });
+    const mother = await saveProfile({
+      fullName: 'Draft Mother',
+      gender: 'female',
+      relationship: 'Mother',
+      memberType: 'mother',
+      parentSide: 'member',
+      dob: '1962-01-01',
+      anniversaryDate: '',
+    });
+    expect(father.status).toBe(201);
+    expect(mother.status).toBe(201);
+    const profiles = await FamilyMember.find({
+      membership: member.membership._id,
+      parentSide: 'member',
+      memberType: { $in: ['father', 'mother'] },
+    }).lean();
+    expect(profiles).toHaveLength(2);
+    expect(profiles.every((profile) => profile.anniversaryDate?.toISOString().slice(0, 10) === '2000-01-01')).toBe(true);
+
+    const update = await request(app)
+      .put(`/api/member/family/${father.body.data._id}`)
+      .set('Cookie', member.cookie)
+      .field('fullName', 'Draft Father')
+      .field('gender', 'male')
+      .field('relationship', 'Father')
+      .field('memberType', 'father')
+      .field('parentSide', 'member')
+      .field('dob', '1960-01-01')
+      .field('anniversaryDate', '2001-02-03');
+    expect(update.status).toBe(200);
+    const updatedParents = await FamilyMember.find({
+      membership: member.membership._id,
+      parentSide: 'member',
+      memberType: { $in: ['father', 'mother'] },
+    }).lean();
+    expect(updatedParents.every((profile) => profile.anniversaryDate?.toISOString().slice(0, 10) === '2001-02-03')).toBe(true);
+  });
+
+  test('active membership family pricing resolves the stored plan reference and canonical tier', async () => {
+    const imperialPlan = await MembershipPlan.create({
+      name: 'Imperial Signature',
+      price: 700000,
+      earlyBirdPoints: 1550000,
+      defaultPoints: 1260000,
+      renewalPoints: 1190000,
+      sortOrder: 3,
+      isActive: true,
+    });
+    const requestedPlan = await createFamilyPlan('founder-legacy');
+    const member = await createMember({
+      membership: {
+        plan: imperialPlan._id,
+        planModel: 'MembershipPlan',
+        tier: 'stale-or-unsupported-tier',
+        status: 'active',
+      },
+    });
+
+    const response = await request(app)
+      .get(`/api/member/family-prices?planId=${requestedPlan._id}`)
+      .set('Cookie', member.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      tier: 'imperial-signature',
+      familyEnabled: true,
+      limits: { spouse: 1, parents: 4, parentsPerSide: 2, children: null },
+    });
+    expect(response.body.data.prices).toHaveProperty('child');
+  });
+
+  test('member family requests accept unlimited children and parents on either side, and appear in admin queue', async () => {
+    const plan = await createFamilyPlan();
+    const member = await createMember({
+      membership: { plan: plan._id, status: 'active', memberType: 'primary' },
+    });
+    const addMember = (fields) => {
+      const response = request(app).post('/api/me/family').set('Cookie', member.cookie);
+      for (const [key, value] of Object.entries(fields)) response.field(key, String(value));
+      return response;
+    };
+
+    const missingParentSide = await addMember({
+      name: 'Missing Side Parent',
+      relation: 'Father',
+      dateOfBirth: '1960-01-01',
+      phone: '9000000000',
+    });
+    expect(missingParentSide.status).toBe(400);
+    expect(missingParentSide.body.message).toMatch(/choose whether this parent/i);
+
+    const profiles = [
+      { name: 'Member father', relation: 'Father', parentSide: 'member', dateOfBirth: '1960-01-01' },
+      { name: 'Member mother', relation: 'Mother', parentSide: 'member', dateOfBirth: '1962-01-01' },
+      { name: 'Spouse father', relation: 'Father', parentSide: 'spouse', dateOfBirth: '1958-01-01' },
+      { name: 'Spouse mother', relation: 'Mother', parentSide: 'spouse', dateOfBirth: '1963-01-01' },
+      { name: 'Child one', relation: 'Child', dateOfBirth: '2015-01-01' },
+      { name: 'Child two', relation: 'Child', dateOfBirth: '2017-01-01' },
+    ];
+    const created = [];
+    for (const profile of profiles) {
+      const response = await addMember({
+        ...profile,
+        phone: '9000000000',
+      });
+      expect(response.status).toBe(201);
+      expect(response.body.data).toMatchObject({
+        pendingAction: 'add',
+        status: 'pending_approval',
+      });
+      created.push(response.body.data);
+    }
+
+    const admin = await createAdmin();
+    const queue = await request(app)
+      .get('/api/admin/family-requests')
+      .set('Cookie', admin.cookie);
+    expect(queue.status).toBe(200);
+    expect(queue.body.data.items.map((item) => item._id))
+      .toEqual(expect.arrayContaining(created.map((item) => item._id)));
+    expect(created.slice(0, 4).map((item) => item.parentSide))
+      .toEqual(['member', 'member', 'spouse', 'spouse']);
+    const membership = await request(app)
+      .get('/api/me/membership')
+      .set('Cookie', member.cookie);
+    expect(membership.status).toBe(200);
+    expect(membership.body.data.family.adults
+      .filter((item) => item.relation.toLowerCase() === 'father' || item.relation.toLowerCase() === 'mother')
+      .map((item) => item.parentSide))
+      .toEqual(['member', 'member', 'spouse', 'spouse']);
+  });
+
   test('lists plans using family defaults when persisted settings predate family membership', async () => {
     await Setting.collection.insertOne({ _id: 'global', membershipValidityYears: 25 });
     await MembershipPlan.create({

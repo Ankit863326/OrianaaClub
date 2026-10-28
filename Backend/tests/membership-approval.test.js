@@ -138,10 +138,11 @@ describe('membership approval workflow', () => {
     expect(result.membership).toMatchObject({
       status: 'active',
       approvalSeq: 1,
-      memberNo: '1',
       earlyBird: true,
       pointsBalance: 600000,
     });
+    expect(result.membership.memberCode).toMatch(/^OC-\d{12}$/);
+    expect(result.membership.memberNo).toBe(result.membership.memberCode);
     expect(await PointsLedger.findOne({ memberId: member.membership._id })).toMatchObject({
       pointsBasis: 300000,
       multiplier: 2,
@@ -150,14 +151,24 @@ describe('membership approval workflow', () => {
       points: 600000,
     });
     expect(await FamilyMember.findOne({ membership: member.membership._id, isPrimary: true }))
-      .toMatchObject({ memberType: 'primary', memberNo: '1', approvalSeq: 1, status: 'active' });
+      .toMatchObject({
+        memberType: 'primary',
+        memberNo: result.membership.memberCode,
+        approvalSeq: 1,
+        status: 'active',
+      });
     const dashboard = await getMyMembership(member.user._id);
     expect(dashboard).toMatchObject({
       status: 'active',
-      memberNo: '1',
+      memberNo: result.membership.memberCode,
+      memberCode: result.membership.memberCode,
       pointsBalance: 600000,
     });
-    expect(dashboard).not.toHaveProperty('pointsExpireAt');
+    expect(dashboard.membershipExpireAt).toEqual(result.membership.membershipExpireAt);
+    expect(dashboard.pointsExpireAt).toEqual(result.membership.pointsExpireAt);
+    expect(dashboard.membershipValidityYears).toBe(25);
+    expect(dashboard.pointsValidityYears).toBe(11);
+    expect(dashboard).not.toHaveProperty('expiresAt');
     expect(dashboard).not.toHaveProperty('expiresAt');
     expect(dashboard).not.toHaveProperty('earlyBirdApplied');
     expect(dashboard).not.toHaveProperty('approvalSeq');
@@ -178,7 +189,6 @@ describe('membership approval workflow', () => {
 
     expect(dashboard.status).toBe('pending_approval');
     expect(dashboard).not.toHaveProperty('pointsBalance');
-    expect(dashboard).not.toHaveProperty('pointsExpireAt');
     expect(dashboard).not.toHaveProperty('earlyBirdApplied');
   });
 
@@ -225,7 +235,7 @@ describe('membership approval workflow', () => {
     expect(await PointsLedger.findOne({ memberId: member.membership._id })).toMatchObject({ approvalSeq: sequence, phase });
   });
 
-  test('Corporate approval waits for confirmed nominees and numbers primary, GM, then HR', async () => {
+  test('Corporate approval waits for confirmed nominees and does not assign nominee codes', async () => {
     const member = await createPaidMembership({ tier: 'corporate' });
     const admin = await createAdmin();
     const gm = await addNominee(member.membership, { role: 'GM', memberType: 'nominee_gm' });
@@ -238,16 +248,16 @@ describe('membership approval workflow', () => {
     const result = await approveMembership(member.membership._id, admin.user._id);
 
     expect(result.membership.approvalSeq).toBe(1);
-    expect(await FamilyMember.findById(gm._id)).toMatchObject({ approvalSeq: 2, memberNo: '1-GM', status: 'active' });
-    expect(await FamilyMember.findById(hr._id)).toMatchObject({ approvalSeq: 3, memberNo: '1-HR', status: 'active' });
+    expect(await FamilyMember.findById(gm._id)).toMatchObject({ approvalSeq: 2, memberNo: '', status: 'active' });
+    expect(await FamilyMember.findById(hr._id)).toMatchObject({ approvalSeq: 3, memberNo: '', status: 'active' });
     expect(await PointsLedger.countDocuments({ memberId: { $in: [gm._id, hr._id] } })).toBe(0);
     expect(await AuditLog.findOne({
       action: 'nominee.activate',
       entityId: String(gm._id),
-      memberNo: '1-GM',
+      memberNo: '',
     })).toMatchObject({
       before: { status: 'pending_approval' },
-      after: { status: 'active', approvalSeq: 2, memberNo: '1-GM' },
+      after: { status: 'active', approvalSeq: 2, memberNo: '' },
     });
   });
 
@@ -263,7 +273,7 @@ describe('membership approval workflow', () => {
     await approveMembership(member.membership._id, admin.user._id);
     expect(await FamilyMember.findById(second._id)).toMatchObject({
       approvalSeq: 2,
-      memberNo: '1-N2',
+      memberNo: '',
       status: 'active',
     });
     expect(await FamilyMember.findById(first._id)).toMatchObject({ approvalSeq: null, status: 'pending_approval' });
@@ -271,7 +281,7 @@ describe('membership approval workflow', () => {
     await confirmNomineeEmail(first._id);
     expect(await FamilyMember.findById(first._id)).toMatchObject({
       approvalSeq: 3,
-      memberNo: '1-N1',
+      memberNo: '',
       status: 'active',
     });
     expect(await PointsLedger.countDocuments({ memberId: { $in: [first._id, second._id] } })).toBe(0);

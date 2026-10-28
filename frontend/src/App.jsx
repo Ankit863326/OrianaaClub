@@ -18,13 +18,10 @@ import Activate from './pages/Activate/Activate.jsx';
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
 import Dashboard from './pages/Dashboard/MemberDashboardPage.jsx';
-<<<<<<< HEAD
 import FamilyVerificationPage from './pages/Dashboard/FamilyVerificationPage.jsx';
 import FamilyCheckoutPage from './pages/Dashboard/FamilyCheckoutPage.jsx';
-=======
 import NotFound from './pages/NotFound/NotFound.jsx';
 import LuxuryCursor from './components/LuxuryCursor';
->>>>>>> origin/main
 
 function SiteScrollMotion() {
   const location = useLocation();

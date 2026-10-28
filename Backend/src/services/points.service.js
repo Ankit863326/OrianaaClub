@@ -4,6 +4,7 @@ import Membership from '../models/Membership.js';
 import Plan from '../models/Plan.js';
 import PointsTransaction from '../models/PointsTransaction.js';
 import ApiError from '../utils/ApiError.js';
+import { getMembershipMemberCode } from '../utils/memberCode.js';
 import { getPointsTier } from './membership.service.js';
 
 const categories = ['membership_award', 'food', 'dance_floor', 'stay', 'spa', 'event', 'other', 'adjustment', 'refund'];
@@ -180,7 +181,7 @@ export async function getMemberPoints(userId, options = {}) {
         id: String(membership._id),
         status: membership.status,
         tier: membership.plan?.name || membership.plan?.title || '',
-        memberNo: membership.memberNo || '',
+        memberNo: getMembershipMemberCode(membership),
       },
       history: { items: [], page: 1, limit: 20, total: 0, pages: 0 },
     };
@@ -195,7 +196,7 @@ export async function getMemberPoints(userId, options = {}) {
       id: String(membership._id),
       status: membership.status,
       tier: membership.plan?.name || membership.plan?.title || '',
-      memberNo: membership.memberNo || '',
+      memberNo: getMembershipMemberCode(membership),
     },
     history: {
       ...history,

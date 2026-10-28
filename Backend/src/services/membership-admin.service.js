@@ -12,7 +12,7 @@ import Setting, { getSettings } from '../models/Setting.js';
 import Profile from '../models/Profile.js';
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
-import { formatMemberCode, getMembershipMemberCode } from '../utils/memberCode.js';
+import { formatMemberCode, getMembershipMemberCode, isMemberId } from '../utils/memberCode.js';
 import { findMemberMatches } from './member-search.service.js';
 import { listMembershipsWithPointsExpiring } from './membership-expiry.service.js';
 import { groupFamily } from './family.service.js';
@@ -21,6 +21,13 @@ function pagination(query) {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
   return { page, limit, skip: (page - 1) * limit };
+}
+
+function legacyCodePattern(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 8
+    ? new RegExp(`^${digits.split('').join('\\s*')}$`, 'i')
+    : /$a/;
 }
 
 function familyMemberType(member) {
@@ -50,7 +57,9 @@ async function listFamilyNominees(query) {
     const search = query.search.trim();
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const [exactMembership, exactFamily, matchingProfiles] = await Promise.all([
-      Membership.findOne({ memberNo: search }).select('_id linkedTo').lean(),
+      Membership.findOne({
+        $or: [{ memberNo: search }, { memberCode: search }, { legacyMemberCode: legacyCodePattern(search) }],
+      }).select('_id linkedTo').lean(),
       FamilyMember.findOne({ memberNo: search }).select('_id membership').lean(),
       FamilyMember.find({
         isNominee: true,
@@ -105,7 +114,7 @@ async function listFamilyNominees(query) {
   return {
     items: nominees.map((item) => ({
       _id: item._id,
-      memberNo: item.memberNo || '',
+      memberNo: '',
       memberCode: '',
       memberType: familyMemberType(item),
       status: item.status || 'pending_approval',
@@ -114,7 +123,7 @@ async function listFamilyNominees(query) {
       pointsMultiplier: null,
       ratePhase: null,
       aadhaarStatus: 'not_applicable',
-      primaryMemberNo: item.membership?.memberNo || '',
+      primaryMemberNo: getMembershipMemberCode(item.membership) || '',
       nomineeRole: item.nomineeRole || '',
       user: item.membership?.user || null,
       plan: item.membership?.plan || null,
@@ -261,8 +270,32 @@ export async function listMemberships(query) {
   }
   if (query.search) {
     const matches = await findMemberMatches(query.search);
-    const exactMember = await Membership.findOne({ memberNo: query.search }).select('_id linkedTo familyMember').lean();
-    const exactFamily = await FamilyMember.findOne({ memberNo: query.search }).select('_id membership').lean();
+    const searchCode = String(query.search || '').trim();
+    const legacyPattern = legacyCodePattern(searchCode);
+    const sequencePattern = /^\d{6,}$/.test(searchCode) && !/^\d{10}$/.test(searchCode)
+      ? new RegExp(`^OC-\\d{6}\\d*${searchCode}(?:-(?:S|C\\d+|F|M|SF|SM))?$`, 'i')
+      : null;
+    const exactMember = await Membership.findOne({
+      $or: [
+        { memberNo: searchCode },
+        { memberCode: searchCode },
+        { memberId: searchCode },
+        { legacyMemberCode: legacyPattern },
+        ...(sequencePattern ? [
+          { memberId: sequencePattern },
+          { memberCode: sequencePattern },
+          { memberNo: sequencePattern },
+        ] : []),
+      ],
+    }).select('_id linkedTo familyMember').lean();
+    const exactFamily = await FamilyMember.findOne({
+      $or: [
+        { memberNo: searchCode },
+        { memberId: searchCode },
+        { legacyMemberCode: legacyPattern },
+        ...(sequencePattern ? [{ memberNo: sequencePattern }, { memberId: sequencePattern }] : []),
+      ],
+    }).select('_id membership').lean();
     const anchorIds = [
       ...matches.memberships.map((membership) => membership._id),
       ...(exactMember ? [exactMember._id] : []),
@@ -330,12 +363,12 @@ export async function listMemberships(query) {
   const primaryCodes = new Map();
   const linkedIds = [...new Set(memberships.map((item) => item.linkedTo).filter(Boolean).map(String))];
   if (linkedIds.length) {
-    const linked = await Membership.find({ _id: { $in: linkedIds } }).select('_id memberNo').lean();
-    linked.forEach((item) => primaryCodes.set(String(item._id), item.memberNo));
+    const linked = await Membership.find({ _id: { $in: linkedIds } }).select('_id memberCode memberNo memberNumber').lean();
+    linked.forEach((item) => primaryCodes.set(String(item._id), getMembershipMemberCode(item)));
   }
   const primaryCodesForFamily = memberships
     .filter((item) => item.memberType === 'primary')
-    .map((item) => [String(item._id), item.memberNo]);
+    .map((item) => [String(item._id), getMembershipMemberCode(item)]);
   primaryCodesForFamily.forEach(([id, code]) => primaryCodes.set(id, code));
   const items = memberships.map((membership) => ({
     ...membership,
@@ -378,7 +411,7 @@ export async function listMemberships(query) {
       if (!owner) return null;
       return {
         _id: profile._id,
-        memberNo: profile.memberNo || '',
+        memberNo: '',
         memberCode: '',
         memberType: familyMemberType(profile),
         status: profile.status || 'pending_approval',
@@ -387,7 +420,7 @@ export async function listMemberships(query) {
         pointsMultiplier: null,
         ratePhase: null,
         aadhaarStatus: 'not_applicable',
-        primaryMemberNo: owner.memberNo || '',
+        primaryMemberNo: getMembershipMemberCode(owner) || '',
         nomineeRole: profile.nomineeRole || '',
         user: owner.user,
         plan: owner.plan,
@@ -409,10 +442,13 @@ export async function listMemberships(query) {
 }
 
 export async function getFamilyTree(memberNo) {
-  const exactMembership = await Membership.findOne({ memberNo }).lean();
+  const search = String(memberNo || '').trim();
+  const exactMembership = await Membership.findOne({
+    $or: [{ memberNo: search }, { memberCode: search }, { legacyMemberCode: legacyCodePattern(search) }],
+  }).lean();
   const exactProfile = exactMembership
     ? null
-    : await FamilyMember.findOne({ memberNo }).select('membership').lean();
+    : await FamilyMember.findOne({ memberNo: search }).select('membership').lean();
   const primaryId = exactMembership?.memberType === 'primary'
     ? exactMembership._id
     : exactMembership?.linkedTo || exactProfile?.membership || exactMembership?._id;
@@ -454,7 +490,19 @@ export async function getFamilyTree(memberNo) {
       familyProfileId: familyProfile ? String(familyProfile._id) : null,
       name: familyProfile?.name || familyProfile?.fullName || profile?.fullName || membership.user?.firstName || 'Member',
       relation: familyProfile?.relation || familyProfile?.relationship || membership.memberType || 'primary',
-      memberNo: membership.memberNo || familyProfile?.memberNo || '',
+      anniversaryDate: familyProfile?.anniversaryDate || null,
+      memberNo: nominee
+        ? ''
+        : getMembershipMemberCode(membership)
+          || (isMemberId(familyProfile?.memberId || familyProfile?.memberNo)
+            ? familyProfile.memberId || familyProfile.memberNo
+            : ''),
+      memberId: nominee
+        ? ''
+        : getMembershipMemberCode(membership)
+          || (isMemberId(familyProfile?.memberId || familyProfile?.memberNo)
+            ? familyProfile.memberId || familyProfile.memberNo
+            : ''),
       memberType: membership.memberType || 'primary',
       status: membership.status,
       discountPct: membership.discountPct || 0,
@@ -482,7 +530,10 @@ export async function getFamilyTree(memberNo) {
       familyProfileId: String(item._id),
       name: item.name || item.fullName || 'Family member',
       relation: item.relation || item.relationship || item.memberType || 'family',
-      memberNo: item.memberNo || '',
+      anniversaryDate: item.anniversaryDate || null,
+      memberNo: item.isNominee
+        ? ''
+        : (isMemberId(item.memberId || item.memberNo) ? item.memberId || item.memberNo : ''),
       memberType: familyMemberType(item),
       status: item.status === 'active' && !item.isNominee ? 'profile_only' : item.status || 'profile_only',
       discountPct: item.discountPct || 0,
@@ -622,7 +673,7 @@ export async function getMembershipQueue(query = {}) {
     FamilyMember.find({ pendingAction: { $in: ['add', 'update', 'remove', 'nominee'] } })
       .sort({ updatedAt: 1 })
       .limit(limit)
-      .populate({ path: 'membership', select: 'memberCode memberNumber user', populate: { path: 'user', select: 'firstName' } })
+      .populate({ path: 'membership', select: 'memberCode memberId memberNumber user', populate: { path: 'user', select: 'firstName' } })
       .lean(),
   ]);
   const payments = await Payment.find({ status: 'pending', membership: { $in: memberships.map((m) => m._id) } })
@@ -630,10 +681,28 @@ export async function getMembershipQueue(query = {}) {
     .sort({ createdAt: 1 })
     .lean();
   return {
-    memberships,
+    memberships: memberships.map((membership) => ({
+      ...membership,
+      memberCode: getMembershipMemberCode(membership),
+      memberId: getMembershipMemberCode(membership),
+      formattedMemberCode: getMembershipMemberCode(membership)
+        ? formatMemberCode(getMembershipMemberCode(membership))
+        : '',
+    })),
     membershipPagination: { page, limit, total: membershipCount, pages: Math.ceil(membershipCount / limit) },
     payments,
-    familyRequests,
+    familyRequests: familyRequests.map((member) => ({
+      ...member,
+      memberId: member.isNominee ? '' : (isMemberId(member.memberId || member.memberNo)
+        ? member.memberId || member.memberNo
+        : ''),
+      membership: member.membership
+        ? {
+          ...member.membership,
+          memberCode: getMembershipMemberCode(member.membership),
+        }
+        : null,
+    })),
   };
 }
 

@@ -140,12 +140,16 @@ function PersonCard({ person, onClick, primary = false }) {
       {primary ? 'Primary member' : person.nominee ? `${person.nomineeRole || 'Nominee'} nominee` : person.relation}
       {person.memberNo ? ` · ${person.memberNo}` : ''}
     </span>
+    {person.anniversaryDate && <span className="mt-1 block text-sm text-slate-600">
+      Anniversary: {formatDate(person.anniversaryDate)}
+    </span>}
   </button>;
 }
 
 function MemberDetails({ person }) {
   const rows = [
     ['Status', String(person.status || 'profile_only').replaceAll('_', ' ')],
+    ['Anniversary', person.anniversaryDate ? formatDate(person.anniversaryDate) : '—'],
     ['Discount', `${Number(person.discountPct || 0)}%`],
     ['Base amount', formatRupees(person.baseAmount)],
     ['GST', formatRupees(person.gstAmount)],
@@ -158,7 +162,7 @@ function MemberDetails({ person }) {
   return <div>
     <p className="text-xs font-bold uppercase tracking-[.17em] text-gold">Member details</p>
     <h2 className="mt-1 font-display text-2xl text-slate-900">{personName(person)}</h2>
-    <p className="mt-1 text-sm text-slate-500">{person.memberNo || 'No member number'}{person.relation ? ` · ${person.relation}` : ''}</p>
+    <p className="mt-1 text-sm text-slate-500">Member ID: {person.memberId || person.memberNo || '—'}{person.relation ? ` · ${person.relation}` : ''}</p>
     <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
       {rows.map(([label, value]) => <div key={label}>
         <dt className="text-slate-500">{label}</dt><dd className="font-semibold capitalize text-slate-800">{value}</dd>

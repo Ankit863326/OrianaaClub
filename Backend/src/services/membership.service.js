@@ -1,5 +1,5 @@
 // Phase 2: Apply membership cohort and points-tier rules for a member number.
-import { generateMemberCode } from '../utils/memberCode.js';
+import { buildMemberId } from '../utils/memberCode.js';
 
 function parseMemberNumber(memberNumber) {
   const number = Number.parseInt(memberNumber, 10);
@@ -23,6 +23,6 @@ export function getMembershipCohort(plan, memberNumber) {
   return (plan?.cohorts || []).find((cohort) => cohort.label === tier.label) || null;
 }
 
-export function formatMemberId(memberNumber) {
-  return generateMemberCode(Number(memberNumber));
+export function formatMemberId({ activatedAt, expiresAt, sequence, suffix = '' }) {
+  return buildMemberId({ activatedAt, expiresAt, sequence, suffix });
 }

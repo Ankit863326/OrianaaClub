@@ -2,6 +2,7 @@ import * as paymentService from '../services/payment.service.js';
 import ApiError from '../utils/ApiError.js';
 import MembershipPlan from '../models/MembershipPlan.js';
 import { getSettings } from '../models/Setting.js';
+import { getFamilyTier } from '../services/family-tier.service.js';
 import { env } from '../config/env.js';
 import { unlink } from 'node:fs/promises';
 import { verificationDocumentPath } from '../utils/verificationDocumentStorage.js';
@@ -21,9 +22,7 @@ export const listPlans = asyncHandler(async (request, response) => {
       subtitle: `${settings.membershipValidityYears} year membership`,
       termYears: settings.membershipValidityYears,
       familyLimits: settings.familyMembership.limits,
-      familyEnabled: settings.familyMembership.tiers
-        .find((tier) => tier.tier === plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
-        ?.familyEnabled ?? false,
+      familyEnabled: getFamilyTier(plan, settings.familyMembership.tiers)?.familyEnabled ?? false,
       benefitsTitle: plan.name,
       benefits: [
         { points: plan.earlyBirdPoints, label: `First ${settings.earlyBirdLimit} members` },

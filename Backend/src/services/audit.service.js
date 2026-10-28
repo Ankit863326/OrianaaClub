@@ -3,19 +3,27 @@ import mongoose from 'mongoose';
 import AuditLog from '../models/AuditLog.js';
 import FamilyMember from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
+import { getMembershipMemberCode, isMemberId } from '../utils/memberCode.js';
 
 export async function recordAdminAction({
   adminId, action, entityType, entityId, summary, memberNo = '', ip = '', before = null, after = null, reason = '',
 }) {
   let resolvedMemberNo = memberNo;
   if (!resolvedMemberNo && entityType === 'membership' && mongoose.isValidObjectId(entityId)) {
-    resolvedMemberNo = (await Membership.findById(entityId).select('memberNo').lean())?.memberNo || '';
+    const membership = await Membership.findById(entityId)
+      .select('memberNo memberCode memberNumber legacyMemberCode')
+      .lean();
+    resolvedMemberNo = getMembershipMemberCode(membership) || '';
   } else if (!resolvedMemberNo && entityType === 'family_member') {
     const familyMember = await FamilyMember.findById(entityId).select('memberNo membership').lean();
     const membership = familyMember?.membership
-      ? await Membership.findById(familyMember.membership).select('memberNo').lean()
+      ? await Membership.findById(familyMember.membership)
+        .select('memberNo memberCode memberNumber legacyMemberCode')
+        .lean()
       : null;
-    resolvedMemberNo = familyMember?.memberNo || membership?.memberNo || '';
+    resolvedMemberNo = isMemberId(familyMember?.memberId || familyMember?.memberNo)
+      ? familyMember.memberId || familyMember.memberNo
+      : getMembershipMemberCode(membership) || '';
   }
   return AuditLog.create({
     admin: adminId,

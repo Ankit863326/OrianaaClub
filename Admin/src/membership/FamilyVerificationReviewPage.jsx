@@ -35,8 +35,7 @@ const rejectionReasons = [
 ];
 
 function memberCode(value) {
-  const formatted = formatMemberCode(value);
-  return formatted && !formatted.startsWith('OC-') ? `OC-${formatted}` : formatted;
+  return formatMemberCode(value);
 }
 
 function relationHint(relation, parentSide) {

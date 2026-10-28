@@ -42,10 +42,7 @@ function escaped(value) {
 }
 
 function formatCardMemberCode(code) {
-  const value = String(code || '').replace(/\s/g, '');
-  return /^2651\d{8}$/.test(value)
-    ? `${value.slice(0, 4)} ${value.slice(4)}`
-    : formatMemberCode(code);
+  return formatMemberCode(code);
 }
 
 export default function MembershipMemberDetailPage() {
@@ -168,7 +165,7 @@ export default function MembershipMemberDetailPage() {
     <Panel>
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div>
-          <p className="text-sm text-slate-500">Member code</p>
+          <p className="text-sm text-slate-500">Member ID</p>
           <p className="mb-1 text-sm font-semibold text-slate-700">{membership?.plan?.name || 'Membership'}</p>
           <h2 className="font-display text-2xl text-slate-900">{memberCode || 'Not assigned'}</h2>
           <p className="mt-2 text-slate-700">{memberName}</p>

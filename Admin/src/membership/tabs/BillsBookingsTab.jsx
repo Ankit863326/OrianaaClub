@@ -177,7 +177,7 @@ export default function BillsBookingsTab() {
           </table>
         </div>
         : <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-          {membership?.memberCode ? 'No redemption bills found for this membership.' : 'This membership does not have a member code yet.'}
+          {membership?.memberCode ? 'No redemption bills found for this membership.' : 'This membership does not have a Member ID yet.'}
         </div>}
       {data && <Pagination
         info={{ page: data.page, pages: data.pages, total: data.total }}

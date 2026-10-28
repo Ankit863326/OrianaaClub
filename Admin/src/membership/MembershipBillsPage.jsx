@@ -133,8 +133,8 @@ export default function MembershipBillsPage() {
             {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
           </select>
         </FormField>
-        <FormField label="Member code">
-          <input className={controlClass} value={filters.memberCode} maxLength="32" onChange={(event) => setFilters({ ...filters, memberCode: event.target.value })} placeholder="OC-XXXX-XXXX" />
+        <FormField label="Member ID">
+          <input className={controlClass} value={filters.memberCode} maxLength="60" onChange={(event) => setFilters({ ...filters, memberCode: event.target.value })} placeholder="OC-YYEE11NNNNNN" />
         </FormField>
         <FormField label="Channel">
           <select className={controlClass} value={filters.channel} onChange={(event) => setFilters({ ...filters, channel: event.target.value })}>
@@ -162,14 +162,15 @@ export default function MembershipBillsPage() {
         <table className="w-full min-w-[1500px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>{[
-              'Date', 'Member', 'Member code', 'Service', 'Booking / bill ID',
+              'Date', 'Member', 'Member ID', 'Service', 'Booking / bill ID',
               'Channel', 'Bill amount', 'Discount', 'Points used', 'Balance after', 'Status', 'Refunded points',
             ].map((label) => <th key={label} className="px-3 py-3 font-semibold">{label}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.items.map((bill) => {
               const memberId = billMembershipId(bill);
-              const code = bill.memberCode ? formatMemberCode(bill.memberCode) : '—';
+              const displayCode = bill.displayMemberCode || bill.memberCode;
+              const code = displayCode ? formatMemberCode(displayCode) : '—';
               return <tr
                 key={bill._id}
                 className={memberId ? 'cursor-pointer hover:bg-slate-50/70' : ''}

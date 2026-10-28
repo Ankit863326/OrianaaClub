@@ -8,6 +8,8 @@ import User from '../models/User.js';
 import { getSettings } from '../models/Setting.js';
 import AuditLog from '../models/AuditLog.js';
 import ApiError from '../utils/ApiError.js';
+import { isMemberId } from '../utils/memberCode.js';
+import { allocateFamilyChildNumber } from './member-code.service.js';
 import { getBalance } from './points-ledger.service.js';
 import { publicMediaDirectory } from '../utils/uploadDirectories.js';
 import {
@@ -92,7 +94,24 @@ function familyValues(values, settings) {
   const relation = values.relation ?? values.relationship;
   const dateOfBirth = values.dateOfBirth ?? values.dob;
   if (name !== undefined) Object.assign(normalized, { name, fullName: name });
-  if (relation !== undefined) Object.assign(normalized, { relation, relationship: relation });
+  if (relation !== undefined) {
+    const normalizedRelation = String(relation).trim().toLowerCase();
+    const memberType = ({
+      spouse: 'spouse',
+      wife: 'spouse',
+      husband: 'spouse',
+      child: 'child',
+      son: 'child',
+      daughter: 'child',
+      father: 'father',
+      mother: 'mother',
+    })[normalizedRelation] || values.memberType;
+    Object.assign(normalized, {
+      relation,
+      relationship: relation,
+      ...(memberType ? { memberType } : {}),
+    });
+  }
   if (dateOfBirth !== undefined) {
     normalized.dateOfBirth = dateOfBirth || null;
     normalized.dob = dateOfBirth || null;
@@ -108,7 +127,58 @@ function familyValues(values, settings) {
   if (values.gender !== undefined) normalized.gender = values.gender;
   if (values.address !== undefined) normalized.address = values.address;
   if (values.parentSide !== undefined) normalized.parentSide = values.parentSide;
+  if (Object.hasOwn(values, 'anniversaryDate')) {
+    normalized.anniversaryDate = values.anniversaryDate || null;
+  }
   return normalized;
+}
+
+function validateAnniversary(member) {
+  const anniversaryDate = member.anniversaryDate;
+  if (!anniversaryDate) return;
+  const relation = String(member.relation || member.relationship || '').trim().toLowerCase();
+  if (!['spouse', 'wife', 'husband', 'father', 'mother'].includes(relation)) {
+    throw new ApiError(400, 'Anniversary date is only available for a spouse or parent.');
+  }
+  const dateOfBirth = member.dateOfBirth || member.dob;
+  if (!dateOfBirth) {
+    throw new ApiError(400, 'Date of birth is required when an anniversary date is provided.');
+  }
+  const anniversaryDay = new Date(anniversaryDate).setUTCHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  if (anniversaryDay > today.getTime()) {
+    throw new ApiError(400, 'Anniversary date cannot be in the future.');
+  }
+  if (dateOfBirth && anniversaryDay <= new Date(dateOfBirth).setUTCHours(0, 0, 0, 0)) {
+    throw new ApiError(400, 'Anniversary date must be after the family member’s date of birth.');
+  }
+}
+
+async function parentCoupleAnniversary(membershipId, member, anniversaryDate) {
+  const relation = String(member.relation || member.relationship || '').toLowerCase();
+  if (!['father', 'mother'].includes(relation)) return;
+  await FamilyMember.updateMany({
+    membership: membershipId,
+    parentSide: member.parentSide || 'member',
+    memberType: relation === 'father' ? 'mother' : 'father',
+    status: { $ne: 'removed' },
+    _id: { $ne: member._id },
+  }, { $set: { anniversaryDate: anniversaryDate || null } });
+}
+
+async function defaultParentAnniversary(membershipId, values) {
+  if (!['father', 'mother'].includes(String(values.memberType || '').toLowerCase())
+    || values.anniversaryDate) return values;
+  const counterpart = await FamilyMember.findOne({
+    membership: membershipId,
+    parentSide: values.parentSide || 'member',
+    memberType: values.memberType === 'father' ? 'mother' : 'father',
+    status: { $ne: 'removed' },
+  }).select('anniversaryDate').lean();
+  return counterpart?.anniversaryDate
+    ? { ...values, anniversaryDate: counterpart.anniversaryDate }
+    : values;
 }
 
 export async function listOwnedFamily(userId) {
@@ -129,7 +199,9 @@ export async function listOwnedFamily(userId) {
       ? Verification.find({ memberId: { $in: memberIds } }).select('memberId status rejectionReason').lean()
       : [],
     memberIds.length
-      ? Membership.find({ familyMember: { $in: memberIds } }).select('_id familyMember status memberNo').lean()
+      ? Membership.find({ familyMember: { $in: memberIds } })
+        .select('_id familyMember status memberNo memberCode memberId')
+        .lean()
       : [],
   ]);
   const verificationByMember = new Map(verifications.map((item) => [String(item.memberId), item]));
@@ -139,11 +211,14 @@ export async function listOwnedFamily(userId) {
     const linkedMembership = membershipByMember.get(String(member._id));
     const isNominee = Boolean(member.isNominee || member.memberType?.startsWith('nominee'));
     const approved = !isNominee && linkedMembership?.status === 'active';
+    const storedCode = linkedMembership?.memberId || linkedMembership?.memberCode
+      || linkedMembership?.memberNo || member.memberId || member.memberNo || '';
     const { idProofStorageKey, idProof, approvalSeq, approvalDueAt,
       approvalOverdueAt, approvalOverdueNotifiedAt, ...safeMember } = member;
     return {
       ...safeMember,
-      memberNo: linkedMembership?.memberNo || member.memberNo || '',
+      memberNo: !isNominee && isMemberId(storedCode) ? storedCode : '',
+      memberId: !isNominee && isMemberId(storedCode) ? storedCode : '',
       memberStatus: linkedMembership?.status || '',
       verificationStatus: isNominee
         ? (member.emailConfirmedAt ? 'verified' : 'not_added')
@@ -156,22 +231,56 @@ export async function listOwnedFamily(userId) {
 
 export async function requestAddFamilyMember(userId, values, photo) {
   const membership = await ownedMembership(userId);
-  const normalized = familyValues(values, await getSettings());
-  const settings = await enforceFamilyCapacity(membership, normalized);
+  const settings = await getSettings();
+  const normalized = await defaultParentAnniversary(
+    membership._id,
+    familyValues(values, settings),
+  );
+  validateAnniversary(normalized);
+  const capacitySettings = await enforceFamilyCapacity(membership, normalized);
   const photoUrl = await storePhoto(photo);
   const data = {
     membership: membership._id,
-    ...familyValues(values, settings),
+    ...familyValues({ ...values, ...normalized }, capacitySettings),
     photo: photoUrl,
     photoUrl,
     status: 'pending_approval',
     pendingAction: 'add',
     addedBy: 'member',
   };
+  if (data.memberType === 'child' && !data.isNominee) {
+    data.familyChildNumber = await allocateFamilyChildNumber(membership);
+  }
   const member = await FamilyMember.create(data);
   await writeAudit({
     actorType: 'member', actorId: userId, action: 'family.add.request',
     membershipId: membership._id, entityId: member._id, after: member.toObject(),
+  });
+  return member;
+}
+
+export async function requestUpdateFamilyMember(userId, memberId, values) {
+  const membership = await ownedMembership(userId);
+  const member = await FamilyMember.findOne({
+    _id: memberId,
+    membership: membership._id,
+    status: 'active',
+  });
+  if (!member) throw new ApiError(404, 'Active family member was not found.');
+  if (member.isPrimary) throw new ApiError(409, 'The primary member cannot be edited as a family member.');
+  if (member.pendingAction) throw new ApiError(409, 'This family member already has a pending request.');
+
+  const before = member.toObject();
+  const changes = familyValues(values, await getSettings());
+  const nextMember = { ...member.toObject(), ...changes };
+  validateAnniversary(nextMember);
+  member.pendingAction = 'update';
+  member.pendingChanges = changes;
+  await member.save();
+  await writeAudit({
+    actorType: 'member', actorId: userId, action: 'family.update.request',
+    membershipId: membership._id, entityId: member._id,
+    before, after: { pendingAction: 'update', pendingChanges: changes },
   });
   return member;
 }
@@ -260,18 +369,30 @@ export async function adminListFamily(membershipId) {
 export async function adminAddFamilyMember(adminId, membershipId, values, photo) {
   const membership = await Membership.findById(membershipId).populate('plan');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
-  const normalized = familyValues(values, await getSettings());
-  const settings = await enforceFamilyCapacity(membership, normalized);
+  const settings = await getSettings();
+  const normalized = await defaultParentAnniversary(
+    membershipId,
+    familyValues(values, settings),
+  );
+  validateAnniversary(normalized);
+  const capacitySettings = await enforceFamilyCapacity(membership, normalized);
   const photoUrl = await storePhoto(photo);
-  const member = await FamilyMember.create({
+  const data = {
     membership: membershipId,
-    ...familyValues(values, settings),
+    ...familyValues({ ...values, ...normalized }, capacitySettings),
     photo: photoUrl,
     photoUrl,
     status: 'active',
     addedBy: 'admin',
     linkedUser: values.linkedUser || null,
-  });
+  };
+  if (data.memberType === 'child' && !data.isNominee) {
+    data.familyChildNumber = await allocateFamilyChildNumber(membership);
+  }
+  const member = await FamilyMember.create(data);
+  if (['father', 'mother'].includes(String(member.memberType || '').toLowerCase())) {
+    await parentCoupleAnniversary(membershipId, member, member.anniversaryDate);
+  }
   await writeAudit({
     actorType: 'admin', actorId: adminId, action: 'family.add',
     membershipId, entityId: member._id, after: member.toObject(),
@@ -286,7 +407,15 @@ async function saveNominee(membership, member, adminId) {
     { membership: membership._id, $or: [{ isNominee: true }, { pendingAction: 'nominee' }] },
     { $set: { isNominee: false, pendingAction: '' } },
   );
-  if (member) await FamilyMember.updateOne({ _id: member._id }, { $set: { isNominee: true } });
+  if (member) {
+    member.isNominee = true;
+    member.memberNo = '';
+    await member.save();
+    await Membership.updateMany(
+      { familyMember: member._id },
+      { $set: { memberNo: '', memberCode: '' } },
+    );
+  }
   membership.nominee = member?._id || null;
   membership.pendingNominee = null;
   membership.pendingNomineeRemoval = false;
@@ -317,7 +446,10 @@ export async function updateAdminFamilyMember(adminId, memberId, values, idProof
   if (!member || member.status === 'removed') throw new ApiError(404, 'Family member was not found.');
   const before = member.toObject();
   const settings = await getSettings();
-  Object.assign(member, familyValues(values, settings));
+  const changes = familyValues(values, settings);
+  const nextMember = { ...member.toObject(), ...changes };
+  validateAnniversary(nextMember);
+  Object.assign(member, changes);
   if (before.type === 'adult' && member.type === 'child' && member.status === 'active') {
     const adults = await FamilyMember.countDocuments({
       membership: member.membership,
@@ -351,6 +483,10 @@ export async function updateAdminFamilyMember(adminId, memberId, values, idProof
   member.status = 'active';
   member.approvedBy = adminId;
   await member.save();
+  if (Object.hasOwn(values, 'anniversaryDate')
+    && ['father', 'mother'].includes(String(member.memberType || '').toLowerCase())) {
+    await parentCoupleAnniversary(member.membership, member, member.anniversaryDate);
+  }
   await invalidateVerificationAfterProfileChange(member, before, adminId, 'admin');
   await writeAudit({
     actorType: 'admin', actorId: adminId, action: 'family.update',
@@ -410,7 +546,10 @@ export async function decideFamilyRequest(adminId, memberId, approve, reason = '
     if (action === 'add') {
       if (member.status !== 'pending_approval') throw new ApiError(409, 'The family request is no longer pending.');
       member.status = 'active';
+      validateAnniversary(member);
     } else if (action === 'update') {
+      const nextMember = { ...member.toObject(), ...(member.pendingChanges || {}) };
+      validateAnniversary(nextMember);
       Object.assign(member, member.pendingChanges || {});
       const settings = await getSettings();
       if (member.dateOfBirth) {
@@ -470,6 +609,10 @@ export async function decideFamilyRequest(adminId, memberId, approve, reason = '
   member.pendingChanges = null;
   member.approvedBy = adminId;
   await member.save();
+  if (approve && ['add', 'update'].includes(action)
+    && ['father', 'mother'].includes(String(member.memberType || '').toLowerCase())) {
+    await parentCoupleAnniversary(member.membership, member, member.anniversaryDate);
+  }
   await writeAudit({
     actorType: 'admin', actorId: adminId,
     action: `family.request.${approve ? 'approve' : 'reject'}`,

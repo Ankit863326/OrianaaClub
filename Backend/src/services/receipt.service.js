@@ -62,9 +62,7 @@ function formatMoney(value) {
 }
 
 function formatMemberId(membership) {
-  if (membership.memberNo) return membership.memberNo;
-  const memberCode = getMembershipMemberCode(membership);
-  return memberCode ? `${memberCode.slice(0, 4)} ${memberCode.slice(4)}` : '—';
+  return getMembershipMemberCode(membership) || '—';
 }
 
 function formatMethod(method) {
@@ -89,7 +87,7 @@ export async function createPaymentReceipt(paymentId, userId) {
 
   const [membership, profile, user, settings] = await Promise.all([
     Membership.findById(payment.membership)
-      .select('memberNo memberCode memberId memberNumber termNumber previousMembership pointsGranted status plan planModel')
+      .select('memberNo memberCode legacyMemberCode memberId memberNumber termNumber previousMembership pointsGranted status plan planModel')
       .populate('plan', 'name title')
       .lean(),
     Profile.findOne({ user: payment.user }).select('fullName').lean(),

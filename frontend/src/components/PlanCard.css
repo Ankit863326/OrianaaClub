@@ -78,6 +78,17 @@
   color: var(--mb-muted, #5a6058);
 }
 
+.mb-card__redemption-rate {
+  margin: 12px 0 0;
+  color: var(--mb-green, #0d4a39);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mb-card--featured .mb-card__redemption-rate {
+  color: var(--mb-gold-light, #f1d99c);
+}
+
 .mb-card__cohorts {
   position: relative;
   z-index: 1;

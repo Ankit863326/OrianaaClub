@@ -15,7 +15,7 @@ import {
 } from '../../components/ui.jsx';
 import { membershipApi } from '../../api/membership.js';
 
-const blankForm = { name: '', relation: '', dateOfBirth: '', phone: '' };
+const blankForm = { name: '', relation: '', dateOfBirth: '', anniversaryDate: '', phone: '' };
 
 function familyMembers(family) {
   return [...(family?.adults || []), ...(family?.children || [])];
@@ -81,6 +81,7 @@ export default function FamilyTab() {
       name: member.name || member.fullName || '',
       relation: member.relation || member.relationship || '',
       dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString().slice(0, 10) : '',
+      anniversaryDate: member.anniversaryDate ? new Date(member.anniversaryDate).toISOString().slice(0, 10) : '',
       phone: member.phone || '',
     });
     setPhoto(null);
@@ -95,6 +96,7 @@ export default function FamilyTab() {
         name: form.name.trim(),
         relation: form.relation.trim(),
         dateOfBirth: form.dateOfBirth || undefined,
+        anniversaryDate: form.anniversaryDate || '',
         phone: form.phone.trim(),
       };
       if (editing) {
@@ -183,6 +185,7 @@ export default function FamilyTab() {
           </div>
           <p className="mt-1 text-sm text-slate-600">{member.relation || member.relationship || '—'}</p>
           <p className="mt-1 text-sm text-slate-600">Date of birth: {formatDate(member.dateOfBirth || member.dob)}</p>
+          {member.anniversaryDate && <p className="mt-1 text-sm text-slate-600">Anniversary: {formatDate(member.anniversaryDate)}</p>}
           <p className="mt-1 text-sm text-slate-600">Phone: {member.phone || '—'}</p>
           {member.type === 'child' && <p className="mt-2 text-sm text-amber-800">Children cannot be nominees.</p>}
           {lastAdult && <p className="mt-2 text-sm text-amber-800">At least one active adult must remain on the membership.</p>}
@@ -254,6 +257,11 @@ export default function FamilyTab() {
                     {requestValues.name || request.name || request.fullName || '—'}
                     {requestValues.relation || request.relation ? ` · ${requestValues.relation || request.relation}` : ''}
                   </p>
+                  {(Object.hasOwn(requestValues, 'anniversaryDate') || request.anniversaryDate) && <p className="mt-1 text-sm text-slate-700">
+                    Anniversary: {formatDate(Object.hasOwn(requestValues, 'anniversaryDate')
+                      ? requestValues.anniversaryDate
+                      : request.anniversaryDate)}
+                  </p>}
                   {request.pendingAction === 'nominee' && <p className="mt-1 text-sm text-slate-600">Nominee requests are allowed for active adults only.</p>}
                 </div>
                 <div className="flex gap-2">
@@ -278,6 +286,9 @@ export default function FamilyTab() {
         </FormField>
         <FormField label="Date of birth">
           <input className={controlClass} type="date" value={form.dateOfBirth} onChange={(event) => setForm({ ...form, dateOfBirth: event.target.value })} />
+        </FormField>
+        <FormField label="Anniversary date (optional)">
+          <input className={controlClass} type="date" max={new Date().toISOString().slice(0, 10)} value={form.anniversaryDate} onChange={(event) => setForm({ ...form, anniversaryDate: event.target.value })} />
         </FormField>
         <FormField label="Phone">
           <input className={controlClass} type="tel" maxLength="40" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />

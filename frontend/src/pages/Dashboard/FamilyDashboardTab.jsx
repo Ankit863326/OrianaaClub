@@ -5,6 +5,7 @@ import useAuth from '../../context/useAuth.js';
 import { getMyMembership } from './memberDashboardApi.js';
 import {
   requestFamilyMember,
+  requestFamilyMemberUpdate,
   requestFamilyNominee,
   requestFamilyRemoval,
 } from './memberDashboardActionsApi.js';
@@ -12,6 +13,11 @@ import {
 const allowedPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const maxPhotoSize = 10 * 1024 * 1024;
 const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+const parentRelations = new Set(['father', 'mother']);
+
+function isLimitReached(count, limit) {
+  return limit != null && count >= Number(limit);
+}
 
 function statusLabel(status, pendingAction) {
   if (pendingAction) return 'Pending approval';
@@ -25,7 +31,7 @@ function StatusChip({ status, pendingAction }) {
   </span>;
 }
 
-function FamilyMemberCard({ member, type, activeAdultCount, currentNomineeId, onRemove, onVerify, saving }) {
+function FamilyMemberCard({ member, type, activeAdultCount, currentNomineeId, onRemove, onEdit, onVerify, saving }) {
   const photo = member.photo || member.photoUrl;
   const memberId = String(member.id || member._id);
   const isNominee = member.isNominee || memberId === String(currentNomineeId);
@@ -54,8 +60,9 @@ function FamilyMemberCard({ member, type, activeAdultCount, currentNomineeId, on
       <div><dt>Name</dt><dd>{member.name || member.fullName || '—'}</dd></div>
       <div><dt>Relation</dt><dd>{member.relation || member.relationship || '—'}</dd></div>
       <div><dt>Date of birth</dt><dd>{formatDate(member.dateOfBirth || member.dob)}</dd></div>
+      {member.anniversaryDate && <div><dt>Anniversary</dt><dd>{formatDate(member.anniversaryDate)}</dd></div>}
       <div><dt>Phone</dt><dd>{member.phone || '—'}</dd></div>
-      {member.memberNo && <div><dt>Member number</dt><dd>{member.memberNo}</dd></div>}
+      <div><dt>Member ID</dt><dd>{member.memberId || member.memberNo || '—'}</dd></div>
       {isApprovedMember && Number.isSafeInteger(member.pointsBalance)
         && <div><dt>Points</dt><dd>{numberFormat.format(member.pointsBalance)}</dd></div>}
       {!isNominee && <div><dt>Aadhaar status</dt><dd>{verificationStatus.replaceAll('_', ' ')}</dd></div>}
@@ -103,6 +110,10 @@ function FamilyMemberCard({ member, type, activeAdultCount, currentNomineeId, on
         disabled={saving}
         onClick={() => onRemove(member)}
       >Request removal</button>}
+    {member.status === 'active' && !member.pendingAction
+      && (String(member.relation || member.relationship || '').toLowerCase() === 'spouse'
+        || parentRelations.has(String(member.relation || member.relationship || '').toLowerCase()))
+      && <button className="member-hub__retry" type="button" disabled={saving} onClick={() => onEdit(member)}>Edit</button>}
   </article>;
 }
 
@@ -123,6 +134,10 @@ export default function FamilyDashboardTab() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [nomineeId, setNomineeId] = useState('');
+  const [addRelation, setAddRelation] = useState('');
+  const [parentSide, setParentSide] = useState('member');
+  const [addAnniversaryDate, setAddAnniversaryDate] = useState('');
+  const [editingMember, setEditingMember] = useState(null);
 
   function onVerify(member, isNominee, verificationStatus) {
     const familyId = member.id || member._id;
@@ -189,13 +204,61 @@ export default function FamilyDashboardTab() {
   const familyPolicy = membership?.familyPolicy || {
     enabled: true,
     discounts: { spouse: 50, parent: 50, child: 75 },
-    limits: { spouse: 1, parents: 4 },
+    limits: {},
   };
-  const spouseCount = allMembers.filter((member) => ['spouse', 'wife', 'husband'].includes(String(member.relation || '').toLowerCase()) && member.status !== 'removed').length;
-  const parentCount = allMembers.filter((member) => ['father', 'mother'].includes(String(member.relation || '').toLowerCase()) && member.status !== 'removed').length;
+  const eligibleFamilyMembers = allMembers.filter((member) => (
+    member.status !== 'removed' && member.pendingAction !== 'remove' && !member.isNominee
+  ));
+  const spouseCount = eligibleFamilyMembers.filter((member) => (
+    ['spouse', 'wife', 'husband'].includes(String(member.relation || '').toLowerCase())
+  )).length;
+  const parentMembers = eligibleFamilyMembers.filter((member) => (
+    parentRelations.has(String(member.relation || '').toLowerCase())
+  ));
+  const parentCount = parentMembers.length;
+  const parentSideCount = (side) => parentMembers.filter((member) => (
+    (member.parentSide || 'member') === side
+  )).length;
+  const limits = familyPolicy.limits || {};
+  const hasOpenParentSlot = !isLimitReached(parentCount, limits.parents)
+    && ['member', 'spouse'].some((side) => !isLimitReached(parentSideCount(side), limits.parentsPerSide));
   const canManageFamily = membership?.status === 'active' && familyPolicy.enabled;
 
-  function scrollToAddForm() {
+  function scrollToAddForm(relation) {
+    setAddRelation(relation);
+    setEditingMember(null);
+    const side = 'member';
+    if (parentRelations.has(relation)) {
+      setParentSide(side);
+      setAddAnniversaryDate(anniversaryForParentSide(side));
+    } else {
+      setAddAnniversaryDate('');
+    }
+    document.getElementById('family-add-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function anniversaryForParentSide(side) {
+    const parent = allMembers.find((member) => (
+      parentRelations.has(String(member.relation || member.relationship || '').toLowerCase())
+      && (member.parentSide || 'member') === side
+      && member.status !== 'removed'
+      && member.pendingAction !== 'remove'
+      && member.anniversaryDate
+    ));
+    return parent?.anniversaryDate ? new Date(parent.anniversaryDate).toISOString().slice(0, 10) : '';
+  }
+
+  function startEdit(member) {
+    setEditingMember(member);
+    const relation = String(member.relation || member.relationship || '').toLowerCase();
+    const side = member.parentSide || 'member';
+    setAddRelation(relation);
+    setParentSide(side);
+    setAddAnniversaryDate(
+      member.anniversaryDate
+        ? new Date(member.anniversaryDate).toISOString().slice(0, 10)
+        : parentRelations.has(relation) ? anniversaryForParentSide(side) : '',
+    );
     document.getElementById('family-add-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -227,8 +290,31 @@ export default function FamilyDashboardTab() {
     const photo = form.elements.photo.files[0] || null;
     setFormError('');
     setMessage('');
-    if (atLimit) {
-      setFormError(`Your family has reached the ${limit}-member limit.`);
+    const relation = String(values.relation || '').toLowerCase();
+    const isParent = parentRelations.has(relation);
+    const requestedParentSide = isParent ? (values.parentSide || 'member') : '';
+    let limitReached = false;
+    if (relation === 'spouse') {
+      limitReached = isLimitReached(spouseCount, limits.spouse);
+    } else if (isParent) {
+      if (isLimitReached(parentCount, limits.parents)) {
+        setFormError(`Your family has reached the ${limits.parents}-parent limit.`);
+        return;
+      }
+      if (isLimitReached(parentSideCount(requestedParentSide), limits.parentsPerSide)) {
+        setFormError(`Your family has reached the ${limits.parentsPerSide}-parent limit for the ${requestedParentSide} side.`);
+        return;
+      }
+    } else if (relation === 'child') {
+      limitReached = isLimitReached(
+        family.children.filter((member) => member.status !== 'removed' && member.pendingAction !== 'remove').length,
+        limits.children,
+      );
+    }
+    if (limitReached) {
+      setFormError(isParent
+        ? `Your family has reached the parent limit for the ${requestedParentSide} side.`
+        : `Your family has reached the ${relation || 'member'} limit.`);
       return;
     }
     if (!values.dateOfBirth) {
@@ -246,14 +332,27 @@ export default function FamilyDashboardTab() {
 
     setSaving(true);
     try {
-      await requestFamilyMember({
+      const requestValues = {
         name: values.name,
-        relation: values.relation,
+        relation,
         dateOfBirth: values.dateOfBirth,
         phone: values.phone,
-      }, photo);
+        ...(isParent ? { parentSide: requestedParentSide } : {}),
+        ...(relation === 'spouse' || isParent ? { anniversaryDate: values.anniversaryDate || '' } : {}),
+      };
+      if (editingMember) {
+        await requestFamilyMemberUpdate(editingMember.id || editingMember._id, requestValues);
+      } else {
+        await requestFamilyMember(requestValues, photo);
+      }
       form.reset();
-      setMessage('Add-member request sent. It will appear as pending until an admin approves it.');
+      setAddRelation('');
+      setAddAnniversaryDate('');
+      setEditingMember(null);
+      setParentSide('member');
+      setMessage(editingMember
+        ? 'Family update request sent. It will take effect after admin approval.'
+        : 'Add-member request sent. It will appear as pending until an admin approves it.');
       await load();
     } catch (failure) {
       if (failure.status === 401) {
@@ -315,17 +414,17 @@ export default function FamilyDashboardTab() {
     {familyPolicy.enabled && <section aria-labelledby="family-open-slots-title">
       <h3 id="family-open-slots-title">Open family slots</h3>
       <div className="member-hub__family-slots">
-        {spouseCount < Number(familyPolicy.limits?.spouse ?? 1) && <article className="member-hub__family-slot">
+        {!isLimitReached(spouseCount, limits.spouse) && <article className="member-hub__family-slot">
           <strong>Spouse</strong><span className="member-hub__badge">50% discount</span>
-          <button className="member-hub__retry" type="button" disabled={!canManageFamily} onClick={scrollToAddForm}>Add</button>
+          <button className="member-hub__retry" type="button" disabled={!canManageFamily} onClick={() => scrollToAddForm('spouse')}>Add</button>
         </article>}
-        {parentCount < Number(familyPolicy.limits?.parents ?? 4) && <article className="member-hub__family-slot">
-          <strong>Parents · up to {familyPolicy.limits?.parents ?? 4}</strong><span className="member-hub__badge">50% discount</span>
-          <button className="member-hub__retry" type="button" disabled={!canManageFamily} onClick={scrollToAddForm}>Add</button>
+        {hasOpenParentSlot && <article className="member-hub__family-slot">
+          <strong>Parents{limits.parents != null ? ` · up to ${limits.parents}` : ''}{limits.parentsPerSide != null ? `, ${limits.parentsPerSide} per side` : ''}</strong><span className="member-hub__badge">50% discount</span>
+          <button className="member-hub__retry" type="button" disabled={!canManageFamily} onClick={() => scrollToAddForm('father')}>Add</button>
         </article>}
         <article className="member-hub__family-slot">
           <strong>Children · no limit</strong><span className="member-hub__badge">75% discount</span>
-          <button className="member-hub__retry" type="button" disabled={!canManageFamily} onClick={scrollToAddForm}>Add</button>
+          <button className="member-hub__retry" type="button" disabled={!canManageFamily} onClick={() => scrollToAddForm('child')}>Add</button>
         </article>
       </div>
     </section>}
@@ -347,6 +446,7 @@ export default function FamilyDashboardTab() {
               activeAdultCount={activeAdultCount}
               currentNomineeId={membership?.nominee?.id}
               onRemove={onRemove}
+              onEdit={startEdit}
               onVerify={onVerify}
               saving={saving}
             />)}
@@ -362,7 +462,6 @@ export default function FamilyDashboardTab() {
             <strong>{nominee.name || nominee.fullName || 'Nominee'}</strong>
             <dl>
               <div><dt>Role</dt><dd>{nominee.nomineeRole || nominee.designation || 'Nominee'}</dd></div>
-              {nominee.memberNo && <div><dt>Member number</dt><dd>{nominee.memberNo}</dd></div>}
               <div><dt>Email</dt><dd>{nominee.emailConfirmed || nominee.emailConfirmedAt ? 'Confirmed' : 'Not confirmed'}</dd></div>
               <div><dt>Points</dt><dd>No points</dd></div>
             </dl>
@@ -377,18 +476,43 @@ export default function FamilyDashboardTab() {
     </section>
 
     {canManageFamily && <section aria-labelledby="family-add-title">
-      <h3 id="family-add-title">Request to add a member</h3>
-      <form className="member-hub__filters" onSubmit={onSubmit}>
-          <label>Name<input name="name" autoComplete="name" maxLength={120} required /></label>
-          <label>Relation<input name="relation" maxLength={40} required /></label>
-          <label>Date of birth<input name="dateOfBirth" type="date" required /></label>
-          <label>Phone<input name="phone" type="tel" autoComplete="tel" maxLength={40} required /></label>
+      <h3 id="family-add-title">{editingMember ? 'Request family member update' : 'Request to add a member'}</h3>
+      <form key={editingMember?.id || editingMember?._id || 'new-family-member'} className="member-hub__filters" onSubmit={onSubmit}>
+          <label>Name<input name="name" autoComplete="name" maxLength={120} defaultValue={editingMember?.name || editingMember?.fullName || ''} required /></label>
+          <label>Relation
+            <select name="relation" value={addRelation} onChange={(event) => {
+              const relation = event.target.value;
+              setAddRelation(relation);
+              setAddAnniversaryDate(parentRelations.has(relation) ? anniversaryForParentSide(parentSide) : '');
+            }} required>
+              <option value="" disabled>Choose a relationship</option>
+              <option value="spouse">Spouse</option>
+              <option value="child">Child</option>
+              <option value="father">Father</option>
+              <option value="mother">Mother</option>
+            </select>
+          </label>
+          {parentRelations.has(addRelation) && <label>Whose parents?
+            <select name="parentSide" value={parentSide} onChange={(event) => {
+              setParentSide(event.target.value);
+              setAddAnniversaryDate(anniversaryForParentSide(event.target.value));
+            }} required>
+              <option value="member">Member’s parents</option>
+              <option value="spouse">Spouse’s parents</option>
+            </select>
+          </label>}
+          <label>Date of birth<input name="dateOfBirth" type="date" defaultValue={editingMember?.dateOfBirth || editingMember?.dob ? new Date(editingMember.dateOfBirth || editingMember.dob).toISOString().slice(0, 10) : ''} required /></label>
+          {(addRelation === 'spouse' || parentRelations.has(addRelation)) && <label>{parentRelations.has(addRelation) ? 'Parents’ anniversary date (optional)' : 'Anniversary date (optional)'}
+            <input name="anniversaryDate" type="date" max={new Date().toISOString().slice(0, 10)} value={addAnniversaryDate} onChange={(event) => setAddAnniversaryDate(event.target.value)} />
+          </label>}
+          <label>Phone<input name="phone" type="tel" autoComplete="tel" maxLength={40} defaultValue={editingMember?.phone || ''} required /></label>
           <label>Photo (optional; JPG, PNG, or WebP, up to 10 MB)
             <input name="photo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
           </label>
           <button className="member-hub__retry" type="submit" disabled={saving}>
-            {saving ? 'Submitting…' : 'Submit add-member request'}
+            {saving ? 'Submitting…' : editingMember ? 'Submit update request' : 'Submit add-member request'}
           </button>
+          {editingMember && <button className="member-hub__retry" type="button" disabled={saving} onClick={() => { setEditingMember(null); setAddRelation(''); setAddAnniversaryDate(''); setParentSide('member'); }}>Cancel edit</button>}
       </form>
     </section>}
 

@@ -79,6 +79,23 @@ describe('membership agreement manifest and consent', () => {
     expect(response.body.languages).toHaveLength(4);
   });
 
+  test('accepts sequential section ids beyond s21, including three-digit ids', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'oriana-terms-many-sections-'));
+    const versionDirectory = path.join(directory, 'v1');
+    await mkdir(versionDirectory, { recursive: true });
+    const headings = Array.from({ length: 123 }, (_, index) => (
+      `<h2 id="s${index + 1}">Section ${index + 1}</h2>`
+    )).join('');
+
+    try {
+      await writeFile(path.join(versionDirectory, 'en.html'), `<main>${headings}</main>`);
+      const manifest = await buildTermsManifest(directory);
+      expect(manifest.languages.map(({ code }) => code)).toContain('en');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   test('lists Hindi, Marathi, and Gujarati when optional English files are absent', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'oriana-terms-no-en-'));
     const versionDirectory = path.join(directory, 'v1');

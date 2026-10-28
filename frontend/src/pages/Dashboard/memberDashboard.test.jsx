@@ -52,10 +52,13 @@ function expectNoExpiryDetails() {
 }
 
 describe('member dashboard privacy guard', () => {
+  let membershipResponse;
+
   beforeEach(() => {
+    membershipResponse = dashboardData;
     window.fetch = jest.fn(async (input) => {
       const path = new URL(input, window.location.href).pathname;
-      if (path.endsWith('/me/membership')) return jsonResponse(dashboardData);
+      if (path.endsWith('/me/membership')) return jsonResponse(membershipResponse);
       if (path.endsWith('/me/points-history')) {
         return jsonResponse({ items: [], page: 1, limit: 10, total: 0, pages: 0 });
       }
@@ -100,5 +103,33 @@ describe('member dashboard privacy guard', () => {
       await waitFor(() => expect(screen.getByRole('tabpanel', { name: tabName })).toBeTruthy());
       expectNoExpiryDetails();
     }
+  });
+
+  test('shows membership and points validity dates for an active membership', async () => {
+    membershipResponse = {
+      ...dashboardData,
+      status: 'active',
+      activatedAt: '2026-10-27T07:01:50.829Z',
+      membershipExpireAt: '2051-10-27T07:01:50.829Z',
+      membershipValidityYears: 25,
+      pointsExpireAt: '2037-10-27T07:01:50.942Z',
+      pointsValidityYears: 11,
+    };
+
+    render(
+      <AuthContext.Provider value={{ user: { firstName: 'Amit' }, logout: jest.fn() }}>
+        <MemoryRouter>
+          <MemberDashboardPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    expect(await screen.findByText('Membership valid until')).toBeTruthy();
+    expect(screen.getByText('27 Oct 2051')).toBeTruthy();
+    expect(screen.getByText('25 years')).toBeTruthy();
+    expect(screen.getByText('Points valid until')).toBeTruthy();
+    expect(screen.getByText('27 Oct 2037')).toBeTruthy();
+    expect(screen.getByText('11 years')).toBeTruthy();
+    expect(screen.getByText('Valid until 27 Oct 2037')).toBeTruthy();
   });
 });

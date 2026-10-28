@@ -20,7 +20,7 @@ export default function MembershipMembersPage() {
   }, [filters]);
 
   const columns = [
-    { key: 'memberCode', label: 'Member code', render: (row) => row.formattedMemberCode || '—' },
+    { key: 'memberCode', label: 'Member ID', render: (row) => row.formattedMemberCode || '—' },
     { key: 'name', label: 'Name', render: (row) => <Link className="font-semibold text-forest hover:underline" to={`/membership/members/${row._id}`}>{row.profile?.fullName || row.user?.firstName || '—'}</Link> },
     { key: 'tier', label: 'Tier', render: (row) => row.plan?.name || row.plan?.title || '—' },
     { key: 'status', label: 'Status', render: (row) => <Badge>{row.status}</Badge> },
@@ -33,10 +33,10 @@ export default function MembershipMembersPage() {
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: 1 }));
 
   return <section>
-    <PageHeading eyebrow="MEMBERSHIP" title="Members" description="Search by name, phone, member code or member number." />
+    <PageHeading eyebrow="MEMBERSHIP" title="Members" description="Search by name, phone, Member ID, sequence digits or legacy code." />
     {error && <Toast kind="error" onDismiss={() => setError('')}>{error}</Toast>}
     <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <input className={controlClass} aria-label="Search members" placeholder="Name, phone, member code or number" value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} />
+      <input className={controlClass} aria-label="Search members" placeholder="Name, phone, Member ID, sequence digits or legacy code" value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} />
       <select className={controlClass} aria-label="Filter membership tier" value={filters.tier} onChange={(event) => updateFilter('tier', event.target.value)}><option value="">All tiers</option>{plans.map((plan) => <option key={plan._id} value={plan._id}>{plan.name}</option>)}</select>
       <select className={controlClass} aria-label="Filter membership status" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)}><option value="">All statuses</option>{['draft', 'pending_payment', 'pending_verification', 'active', 'expired', 'cancelled'].map((status) => <option key={status}>{status}</option>)}</select>
       <select className={controlClass} aria-label="Filter documents pending" value={filters.documentsPending} onChange={(event) => updateFilter('documentsPending', event.target.value)}><option value="">All document states</option><option value="true">Documents pending</option></select>
