@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { ArrowRight, Sparkles, ChevronRight, X, Search, ChevronLeft } from "lucide-react";
 import "./Blog.css";
 import { contentApi } from "../../lib/contentApi.js";
@@ -145,9 +145,9 @@ function SlideCapsuleButton({ onExplore }) {
 }
 
 export default function Blog() {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const heroRef = useRef(null);
-  const consideredRef = useRef(null);
+  // const consideredRef = useRef(null);
   const cardsRef = useRef(null);
   const catalogueRef = useRef(null);
 
@@ -207,9 +207,9 @@ export default function Blog() {
     catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleJoinContact = () => {
-    navigate("/#enquiry");
-  };
+  // const handleJoinContact = () => {
+  //   navigate("/#enquiry");
+  // };
 
   const openSlidePage = (story, index = 0) => {
     setSelectedStory(story);
@@ -540,67 +540,7 @@ export default function Blog() {
         )}
       </AnimatePresence>
 
-{/* ========================================================
-          4. JOIN THE ORIANAA CLUB — Two-column Card (Figma Matched)
-      ======================================================== */}
-      <section className="b2-join">
-        <Motion.div
-          className="b2-join__card"
-          initial={{ opacity: 0, y: 45 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {/* Left: Resort Bedroom photo */}
-          <div className="b2-join__img-wrap">
-            <Motion.img
-              src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=85&w=1600&auto=format&fit=crop"
-              alt="Orianaa Club luxury room"
-              className="b2-join__img"
-              initial={{ scale: 1.08 }}
-              whileInView={{ scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <div className="b2-join__img-overlay" />
-          </div>
 
-          {/* Right: Text Copy & Button */}
-          <div className="b2-join__copy">
-            <Motion.h2
-              className="b2-join__heading"
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-            >
-              Join The<br />Orianaa Club
-            </Motion.h2>
-            <Motion.p
-              className="b2-join__desc"
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.32, duration: 0.6 }}
-            >
-              Join our circle for private invitations and stories from the Orianaa world.
-            </Motion.p>
-            <Motion.button
-              type="button"
-              className="b2-join__btn"
-              onClick={handleJoinContact}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.45, duration: 0.55 }}
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              Contact Us
-            </Motion.button>
-          </div>
-        </Motion.div>
-      </section>
     </main>
     
   );
