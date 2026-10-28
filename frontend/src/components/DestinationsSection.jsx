@@ -451,21 +451,31 @@ export default function App() {
         }
 
         .ERexplore-btn {
-          padding: 12px 36px;
-          border: 1.5px solid #8d8d8d;
+          padding: 14px 38px;
+          border: 1px solid rgba(226, 173, 50, 0.35);
           border-radius: 999px;
-          background: transparent;
-          font-size: 14px;
+          background: #0d4a39;
+          font-size: 14.5px;
           font-weight: 600;
-          color: #111111;
+          letter-spacing: 0.03em;
+          color: #e2ad32;
           cursor: pointer;
-          transition: all 0.3s ease;
+          box-shadow:
+            0 0 0 1px rgba(226, 173, 50, 0.35),
+            0 12px 35px rgba(13, 74, 57, 0.45);
+          transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .ERexplore-btn:hover {
-          background: #111111;
-          color: #ffffff;
-          border-color: #111111;
+          background: #0b4531;
+          color: #f1d99c;
+          border-color: rgba(223, 204, 158, 0.82);
+          transform: translateY(-2px);
+          box-shadow:
+            0 0 0 1px rgba(213, 187, 124, 0.45),
+            0 8px 26px rgba(183, 155, 99, 0.27),
+            0 14px 35px rgba(13, 74, 57, 0.55),
+            inset 0 1px 0 rgba(255, 255, 255, 0.24);
         }
 
         @media (max-width: 1200px) {

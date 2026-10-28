@@ -202,9 +202,9 @@ export default function Events() {
 
 
 
-  const scrollToCatalogue = () => {
-    catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  // const scrollToCatalogue = () => {
+  //   catalogueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // };
 
   /* When clicking an event card in the down grid section, update active event and redirect/scroll to the Events & Celebrations featured spotlight */
   const handleEventSelect = (eventId) => {
@@ -262,21 +262,12 @@ export default function Events() {
             <div className="ev2-hero__actions">
               <Motion.button
                 type="button"
-                className="ev2-hero__about-btn"
-                onClick={scrollToCatalogue}
-                whileHover={{ scale: 1.04, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                Explore Events <ArrowRight size={14} style={{ marginLeft: 6 }} />
-              </Motion.button>
-              <Motion.button
-                type="button"
                 className="ev2-hero__membership-btn"
                 onClick={() => navigate("/luxury-membership")}
                 whileHover={{ scale: 1.04, y: -2 }}
                 whileTap={{ scale: 0.97 }}
               >
-                About Membership
+                Add Membership
               </Motion.button>
             </div>
           </div>

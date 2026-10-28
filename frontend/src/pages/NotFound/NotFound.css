@@ -206,24 +206,32 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--midnight-blue, #0B1220);
-  background: linear-gradient(135deg, var(--luxury-gold, #D4A017) 0%, var(--sunset-orange, #FF8A3D) 100%);
-  border: none;
+  color: #e2ad32;
+  background: #0d4a39;
+  border: 1px solid rgba(226, 173, 50, 0.35);
   border-radius: 999px;
   cursor: pointer;
   text-decoration: none;
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-  box-shadow: 0 4px 20px rgba(212, 160, 23, 0.3);
+  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 0 0 1px rgba(226, 173, 50, 0.35),
+    0 12px 35px rgba(13, 74, 57, 0.45);
 }
 
 .not-found__cta:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 8px 32px rgba(212, 160, 23, 0.45);
-  color: var(--midnight-blue, #0B1220);
+  transform: translateY(-2px);
+  background: #0b4531;
+  color: #f1d99c;
+  border-color: rgba(223, 204, 158, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(213, 187, 124, 0.45),
+    0 8px 26px rgba(183, 155, 99, 0.27),
+    0 14px 35px rgba(13, 74, 57, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .not-found__cta:active {
-  transform: translateY(-1px) scale(1);
+  transform: translateY(0) scale(0.98);
 }
 
 .not-found__cta-icon {
