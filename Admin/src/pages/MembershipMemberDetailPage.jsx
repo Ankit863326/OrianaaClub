@@ -216,7 +216,9 @@ export default function MembershipMemberDetailPage() {
     { key: 'createdAt', label: 'Date', render: (row) => formatDate(row.createdAt) },
     { key: 'type', label: 'Type' },
     { key: 'amount', label: 'Amount', render: (row) => `${row.direction}${formatPoints(row.amount)} pts` },
-    { key: 'balanceAfter', label: 'Balance after', render: (row) => `${formatPoints(row.balanceAfter)} pts` },
+    { key: 'balanceAfter', label: 'Balance after', render: (row) => Number.isSafeInteger(row.balanceAfter)
+      ? `${formatPoints(row.balanceAfter)} pts`
+      : '—' },
     { key: 'note', label: 'Note' },
   ];
   const familyColumns = () => [

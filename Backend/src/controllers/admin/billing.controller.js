@@ -1,6 +1,7 @@
 import * as billingService from '../../services/billing.service.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import { recordRequestAction } from '../../services/audit.service.js';
+import * as membershipAdminService from '../../services/membership-admin.service.js';
 
 export const createApiKey = asyncHandler(async (request, response) => {
   const data = await billingService.createBillingApiKey(request.user._id, request.validated.body.name);
@@ -71,7 +72,7 @@ export const cancelRedemption = asyncHandler(async (request, response) => {
 });
 
 export const membershipLedger = asyncHandler(async (request, response) => {
-  const data = await billingService.getMembershipLedger(
+  const data = await membershipAdminService.getMembershipLedger(
     request.validated.params.id,
     request.validated.query,
   );

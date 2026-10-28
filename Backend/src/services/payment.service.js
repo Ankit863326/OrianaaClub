@@ -254,12 +254,42 @@ export async function processRazorpayWebhook(rawBody, signature, eventId) {
   return { received: true, processed: true };
 }
 
+async function ensureCounterExists(name) {
+  try {
+    await Counter.updateOne(
+      { name },
+      { $setOnInsert: { name, value: 0 } },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+  } catch (error) {
+    if (error.code !== 11000 || !await Counter.exists({ name })) throw error;
+  }
+  await Counter.updateOne(
+    { name, value: null },
+    { $set: { value: 0 } },
+  );
+}
+
+async function preparePaymentCounters(paymentId) {
+  const now = new Date();
+  const payment = await Payment.findById(paymentId).select('confirmedAt').lean();
+  const confirmedAt = payment?.confirmedAt ? new Date(payment.confirmedAt) : now;
+  const receiptYear = Number.isNaN(confirmedAt.getTime()) ? now.getUTCFullYear() : confirmedAt.getUTCFullYear();
+  const invoiceYears = [now.getUTCFullYear(), now.getUTCFullYear() + 1];
+  await Promise.all([
+    ...invoiceYears.map((year) => ensureCounterExists(`invoice-${year}`)),
+    ensureCounterExists(`receipt-${receiptYear}`),
+    ensureCounterExists(`receipt-${now.getUTCFullYear()}`),
+  ]);
+}
+
 async function incrementCounter(name, session) {
   const counter = await Counter.findOneAndUpdate(
     { name },
-    { $inc: { value: 1 }, $setOnInsert: { name } },
-    { new: true, upsert: true, session, setDefaultsOnInsert: true },
+    { $inc: { value: 1 } },
+    { new: true, session },
   );
+  if (!counter) throw new ApiError(503, 'A payment sequence is unavailable. Please retry confirmation.');
   return counter.value;
 }
 
@@ -285,8 +315,10 @@ function paiseToWholeRupees(paise) {
 }
 
 export async function finalizePayment(paymentId, options = {}) {
+  await preparePaymentCounters(paymentId);
   const session = await mongoose.startSession();
   let result;
+  let retryWithAllocatedInvoice = false;
   try {
     await session.withTransaction(async () => {
       const payment = await Payment.findById(paymentId).session(session);
@@ -315,7 +347,7 @@ export async function finalizePayment(paymentId, options = {}) {
       ) {
         throw new ApiError(409, 'A verified Razorpay payment is required before confirmation.');
       }
-      let invoiceNumber = payment.invoiceNumber;
+      let invoiceNumber = options.forceGeneratedInvoice ? '' : payment.invoiceNumber;
       if (invoiceNumber && await Payment.exists({
         invoiceNumber,
         _id: { $ne: payment._id },
@@ -437,10 +469,21 @@ export async function finalizePayment(paymentId, options = {}) {
       await payment.save({ session });
       result = payment;
     });
+  } catch (error) {
+    const invoiceNumberCollision = error.code === 11000
+      && (error.keyPattern?.invoiceNumber || /invoiceNumber_1/.test(error.message || ''));
+    if (invoiceNumberCollision && !options.forceGeneratedInvoice) {
+      retryWithAllocatedInvoice = true;
+    } else {
+      throw error;
+    }
   } finally {
     await session.endSession();
   }
 
+  if (retryWithAllocatedInvoice) {
+    return finalizePayment(paymentId, { ...options, forceGeneratedInvoice: true });
+  }
   return result;
 }
 
@@ -1151,8 +1194,8 @@ export async function changePaymentMethod(paymentId, {
   const payment = await Payment.findOne({ _id: paymentId, status: 'pending' });
   if (!payment) throw new ApiError(404, 'Pending payment was not found.');
   const normalizedReference = reference.trim();
-  const utr = ['bank_transfer', 'upi'].includes(method) ? normalizedReference : '';
-  if (['bank_transfer', 'upi'].includes(method) && !normalizedReference) {
+  const utr = ['bank_transfer', 'upi', 'rtgs'].includes(method) ? normalizedReference : '';
+  if (['bank_transfer', 'upi', 'rtgs'].includes(method) && !normalizedReference) {
     throw new ApiError(400, 'A UTR or reference number is required for this payment method.');
   }
   if (utr && await Payment.exists({

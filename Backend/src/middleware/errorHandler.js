@@ -38,13 +38,32 @@ export default function errorHandler(error, request, response, next) {
     return;
   }
 
-  const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500;
-  const isSafeApiError = error.name === 'ApiError'
+  const isApiError = error.name === 'ApiError'
     && Number.isInteger(error.statusCode)
-    && error.statusCode < 500;
-  const message = env.nodeEnv === 'production'
-    ? (isSafeApiError ? redactErrorDetails(error.message) : 'Internal server error.')
-    : redactErrorDetails(error.message || 'Internal server error.');
+    && error.statusCode >= 400
+    && error.statusCode < 600;
+  const isSafeApiError = isApiError && error.statusCode < 500;
+  const developmentMessage = error.message || 'The server could not complete this request.';
+  let statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500;
+  let safeMessage = error.message || 'The server could not complete this request.';
+  if (!isApiError && error.code === 11000) {
+    statusCode = 409;
+    safeMessage = 'A record with the same unique value already exists. Refresh and try again.';
+  } else if (!isApiError && error.name === 'CastError') {
+    statusCode = 400;
+    safeMessage = 'A record identifier or filter value is invalid. Refresh and try again.';
+  } else if (!isApiError && error.name === 'ValidationError') {
+    statusCode = 400;
+    safeMessage = 'The submitted data is invalid. Review the fields and try again.';
+  } else if (!isApiError && /Mongo(Network|ServerSelection|Timeout|ServerError)/i.test(error.name || '')) {
+    statusCode = 503;
+    safeMessage = 'The database is temporarily unavailable. Please try again shortly.';
+  } else if (!isApiError && statusCode >= 500) {
+    safeMessage = 'The server could not complete this request. Please try again shortly.';
+  }
+  const message = redactErrorDetails(env.nodeEnv === 'production' && !isApiError
+    ? safeMessage
+    : developmentMessage);
   const body = { status: 'error', success: false, data: null, message };
   if (isSafeApiError && error.code) body.code = error.code;
 

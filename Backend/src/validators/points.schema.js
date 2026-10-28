@@ -6,9 +6,12 @@ export const pointsCategories = [
 ];
 
 const positiveInteger = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER);
-const optionalDate = z.string().trim().optional().refine(
-  (value) => !value || !Number.isNaN(Date.parse(value)),
-  'Date filter must be a valid date.',
+const optionalDate = z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().trim().optional().refine(
+    (value) => !value || !Number.isNaN(Date.parse(value)),
+    'Date filter must be a valid date.',
+  ),
 );
 
 export const pointsHistorySchema = z.object({

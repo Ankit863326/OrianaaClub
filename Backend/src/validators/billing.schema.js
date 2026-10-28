@@ -64,8 +64,8 @@ export const membershipLedgerParamsSchema = z.object({
 });
 export const redemptionParamsSchema = z.object({ id: objectId });
 export const redemptionsQuerySchema = z.object({
-  from: z.string().trim().optional(),
-  to: z.string().trim().optional(),
+  from: z.preprocess((value) => value === '' ? undefined : value, z.string().trim().optional()),
+  to: z.preprocess((value) => value === '' ? undefined : value, z.string().trim().optional()),
   memberCode: z.string().trim().max(32).optional(),
   serviceType: serviceType.optional(),
   status: z.enum(['confirmed', 'cancelled']).optional(),

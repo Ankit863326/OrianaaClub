@@ -14,7 +14,6 @@ import {
   membershipRenewalSchema,
   membershipSearchQuerySchema,
   membershipSettingsPatchSchema,
-  memberLedgerQuerySchema,
   pointsExpiringQuerySchema,
   queueQuerySchema,
   verificationRejectSchema,
@@ -104,11 +103,4 @@ router.post(
   validate(cancelAdminBillSchema),
   controller.cancelBill,
 );
-router.get(
-  '/memberships/:id/ledger',
-  validate(membershipIdParamsSchema, 'params'),
-  validate(memberLedgerQuerySchema, 'query'),
-  controller.ledger,
-);
-
 export default router;

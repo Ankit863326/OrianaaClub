@@ -7,6 +7,7 @@ import MembershipPlan from '../models/MembershipPlan.js';
 import Payment from '../models/Payment.js';
 import Plan from '../models/Plan.js';
 import PointsTransaction from '../models/PointsTransaction.js';
+import PointsLedger from '../models/PointsLedger.js';
 import Profile from '../models/Profile.js';
 import { getSettings } from '../models/Setting.js';
 import User from '../models/User.js';
@@ -16,6 +17,8 @@ import { sendAdminActivation } from './auth.service.js';
 import { finalizePayment } from './payment.service.js';
 import { findMemberMatches } from './member-search.service.js';
 import { getMembershipMemberCode } from '../utils/memberCode.js';
+import adminDateRange from '../utils/adminDateRange.js';
+import { hydrateMembershipReferences } from './admin-reference.service.js';
 
 function pagination(query) {
   const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
@@ -69,19 +72,20 @@ export async function listMembers(query) {
     User.countDocuments(filter),
   ]);
   const ids = users.map((user) => user._id);
-  const [profiles, memberships] = await Promise.all([
+  const [profiles, rawMemberships] = await Promise.all([
     Profile.find({ user: { $in: ids } }).lean(),
     Membership.find({
       $and: [
         { $or: [{ user: { $in: ids } }, { customer: { $in: ids } }] },
         membershipFilter,
       ],
-    }).sort({ createdAt: -1 }).populate('plan', 'name title slug').lean(),
+    }).sort({ createdAt: -1 }).lean(),
   ]);
+  const memberships = await hydrateMembershipReferences(rawMemberships);
   const profileByUser = new Map(profiles.map((profile) => [String(profile.user), profile]));
   const membershipByUser = new Map();
   memberships.forEach((membership) => {
-    const userId = membership.user || membership.customer;
+    const userId = membership.user?._id || membership.user || membership.customer?._id || membership.customer;
     if (userId && !membershipByUser.has(String(userId))) membershipByUser.set(String(userId), membership);
   });
   return {
@@ -109,13 +113,14 @@ export async function listMembers(query) {
 export async function getMemberDetails(userId) {
   const user = await User.findOne({ _id: userId, role: 'member', deletedAt: null }).lean();
   if (!user) throw new ApiError(404, 'Member was not found.');
-  const [profile, membership, payments] = await Promise.all([
+  const [profile, rawMembership, payments] = await Promise.all([
     Profile.findOne({ user: userId }).lean(),
     Membership.findOne({ $or: [{ user: userId }, { customer: userId }] })
-      .sort({ createdAt: -1 }).populate('plan').lean(),
+      .sort({ createdAt: -1 }).lean(),
     Payment.find({ user: userId }).sort({ createdAt: -1 }).lean(),
   ]);
-  const [family, points] = await Promise.all([
+  const [membership] = await hydrateMembershipReferences(rawMembership ? [rawMembership] : []);
+  const [family, transactionPoints, awardPoints] = await Promise.all([
     membership ? FamilyMember.find({ membership: membership._id }).sort({ createdAt: 1 }).lean() : [],
     membership
       ? PointsTransaction.aggregate([
@@ -123,7 +128,20 @@ export async function getMemberDetails(userId) {
         { $group: { _id: '$type', total: { $sum: '$amount' }, count: { $sum: 1 } } },
       ])
       : [],
+    membership
+      ? PointsLedger.aggregate([
+        { $match: { memberId: membership._id } },
+        { $group: { _id: null, total: { $sum: '$points' }, count: { $sum: 1 } } },
+      ])
+      : [],
   ]);
+  const pointSummary = new Map(transactionPoints.map((entry) => [entry._id, entry]));
+  if (awardPoints[0]) {
+    const credits = pointSummary.get('credit') || { _id: 'credit', total: 0, count: 0 };
+    credits.total += awardPoints[0].total;
+    credits.count += awardPoints[0].count;
+    pointSummary.set('credit', credits);
+  }
   return {
     user,
     profile,
@@ -132,7 +150,7 @@ export async function getMemberDetails(userId) {
       : null,
     family,
     payments,
-    points,
+    points: [...pointSummary.values()],
   };
 }
 
@@ -311,12 +329,7 @@ function paymentFilter(query = {}) {
   const filter = {};
   if (query.status) filter.status = query.status;
   if (query.method) filter.method = query.method;
-  if (query.from || query.to) {
-    filter.createdAt = {};
-    if (query.from) filter.createdAt.$gte = new Date(`${query.from}T00:00:00.000Z`);
-    if (query.to) filter.createdAt.$lte = new Date(`${query.to}T23:59:59.999Z`);
-  }
-  return filter;
+  return { ...filter, ...adminDateRange(query.from, query.to) };
 }
 
 async function hydratePaymentReferences(payments, { includeVerificationDocs = false } = {}) {
@@ -439,7 +452,16 @@ export async function dashboardSummary() {
   const signupStart = new Date();
   signupStart.setUTCDate(signupStart.getUTCDate() - 29);
   signupStart.setUTCHours(0, 0, 0, 0);
-  const [memberStatuses, signups, paidSummary, revenueMonths, planCounts, pendingBankTransfers, pointsTotals] = await Promise.all([
+  const [
+    memberStatuses,
+    signups,
+    paidSummary,
+    revenueMonths,
+    planCounts,
+    pendingBankTransfers,
+    pointsTotals,
+    approvalAwards,
+  ] = await Promise.all([
     User.aggregate([{ $match: { role: 'member', deletedAt: null } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     User.aggregate([
       { $match: { role: 'member', deletedAt: null, createdAt: { $gte: signupStart } } },
@@ -454,15 +476,52 @@ export async function dashboardSummary() {
     ]),
     Membership.aggregate([
       { $match: { status: { $ne: 'cancelled' } } },
-      { $group: { _id: '$plan', count: { $sum: 1 } } },
-      { $lookup: { from: Plan.collection.name, localField: '_id', foreignField: '_id', as: 'plan' } },
-      { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
-      { $project: { plan: '$plan.title', count: 1 } },
+      {
+        $group: {
+          _id: { id: '$plan', model: { $ifNull: ['$planModel', ''] } },
+          count: { $sum: 1 },
+        },
+      },
+      { $lookup: { from: Plan.collection.name, localField: '_id.id', foreignField: '_id', as: 'legacyPlan' } },
+      {
+        $lookup: {
+          from: MembershipPlan.collection.name,
+          localField: '_id.id',
+          foreignField: '_id',
+          as: 'membershipPlan',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          plan: {
+            $cond: [
+              { $eq: ['$_id.model', 'MembershipPlan'] },
+              { $ifNull: [{ $arrayElemAt: ['$membershipPlan.name', 0] }, 'Unknown'] },
+              {
+                $ifNull: [
+                  { $arrayElemAt: ['$legacyPlan.title', 0] },
+                  {
+                    $ifNull: [
+                      { $arrayElemAt: ['$legacyPlan.name', 0] },
+                      { $ifNull: [{ $arrayElemAt: ['$membershipPlan.name', 0] }, 'Unknown'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          count: 1,
+        },
+      },
       { $sort: { count: -1 } },
     ]),
     Payment.countDocuments({ method: 'bank_transfer', status: 'pending_verification' }),
     PointsTransaction.aggregate([
       { $group: { _id: '$type', total: { $sum: '$amount' } } },
+    ]),
+    PointsLedger.aggregate([
+      { $group: { _id: null, total: { $sum: '$points' } } },
     ]),
   ]);
   const statusTotals = Object.fromEntries(memberStatuses.map((row) => [row._id, row.count]));
@@ -494,7 +553,10 @@ export async function dashboardSummary() {
     },
     planCounts,
     pendingBankTransfers,
-    points: { issued: pointTotals.credit || 0, spent: pointTotals.debit || 0 },
+    points: {
+      issued: (pointTotals.credit || 0) + (approvalAwards[0]?.total || 0),
+      spent: pointTotals.debit || 0,
+    },
   };
 }
 

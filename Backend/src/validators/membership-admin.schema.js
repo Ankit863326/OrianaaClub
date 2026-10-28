@@ -2,9 +2,16 @@ import { z } from 'zod';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid identifier.');
 const membershipId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid membership id');
-const optionalDate = z.string().trim().optional().refine(
-  (value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)),
-  'Date filters must use YYYY-MM-DD.',
+const optionalDate = z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().trim().refine(
+    (value) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    },
+    'Date filters must use YYYY-MM-DD.',
+  ).optional(),
 );
 const pagination = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),

@@ -13,17 +13,19 @@ const paymentMethods = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
   { value: 'netbanking', label: 'Online' },
+  { value: 'rtgs', label: 'RTGS bank transfer' },
 ];
 
 function editableMethod(method) {
   if (paymentMethods.some((item) => item.value === method)) return method;
-  if (method === 'rtgs') return 'bank_transfer';
   return ['razorpay', 'card'].includes(method) ? 'netbanking' : 'cash';
 }
 
 function paymentMethodLabel(method) {
   return paymentMethods.find((item) => item.value === method)?.label
-    || (method === 'rtgs' ? 'Offline bank transfer' : method || 'payment');
+    || (method === 'razorpay' ? 'Online (Razorpay)'
+      : method === 'card' ? 'Online (card)'
+        : method || 'payment');
 }
 
 function paymentEditValues(payment) {
@@ -182,7 +184,7 @@ export default function PaymentsPage() {
           <input
             className={controlClass}
             value={paymentEdit.reference}
-            required={['bank_transfer', 'upi'].includes(paymentEdit.method)}
+            required={['bank_transfer', 'upi', 'rtgs'].includes(paymentEdit.method)}
             disabled={selected.status !== 'pending'}
             onChange={(event) => setPaymentEdit({ ...paymentEdit, reference: event.target.value })}
           />

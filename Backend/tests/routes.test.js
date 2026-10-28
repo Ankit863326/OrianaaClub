@@ -446,7 +446,7 @@ describe('member profile, plan, family, and payment routes', () => {
       });
     expect(rejectedManualAmount.status).toBe(400);
     for (const method of ['cash', 'manual', 'netbanking']) {
-      expect((await request(app).post('/api/admin/payments')
+      const response = await request(app).post('/api/admin/payments')
         .set('Cookie', admin.cookie)
         .set('X-Admin-Request', '1')
         .send({
@@ -454,8 +454,11 @@ describe('member profile, plan, family, and payment routes', () => {
           method,
           amount: 2625000,
           reference: 'LEGACY-METHOD',
-        })).status).toBe(400);
+        });
+      expect(response.status).toBe(201);
+      expect(response.body.data.method).toBe(method);
     }
+
     const manualPayment = await request(app).post('/api/admin/payments')
       .set('Cookie', admin.cookie)
       .set('X-Admin-Request', '1')

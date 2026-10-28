@@ -7,11 +7,14 @@ const pagination = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
-const optionalDate = z.string().trim().refine((value) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}, 'Dates must be valid and use YYYY-MM-DD.').optional();
+const optionalDate = z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().trim().refine((value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }, 'Dates must be valid and use YYYY-MM-DD.').optional(),
+);
 const uploadedImagePath = z.string().regex(
   /^\/media\/[a-f\d-]+\.(?:jpg|png|webp)$/i,
   'Choose a supported uploaded image.',

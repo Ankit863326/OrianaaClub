@@ -4,9 +4,10 @@ if (!configuredApiUrl) {
   throw new Error('VITE_API_URL must be configured for the current Vite mode.');
 }
 
-export const API_BASE_URL = new URL(configuredApiUrl, window.location.href)
-  .toString()
-  .replace(/\/+$/, '');
+const parsedApiUrl = new URL(configuredApiUrl, window.location.href);
+const apiPath = parsedApiUrl.pathname.replace(/\/+$/, '');
+if (!apiPath.endsWith('/api')) parsedApiUrl.pathname = `${apiPath}/api`;
+export const API_BASE_URL = parsedApiUrl.toString().replace(/\/+$/, '');
 
 export function getImageUrl(path) {
   if (typeof path !== 'string' || !path.trim()) return '';

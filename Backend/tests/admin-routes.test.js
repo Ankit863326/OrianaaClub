@@ -11,6 +11,8 @@ import MembershipDraft from '../src/models/MembershipDraft.js';
 import Plan from '../src/models/Plan.js';
 import EmailLog from '../src/models/EmailLog.js';
 import Counter from '../src/models/Counter.js';
+import PointsLedger from '../src/models/PointsLedger.js';
+import MembershipPlan from '../src/models/MembershipPlan.js';
 
 const app = createApp();
 
@@ -20,6 +22,83 @@ function adminRequest(admin, method, path) {
 
 // Admin success paths verify the same privileged operations protected by the route matrix.
 describe('admin member and plan routes', () => {
+  test('member and membership detail reads flag stale polymorphic plan references', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const member = await createMember({
+      membership: { plan: plan._id, memberNo: '4242001', status: 'active' },
+    });
+    await Membership.collection.updateOne(
+      { _id: member.membership._id },
+      { $set: { planModel: 'RemovedPlanModel' } },
+    );
+
+    const members = await adminRequest(admin, 'get', '/api/admin/members');
+    expect(members.status).toBe(200);
+    const listed = members.body.data.items.find((item) => item._id === String(member.user._id));
+    expect(listed.membership.plan).toBeNull();
+    expect(listed.membership.brokenReferences).toContain('plan');
+
+    const memberDetails = await adminRequest(admin, 'get', `/api/admin/members/${member.user._id}`);
+    expect(memberDetails.status).toBe(200);
+    expect(memberDetails.body.data.membership.brokenReferences).toContain('plan');
+
+    const membershipDetails = await adminRequest(
+      admin,
+      'get',
+      `/api/admin/memberships/${member.membership._id}/details`,
+    );
+    expect(membershipDetails.status).toBe(200);
+    expect(membershipDetails.body.data.membership.brokenReferences).toContain('plan');
+
+    const familyTree = await adminRequest(admin, 'get', '/api/admin/memberships/family-tree/4242001');
+    expect(familyTree.status).toBe(200);
+    expect(familyTree.body.data.primary.brokenReferences).toContain('plan');
+  });
+
+  test('dashboard and reports include memberships stored against either plan collection', async () => {
+    const admin = await createAdmin();
+    const membershipPlan = await MembershipPlan.create({
+      name: 'Legacy membership plan',
+      price: 1000,
+      earlyBirdPoints: 10,
+      defaultPoints: 5,
+      renewalPoints: 2,
+      sortOrder: 1,
+    });
+    const member = await createMember({
+      membership: {
+        plan: membershipPlan._id,
+        planModel: 'MembershipPlan',
+        status: 'active',
+      },
+    });
+    await PointsLedger.create({
+      memberId: member.membership._id,
+      pointsBasis: 100,
+      multiplier: 1,
+      phase: 'early_bird',
+      approvalSeq: 1,
+      points: 100,
+      expiresAt: new Date(Date.now() + 86400000),
+    });
+
+    const dashboard = await adminRequest(admin, 'get', '/api/admin/dashboard');
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.body.data.points.issued).toBe(100);
+    expect(dashboard.body.data.planCounts).toContainEqual(
+      expect.objectContaining({ plan: membershipPlan.name, count: 1 }),
+    );
+    const reports = await adminRequest(admin, 'get', '/api/admin/reports');
+    expect(reports.status).toBe(200);
+    expect(reports.body.data.membersByPlan).toContainEqual(
+      expect.objectContaining({ plan: membershipPlan.name, members: 1 }),
+    );
+    expect(reports.body.data.pointsByMonth).toEqual(expect.arrayContaining([
+      expect.objectContaining({ issued: 100, spent: 0 }),
+    ]));
+  });
+
   test('creates, lists, updates, suspends, exports, and soft-deletes a manual member', async () => {
     const admin = await createAdmin();
     const plan = await createPlan({ slug: 'admin-member-plan' });
@@ -549,6 +628,16 @@ describe('admin points, content, enquiry and reports routes', () => {
       membership: { plan: plan._id, status: 'active', pointsBalance: 0 },
     });
     const membershipId = String(member.membership._id);
+    await PointsLedger.create({
+      memberId: member.membership._id,
+      pointsBasis: 100,
+      multiplier: 1,
+      phase: 'early_bird',
+      approvalSeq: 1,
+      points: 100,
+      expiresAt: new Date(Date.now() + 86400000),
+    });
+    expect(await PointsLedger.countDocuments({ memberId: member.membership._id })).toBe(1);
     const credit = await adminRequest(admin, 'post', '/api/admin/points/credit').send({
       membershipId, amount: 20, category: 'adjustment', reason: 'Admin award',
     });
@@ -561,6 +650,16 @@ describe('admin points, content, enquiry and reports routes', () => {
     });
     expect(bulkCredit.status).toBe(200);
     expect((await adminRequest(admin, 'get', `/api/admin/members/${member.user._id}/points`)).status).toBe(200);
+    const ledger = await adminRequest(admin, 'get', `/api/admin/memberships/${membershipId}/ledger`);
+    expect(ledger.status).toBe(200);
+    expect(ledger.body.data.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: 'approval_award',
+        type: 'credit_joining',
+        amount: 100,
+        direction: '+',
+      }),
+    ]));
     expect(await AuditLog.countDocuments({ entityType: 'membership' })).toBe(3);
   });
 
@@ -689,6 +788,35 @@ describe('admin draft member routes', () => {
 });
 
 describe('admin payments routes', () => {
+  test('concurrent first confirmations safely initialize invoice and receipt counters', async () => {
+    await Promise.all([Counter.init(), Payment.init()]);
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const members = await Promise.all([
+      createMember({ membership: { plan: plan._id, status: 'pending_payment' } }),
+      createMember({ membership: { plan: plan._id, status: 'pending_payment' } }),
+    ]);
+    const payments = await Promise.all(members.map((member) => Payment.create({
+      user: member.user._id,
+      membership: member.membership._id,
+      plan: plan._id,
+      method: 'cash',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+    })));
+
+    const confirmations = await Promise.all(payments.map((payment) => (
+      adminRequest(admin, 'patch', `/api/admin/payments/${payment._id}/confirm`)
+    )));
+    expect(confirmations.map((response) => response.status)).toEqual([200, 200]);
+    const invoiceNumbers = confirmations.map((response) => response.body.data.payment.invoiceNumber);
+    const receiptNumbers = confirmations.map((response) => response.body.data.payment.receiptNumber);
+    expect(new Set(invoiceNumbers).size).toBe(2);
+    expect(new Set(receiptNumbers).size).toBe(2);
+  });
+
   test('approves and rejects bank transfers and rejects a duplicate UTR', async () => {
     await Payment.init();
     const admin = await createAdmin();

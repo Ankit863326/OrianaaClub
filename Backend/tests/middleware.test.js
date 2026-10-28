@@ -188,8 +188,16 @@ describe('error responses and NoSQL input sanitizing', () => {
   });
 
   test('health route responds from the real app', async () => {
-    expect((await request(createApp()).get('/api/health')).status).toBe(200);
-    expect((await request(createApp()).get('/health')).status).toBe(200);
+    const apiHealth = await request(createApp()).get('/api/health');
+    const rootHealth = await request(createApp()).get('/health');
+    expect(apiHealth.status).toBe(200);
+    expect(apiHealth.body).toEqual({
+      status: 'ok',
+      database: 'connected',
+      replicaSet: 'connected',
+    });
+    expect(rootHealth.status).toBe(200);
+    expect(rootHealth.body).toEqual(apiHealth.body);
   });
 
   test('credentialed CORS accepts configured origins and rejects unknown origins', async () => {

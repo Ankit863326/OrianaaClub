@@ -5,7 +5,6 @@ import {
   adminCancelSchema,
   apiKeyCreateSchema,
   apiKeyParamsSchema,
-  ledgerQuerySchema,
   membershipAdjustmentParamsSchema,
   membershipLookupQuerySchema,
   membershipLedgerParamsSchema,
@@ -13,6 +12,7 @@ import {
   redemptionsQuerySchema,
   redemptionParamsSchema,
 } from '../../validators/billing.schema.js';
+import { memberLedgerQuerySchema } from '../../validators/membership-admin.schema.js';
 
 const router = Router();
 router.post('/api-keys', validate(apiKeyCreateSchema), billingController.createApiKey);
@@ -32,7 +32,7 @@ router.post(
 router.get(
   '/memberships/:id/ledger',
   validate(membershipLedgerParamsSchema, 'params'),
-  validate(ledgerQuerySchema, 'query'),
+  validate(memberLedgerQuerySchema, 'query'),
   billingController.membershipLedger,
 );
 router.get('/redemptions', validate(redemptionsQuerySchema, 'query'), billingController.listRedemptions);

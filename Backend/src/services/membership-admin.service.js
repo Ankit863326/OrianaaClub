@@ -17,57 +17,12 @@ import { formatMemberCode, getMembershipMemberCode, isMemberId } from '../utils/
 import { findMemberMatches } from './member-search.service.js';
 import { listMembershipsWithPointsExpiring } from './membership-expiry.service.js';
 import { groupFamily } from './family.service.js';
+import { hydrateMembershipReferences } from './admin-reference.service.js';
 
 function pagination(query) {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
   return { page, limit, skip: (page - 1) * limit };
-}
-
-async function hydrateMembershipReferences(memberships) {
-  const memberIds = [...new Set(memberships
-    .map((membership) => membership.user || membership.customer)
-    .filter((id) => mongoose.isValidObjectId(id))
-    .map(String))];
-  const planReferences = [...new Map(memberships
-    .filter((membership) => mongoose.isValidObjectId(membership.plan))
-    .map((membership) => [
-      `${membership.planModel || 'Plan'}:${membership.plan}`,
-      { model: membership.planModel || 'Plan', id: String(membership.plan) },
-    ])).values()];
-  const [users, legacyPlans, membershipPlans] = await Promise.all([
-    memberIds.length
-      ? User.find({ _id: { $in: memberIds } })
-        .select('firstName email status activationEmailStatus activationEmailSentAt').lean()
-      : [],
-    planReferences.some((reference) => reference.model === 'Plan')
-      ? Plan.find({ _id: { $in: planReferences.filter((item) => item.model === 'Plan').map((item) => item.id) } })
-        .select('name title price sortOrder slug').lean()
-      : [],
-    planReferences.some((reference) => reference.model === 'MembershipPlan')
-      ? MembershipPlan.find({ _id: { $in: planReferences.filter((item) => item.model === 'MembershipPlan').map((item) => item.id) } })
-        .select('name price').lean()
-      : [],
-  ]);
-  const userById = new Map(users.map((user) => [String(user._id), user]));
-  const planByReference = new Map([
-    ...legacyPlans.map((plan) => [`Plan:${plan._id}`, plan]),
-    ...membershipPlans.map((plan) => [`MembershipPlan:${plan._id}`, plan]),
-  ]);
-  return memberships.map((membership) => {
-    const userId = membership.user || membership.customer;
-    const user = userById.get(String(userId)) || null;
-    const plan = planByReference.get(`${membership.planModel || 'Plan'}:${membership.plan}`) || null;
-    return {
-      ...membership,
-      user,
-      plan,
-      brokenReferences: [
-        !user && 'member',
-        !plan && 'plan',
-      ].filter(Boolean),
-    };
-  });
 }
 
 function legacyCodePattern(value) {
@@ -88,6 +43,44 @@ function familyMemberType(member) {
   if (relation.includes('mother')) return 'mother';
   if (relation.includes('son') || relation.includes('daughter') || relation === 'child') return 'child';
   return member.memberType || (member.type === 'child' ? 'child' : 'spouse');
+}
+
+export async function getMembershipLedger(membershipId, { page = 1, limit = 20, type = '' } = {}) {
+  const membership = await Membership.findById(membershipId).select('termNumber').lean();
+  if (!membership) throw new ApiError(404, 'Membership was not found.');
+  const awardType = membership.termNumber > 1 ? 'credit_renewal' : 'credit_joining';
+  const includeAwards = !type || type === awardType;
+  const skip = (page - 1) * limit;
+  const take = skip + limit;
+  const pointFilter = { membership: membershipId, ...(type ? { type } : {}) };
+  const awardFilter = { memberId: membershipId };
+  const [pointTotal, awardTotal, pointEntries, awardEntries] = await Promise.all([
+    PointLedger.countDocuments(pointFilter),
+    includeAwards ? PointsLedger.countDocuments(awardFilter) : 0,
+    PointLedger.find(pointFilter).sort({ createdAt: -1, _id: -1 }).limit(take).lean(),
+    includeAwards
+      ? PointsLedger.find(awardFilter).sort({ creditedAt: -1, _id: -1 }).limit(take).lean()
+      : [],
+  ]);
+  const normalizedAwards = awardEntries.map((entry) => ({
+    ...entry,
+    type: awardType,
+    amount: entry.points,
+    direction: '+',
+    balanceAfter: null,
+    note: `Membership approval award · ${entry.phase || 'standard'} rate, sequence ${entry.approvalSeq ?? 'unknown'}.`,
+    source: 'approval_award',
+    createdAt: entry.creditedAt || entry.createdAt || null,
+  }));
+  const items = [...pointEntries, ...normalizedAwards]
+    .sort((left, right) => {
+      const timeDifference = new Date(right.createdAt || 0).getTime()
+        - new Date(left.createdAt || 0).getTime();
+      return timeDifference || String(right._id).localeCompare(String(left._id));
+    })
+    .slice(skip, take);
+  const total = pointTotal + awardTotal;
+  return { items, page, limit, total, pages: Math.ceil(total / limit) };
 }
 
 async function listFamilyNominees(query) {
@@ -501,27 +494,28 @@ export async function getFamilyTree(memberNo) {
   const primaryId = exactMembership?.memberType === 'primary'
     ? exactMembership._id
     : exactMembership?.linkedTo || exactProfile?.membership || exactMembership?._id;
-  const primary = primaryId ? await Membership.findById(primaryId)
-    .populate('plan', 'name title slug')
-    .populate('user', 'firstName email')
-    .lean() : null;
+  const rawPrimary = mongoose.isValidObjectId(primaryId)
+    ? await Membership.findById(primaryId).lean()
+    : null;
+  const [primary] = await hydrateMembershipReferences(rawPrimary ? [rawPrimary] : []);
   if (!primary || primary.memberType && primary.memberType !== 'primary') {
     throw new ApiError(404, 'Family membership was not found.');
   }
 
-  const [profile, familyProfiles, linkedMemberships, settings] = await Promise.all([
-    Profile.findOne({ user: primary.user?._id }).select('fullName').lean(),
+  const [profile, familyProfiles, rawLinkedMemberships, settings] = await Promise.all([
+    primary.user?._id ? Profile.findOne({ user: primary.user._id }).select('fullName').lean() : null,
     FamilyMember.find({ membership: primary._id, isPrimary: { $ne: true }, status: { $ne: 'removed' } })
       .sort({ createdAt: 1, _id: 1 }).lean(),
-    Membership.find({ $or: [{ _id: primary._id }, { linkedTo: primary._id }] }).populate('plan', 'name title').lean(),
+    Membership.find({ $or: [{ _id: primary._id }, { linkedTo: primary._id }] }).lean(),
     getSettings(),
   ]);
+  const linkedMemberships = await hydrateMembershipReferences(rawLinkedMemberships);
   const profileIds = familyProfiles.map((item) => item._id);
   const [verifications, points, identity] = await Promise.all([
     profileIds.length ? Verification.find({ memberId: { $in: profileIds } }).select('memberId status').lean() : [],
     PointsLedger.find({ memberId: { $in: linkedMemberships.map((item) => item._id) } })
       .sort({ creditedAt: -1 }).lean(),
-    IdentityVerification.findOne({ user: primary.user?._id }).select('status').lean(),
+    primary.user?._id ? IdentityVerification.findOne({ user: primary.user._id }).select('status').lean() : null,
   ]);
   const membershipByProfile = new Map(linkedMemberships.filter((item) => item.familyMember)
     .map((item) => [String(item.familyMember), item]));
@@ -567,6 +561,7 @@ export async function getFamilyTree(memberNo) {
       nominee,
       nomineeRole: familyProfile?.nomineeRole || membership.nomineeRole || '',
       parentSide: familyProfile?.parentSide || membership.parentSide || null,
+      brokenReferences: membership.brokenReferences || [],
       ledger: nominee ? [] : points.filter((entry) => String(entry.memberId) === String(membership._id)),
     };
   };
@@ -636,24 +631,32 @@ export async function getFamilyTree(memberNo) {
 }
 
 export async function getMembershipDetails(membershipId) {
-  const membership = await Membership.findById(membershipId)
-    .populate('plan')
-    .populate('user', 'firstName email status activationEmailStatus activationEmailSentAt')
-    .populate('previousMembership', 'memberCode memberNumber termNumber status')
-    .lean();
+  const rawMembership = await Membership.findById(membershipId).lean();
+  const [membership] = await hydrateMembershipReferences(rawMembership ? [rawMembership] : []);
   if (!membership) throw new ApiError(404, 'Membership was not found.');
+  if (mongoose.isValidObjectId(membership.previousMembership)) {
+    membership.previousMembership = await Membership.findById(membership.previousMembership)
+      .select('memberCode memberNumber termNumber status').lean();
+    if (!membership.previousMembership) membership.brokenReferences.push('previous membership');
+  } else if (membership.previousMembership) {
+    membership.previousMembership = null;
+    membership.brokenReferences.push('previous membership');
+  }
   const [profile, family, payments, nominee, settings] = await Promise.all([
-    Profile.findOne({ user: membership.user?._id }).select('fullName mobile dob photoUrl').lean(),
+    membership.user?._id
+      ? Profile.findOne({ user: membership.user._id }).select('fullName mobile dob photoUrl').lean()
+      : null,
     FamilyMember.find({ membership: membership._id }).sort({ createdAt: 1 }).lean(),
     Payment.find({ membership: membership._id })
       .select('amount baseAmount gstRate gstEnabled gstLabel gstAmount totalAmount method status reference note createdAt confirmedBy plan planModel')
-      .sort({ createdAt: -1 }).populate('plan', 'name title').lean(),
-    membership.nominee
+      .sort({ createdAt: -1 }).lean(),
+    mongoose.isValidObjectId(membership.nominee)
       ? FamilyMember.findOne({ _id: membership.nominee, membership: membership._id, status: 'active' })
         .select('name fullName relation relationship type').lean()
       : null,
     getSettings(),
   ]);
+  if (membership.nominee && !nominee) membership.brokenReferences.push('nominee');
   const now = new Date();
   const pointsBalance = Number.isSafeInteger(membership.pointsBalance) ? membership.pointsBalance : 0;
   const canRenew = ['active', 'expired'].includes(membership.status)
@@ -661,7 +664,7 @@ export async function getMembershipDetails(membershipId) {
   const [plans, recentRedemptions, ledger] = await Promise.all([
     canRenew ? MembershipPlan.find({ isActive: true }).sort({ sortOrder: 1 }).lean() : [],
     Redemption.find({ membership: membership._id }).sort({ createdAt: -1 }).limit(20).lean(),
-    PointLedger.find({ membership: membership._id }).sort({ createdAt: -1 }).limit(20).lean(),
+    getMembershipLedger(membership._id, { limit: 20 }),
   ]);
   const safeDocs = (membership.verificationDocs || []).map((doc) => ({
     id: doc.id,
@@ -703,7 +706,7 @@ export async function getMembershipDetails(membershipId) {
     },
     discountPercent: membership.status === 'active' ? settings.discountPercent : 0,
     redemptions: recentRedemptions,
-    ledger,
+    ledger: ledger.items,
   };
 }
 

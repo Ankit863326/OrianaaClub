@@ -1,6 +1,5 @@
 // Phase 0/1: Expose health status and mount the account API.
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import authRoutes from './auth.routes.js';
 import planRoutes from './plan.routes.js';
 import memberRoutes from './member.routes.js';
@@ -16,22 +15,11 @@ import billingRoutes from './billing.routes.js';
 import membershipDraftRoutes from './membership-draft.routes.js';
 import termsRoutes from './terms.routes.js';
 import membershipTermsRoutes from './membership-terms.routes.js';
-import { env } from '../config/env.js';
+import { health } from '../controllers/health.controller.js';
 
 const router = Router();
 
-router.get('/health', (request, response) => {
-  const readyState = mongoose.connection.readyState;
-  if (env.nodeEnv === 'production') {
-    const isReady = readyState === 1;
-    response.status(isReady ? 200 : 503).json({ status: isReady ? 'ok' : 'unavailable' });
-    return;
-  }
-  response.json({
-    status: 'ok',
-    database: readyState === 1 ? 'connected' : readyState === 2 ? 'connecting' : 'disconnected',
-  });
-});
+router.get('/health', health);
 
 router.use('/auth', authRoutes);
 router.use('/me', meRoutes);

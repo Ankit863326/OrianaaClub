@@ -7,7 +7,7 @@ jest.unstable_mockModule('../../src/config/env.js', () => ({
 
 const { default: errorHandler } = await import('../src/middleware/errorHandler.js');
 
-test('production error handler hides internal message and stack', () => {
+test('production error handler returns a safe action message and hides stack', () => {
   const response = {
     headersSent: false,
     status(code) {
@@ -20,8 +20,24 @@ test('production error handler hides internal message and stack', () => {
   };
   errorHandler(new Error('private detail'), {}, response, () => {});
   expect(response.statusCode).toBe(500);
-  expect(response.body.message).toBe('Internal server error.');
+  expect(response.body.message).toBe('The server could not complete this request. Please try again shortly.');
   expect(response.body).not.toHaveProperty('stack');
+});
+
+test('production error handler gives a safe message for duplicate records', () => {
+  const response = {
+    headersSent: false,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+    },
+  };
+  errorHandler({ name: 'MongoServerError', code: 11000, message: 'duplicate private-index detail' }, {}, response, () => {});
+  expect(response.statusCode).toBe(409);
+  expect(response.body.message).toBe('A record with the same unique value already exists. Refresh and try again.');
 });
 
 test('production error handler returns the safe identity-encryption configuration message', () => {

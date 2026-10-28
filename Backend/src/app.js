@@ -14,6 +14,7 @@ import errorHandler from './middleware/errorHandler.js';
 import noSqlSanitizer from './middleware/noSqlSanitizer.js';
 import ApiError from './utils/ApiError.js';
 import routes from './routes/index.js';
+import { health } from './controllers/health.controller.js';
 
 const app = express();
 
@@ -72,9 +73,7 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ['Content-Type', 'X-Admin-Request', 'X-Api-Key', 'X-Api-Signature'],
 }));
-app.get('/health', (request, response) => {
-  response.json({ status: 'ok' });
-});
+app.get('/health', health);
 app.use('/terms', express.static(termsDirectory, {
   dotfiles: 'deny',
   index: false,

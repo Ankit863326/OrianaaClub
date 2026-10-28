@@ -7,15 +7,19 @@ import Event from '../models/Event.js';
 import Membership from '../models/Membership.js';
 import FamilyMember from '../models/FamilyMember.js';
 import mongoose from 'mongoose';
+import MembershipPlan from '../models/MembershipPlan.js';
 import Payment from '../models/Payment.js';
 import PointsTransaction from '../models/PointsTransaction.js';
+import PointsLedger from '../models/PointsLedger.js';
 import Post from '../models/Post.js';
 import User from '../models/User.js';
+import Plan from '../models/Plan.js';
 import ApiError from '../utils/ApiError.js';
 import { getMembershipMemberCode, isMemberId } from '../utils/memberCode.js';
 import { createEmailToken } from './token.service.js';
 import { sendMail } from './mail.service.js';
 import { env } from '../config/env.js';
+import adminDateRange from '../utils/adminDateRange.js';
 
 function pageArgs(query) {
   const page = Math.max(1, Number(query.page) || 1);
@@ -28,15 +32,7 @@ function pageResult(items, total, page, limit) {
 }
 
 function dateFilter(from, to, field = 'createdAt') {
-  if (!from && !to) return {};
-  const range = {};
-  if (from) range.$gte = new Date(from);
-  if (to) {
-    const end = new Date(to);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(to)) end.setUTCHours(23, 59, 59, 999);
-    range.$lte = end;
-  }
-  return { [field]: range };
+  return adminDateRange(from, to, field);
 }
 
 export async function publicPosts(query = {}) {
@@ -374,13 +370,48 @@ export async function reports(query = {}) {
     status: { $in: ['paid', 'partially_refunded', 'refunded'] },
   };
   const pointsFilter = dateFilter(query.from, query.to);
-  const [membersByPlan, revenueByMonth, pointsByMonth] = await Promise.all([
+  const approvalAwardFilter = adminDateRange(query.from, query.to, 'creditedAt');
+  const [membersByPlan, revenueByMonth, pointsByMonth, approvalAwardsByMonth] = await Promise.all([
     Membership.aggregate([
       { $match: { ...membershipFilter, status: { $nin: ['cancelled', 'expired'] } } },
-      { $group: { _id: '$plan', members: { $sum: 1 } } },
-      { $lookup: { from: 'plans', localField: '_id', foreignField: '_id', as: 'plan' } },
-      { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
-      { $project: { plan: { $ifNull: ['$plan.title', 'Unknown'] }, members: 1 } },
+      {
+        $group: {
+          _id: { id: '$plan', model: { $ifNull: ['$planModel', ''] } },
+          members: { $sum: 1 },
+        },
+      },
+      { $lookup: { from: Plan.collection.name, localField: '_id.id', foreignField: '_id', as: 'legacyPlan' } },
+      {
+        $lookup: {
+          from: MembershipPlan.collection.name,
+          localField: '_id.id',
+          foreignField: '_id',
+          as: 'membershipPlan',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          plan: {
+            $cond: [
+              { $eq: ['$_id.model', 'MembershipPlan'] },
+              { $ifNull: [{ $arrayElemAt: ['$membershipPlan.name', 0] }, 'Unknown'] },
+              {
+                $ifNull: [
+                  { $arrayElemAt: ['$legacyPlan.title', 0] },
+                  {
+                    $ifNull: [
+                      { $arrayElemAt: ['$legacyPlan.name', 0] },
+                      { $ifNull: [{ $arrayElemAt: ['$membershipPlan.name', 0] }, 'Unknown'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          members: 1,
+        },
+      },
       { $sort: { members: -1 } },
     ]),
     Payment.aggregate([
@@ -393,12 +424,22 @@ export async function reports(query = {}) {
       { $group: { _id: { month: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, type: '$type' }, total: { $sum: '$amount' } } },
       { $sort: { '_id.month': 1 } },
     ]),
+    PointsLedger.aggregate([
+      { $match: approvalAwardFilter },
+      { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$creditedAt' } }, total: { $sum: '$points' } } },
+      { $sort: { _id: 1 } },
+    ]),
   ]);
   const pointsMap = new Map();
   for (const row of pointsByMonth) {
     const value = pointsMap.get(row._id.month) || { month: row._id.month, issued: 0, spent: 0 };
     value[row._id.type === 'credit' ? 'issued' : 'spent'] = row.total;
     pointsMap.set(row._id.month, value);
+  }
+  for (const row of approvalAwardsByMonth) {
+    const value = pointsMap.get(row._id) || { month: row._id, issued: 0, spent: 0 };
+    value.issued += row.total;
+    pointsMap.set(row._id, value);
   }
   return { membersByPlan, revenueByMonth, pointsByMonth: [...pointsMap.values()] };
 }

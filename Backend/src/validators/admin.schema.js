@@ -122,7 +122,7 @@ export const paymentsQuerySchema = paginationSchema.extend({
 }, 'Payment date range must contain valid dates in chronological order.');
 
 export const paymentMethodChangeSchema = z.object({
-  method: z.enum(['bank_transfer', 'cheque', 'cash', 'upi', 'netbanking']),
+  method: z.enum(['bank_transfer', 'cheque', 'cash', 'upi', 'netbanking', 'rtgs']),
   reference: z.string().trim().max(200).optional().default(''),
   invoiceNumber: z.preprocess(
     (value) => value === '' ? undefined : value,
@@ -132,7 +132,7 @@ export const paymentMethodChangeSchema = z.object({
   ).transform((value) => value || ''),
   reason: z.string().trim().min(1, 'A reason is required to change payment details.').max(500),
 }).superRefine((body, context) => {
-  if (['bank_transfer', 'upi'].includes(body.method) && !body.reference) {
+  if (['bank_transfer', 'upi', 'rtgs'].includes(body.method) && !body.reference) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['reference'],

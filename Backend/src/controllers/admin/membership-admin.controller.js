@@ -6,12 +6,13 @@ import { writeCsvHeader, writeCsvRow } from '../../utils/csv.js';
 import { cancelAdminRedemption } from '../../services/billing.service.js';
 import { listMembershipsWithPointsExpiring } from '../../services/membership-expiry.service.js';
 import Membership from '../../models/Membership.js';
-import PointLedger from '../../models/PointLedger.js';
 import Redemption from '../../models/Redemption.js';
 import ApiError from '../../utils/ApiError.js';
 import { getMembershipMemberCode } from '../../utils/memberCode.js';
 import * as identityVerificationService from '../../services/identity-verification.service.js';
 import * as membershipApprovalService from '../../services/membership-approval.service.js';
+import adminDateRange from '../../utils/adminDateRange.js';
+import { hydrateMembershipReferences } from '../../services/admin-reference.service.js';
 
 export const listPlans = asyncHandler(async (request, response) => {
   const data = await membershipAdminService.listMembershipPlans();
@@ -233,15 +234,7 @@ export const exportBills = asyncHandler(async (request, response) => {
   if (query.memberCode) {
     filter.memberCode = query.memberCode.toUpperCase().replace(/^OC-/, '').replace(/[\s-]/g, '');
   }
-  if (query.from || query.to) {
-    filter.createdAt = {};
-    if (query.from) filter.createdAt.$gte = new Date(query.from);
-    if (query.to) {
-      const end = new Date(query.to);
-      end.setUTCHours(23, 59, 59, 999);
-      filter.createdAt.$lte = end;
-    }
-  }
+  Object.assign(filter, adminDateRange(query.from, query.to));
   const cursor = Redemption.find(filter).sort({ createdAt: -1 }).cursor();
   writeCsvHeader(response, 'membership-bills.csv', [
     'Date', 'Member ID', 'Service', 'Booking ID', 'Bill ID',
@@ -249,8 +242,9 @@ export const exportBills = asyncHandler(async (request, response) => {
     'Status', 'Refunded points',
   ]);
   for await (const bill of cursor) {
+    const createdAt = bill.createdAt ? new Date(bill.createdAt) : null;
     writeCsvRow(response, [
-      bill.createdAt.toISOString(),
+      createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toISOString() : '',
       bill.memberCode,
       bill.serviceType,
       bill.bookingId,
@@ -281,11 +275,12 @@ export const cancelBill = asyncHandler(async (request, response) => {
 
 export const pendingMemberships = asyncHandler(async (request, response) => {
   const status = request.validated.query.status;
-  const result = await Membership.find({ status: { $in: status ? [status] : ['pending_payment', 'pending_verification'] } })
+  const rawMemberships = await Membership.find({
+    status: { $in: status ? [status] : ['pending_payment', 'pending_verification'] },
+  })
     .sort({ createdAt: 1 })
-    .populate('user', 'firstName email')
-    .populate('plan', 'name price')
     .lean();
+  const result = await hydrateMembershipReferences(rawMemberships);
   response.json({ success: true, data: result, message: 'Pending memberships loaded.' });
 });
 
@@ -293,21 +288,4 @@ export const pointsExpiring = asyncHandler(async (request, response) => {
   const withinDays = Number(request.validated.query.withinDays);
   const data = await listMembershipsWithPointsExpiring(withinDays);
   response.json({ success: true, data, message: 'Expiring points memberships loaded.' });
-});
-
-export const ledger = asyncHandler(async (request, response) => {
-  const membership = await Membership.exists({ _id: request.validated.params.id });
-  if (!membership) throw new ApiError(404, 'Membership was not found.');
-  const { page, limit } = request.validated.query;
-  const filter = { membership: request.validated.params.id };
-  if (request.validated.query.type) filter.type = request.validated.query.type;
-  const [items, total] = await Promise.all([
-    PointLedger.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-    PointLedger.countDocuments(filter),
-  ]);
-  response.json({
-    success: true,
-    data: { items, page, limit, total, pages: Math.ceil(total / limit) },
-    message: 'Membership ledger loaded.',
-  });
 });

@@ -13,6 +13,7 @@
     "setup:env": "node scripts/setupEnv.js",
     "env:check": "node scripts/envCheck.js",
     "db:check": "node scripts/dbCheck.js",
+    "db:repair-legacy-admin-data": "node scripts/repairLegacyAdminData.js",
     "db:migrate:membership-terms": "node scripts/migrateMembershipTermIndexes.js",
     "db:migrate:family-membership": "node scripts/migrateFamilyMembership.js",
     "db:migrate:terms-consents": "node scripts/migrateTermsConsents.js",

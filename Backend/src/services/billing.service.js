@@ -14,6 +14,7 @@ import { getMembershipMemberCode } from '../utils/memberCode.js';
 import { getSettings } from '../models/Setting.js';
 import { applyPointsChange } from './point-change.service.js';
 import { findMemberMatches, memberSearchError } from './member-search.service.js';
+import adminDateRange from '../utils/adminDateRange.js';
 
 const hashApiKey = (key) => createHash('sha256').update(key).digest('hex');
 const legacyCodePattern = (value) => {
@@ -494,15 +495,7 @@ export async function listRedemptions(query) {
     if (membershipIds.length) filter.membership = { $in: membershipIds };
     else filter.memberCode = { $in: [search, search.replace(/\s+/g, '')] };
   }
-  if (query.from || query.to) {
-    filter.createdAt = {};
-    if (query.from) filter.createdAt.$gte = new Date(query.from);
-    if (query.to) {
-      const end = new Date(query.to);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) end.setUTCHours(23, 59, 59, 999);
-      filter.createdAt.$lte = end;
-    }
-  }
+  Object.assign(filter, adminDateRange(query.from, query.to));
   const [items, total] = await Promise.all([
     Redemption.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Redemption.countDocuments(filter),
