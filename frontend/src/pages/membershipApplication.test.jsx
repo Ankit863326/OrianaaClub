@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AuthContext from '../context/auth-context.js';
+import AgreementReaderModal from '../components/AgreementReaderModal.jsx';
 import MembershipAll from './LuxuryMembershipStepOne/MembershipAll.jsx';
 
 const jsonResponse = (body, status = 200) => ({
@@ -28,9 +29,9 @@ const userId = '64a000000000000000000001';
 const termsManifest = {
   version: 'v1',
   effectiveFrom: '2026-10-20',
-  languages: ['hi', 'mr', 'gu'].map((code, index) => ({
+  languages: ['en', 'hi', 'mr', 'gu'].map((code, index) => ({
     code,
-    label: ['Hindi', 'Marathi', 'Gujarati'][index],
+    label: ['English', 'हिन्दी', 'मराठी', 'ગુજરાતી'][index],
     pdfUrl: `/terms/v1/${code}.pdf`,
     htmlUrl: `/terms/v1/${code}.html`,
     sha256: code.repeat(32),
@@ -42,16 +43,20 @@ const termsManifest = {
     'The AMC is the annual maintenance charge described in the agreement.',
   ],
 };
-const termsHtml = `<main>${Array.from({ length: 21 }, (_, index) => (
-  `<h2 id="s${index + 1}">Section ${index + 1}</h2>`
-)).join('')}</main>`;
+const termsHtml = (language) => {
+  const sectionName = { en: 'Section', hi: 'धारा', mr: 'कलम', gu: 'કલમ' }[language];
+  return `<main>${Array.from({ length: 21 }, (_, index) => (
+    `<h2 id="s${index + 1}">${sectionName} ${index + 1}</h2>`
+  )).join('')}</main>`;
+};
 
 function setUpApi(identityStatus = 'verified', {
   membership: currentMembership = member.membership,
   membershipGate = null,
+  family: currentFamily = member.family,
 } = {}) {
   fetch.mockImplementation(async (url, options = {}) => {
-    const requestUrl = new URL(url);
+    const requestUrl = new URL(url, window.location.href);
     const path = requestUrl.pathname;
     const method = options.method || 'GET';
     if (path.endsWith('/terms/current')) return jsonResponse(termsManifest);
@@ -67,10 +72,13 @@ function setUpApi(identityStatus = 'verified', {
         language: body.language,
       } }, 201);
     }
-    if (/\/terms\/v1\/(hi|mr|gu)\.html$/.test(path)) {
-      return { ok: true, status: 200, text: async () => termsHtml };
+    const agreementPath = path.match(/\/terms\/v1\/(en|hi|mr|gu)\.html$/);
+    if (agreementPath) {
+      return { ok: true, status: 200, text: async () => termsHtml(agreementPath[1]) };
     }
-    if (path.endsWith('/member/me')) return jsonResponse({ data: { ...member, membership: currentMembership } });
+    if (path.endsWith('/member/me')) return jsonResponse({
+      data: { ...member, membership: currentMembership, family: currentFamily },
+    });
     if (path.endsWith('/family-prices')) return jsonResponse({ data: {
       tier: 'founder-legacy',
       familyEnabled: true,
@@ -108,7 +116,7 @@ function setUpApi(identityStatus = 'verified', {
     if (path.endsWith('/member/family') && method === 'POST') {
       const values = options.body;
       return jsonResponse({ data: {
-        _id: 'family-new',
+        _id: `family-${values.get('fullName')}`,
         fullName: values.get('fullName'),
         gender: values.get('gender'),
         relationship: values.get('relationship'),
@@ -119,6 +127,7 @@ function setUpApi(identityStatus = 'verified', {
         workEmail: values.get('workEmail'),
         phone: values.get('phone'),
         dob: values.get('dob') || null,
+        parentSide: values.get('parentSide') || undefined,
       } });
     }
     if (path.endsWith('/member/family/family-old') && method === 'PUT') return jsonResponse({ data: { ...member.family[0], fullName: 'Sam Updated' } });
@@ -241,6 +250,25 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
     let agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
     let agreementText = agreementDialog.querySelector('.terms-modal__text');
+    await waitFor(() => {
+      expect(agreementDialog.querySelector('.terms-agreement-content #s1')).toHaveTextContent('धारा 1');
+      expect(agreementDialog.querySelectorAll('.terms-modal__sections li')).toHaveLength(21);
+    });
+    for (const [code, label] of [
+      ['en', 'English'],
+      ['hi', 'हिन्दी'],
+      ['mr', 'मराठी'],
+      ['gu', 'ગુજરાતી'],
+    ]) {
+      fireEvent.click(within(agreementDialog).getByRole('tab', { name: label }));
+      const expectedUrl = `http://localhost:5000/terms/v1/${code}.html`;
+      const expectedSectionName = { en: 'Section', hi: 'धारा', mr: 'कलम', gu: 'કલમ' }[code];
+      await waitFor(() => {
+        expect(fetch.mock.calls.some(([url]) => url === expectedUrl)).toBe(true);
+        expect(agreementDialog.querySelector('.terms-agreement-content #s1'))
+          .toHaveTextContent(`${expectedSectionName} 1`);
+      });
+    }
     expect(agreementText).toHaveStyle({ fontSize: '18px', lineHeight: '1.8' });
     fireEvent.click(screen.getByRole('button', { name: 'Increase agreement text size' }));
     expect(agreementText).toHaveStyle({ fontSize: '20px' });
@@ -249,6 +277,9 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
     agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
     agreementText = agreementDialog.querySelector('.terms-modal__text');
+    await waitFor(() => {
+      expect(agreementDialog.querySelector('.terms-agreement-content #s1')).toHaveTextContent('धारा 1');
+    });
     expect(agreementText).toHaveStyle({ fontSize: '20px' });
     Object.defineProperty(agreementText, 'clientHeight', { configurable: true, value: 100 });
     Object.defineProperty(agreementText, 'scrollHeight', { configurable: true, value: 500 });
@@ -264,6 +295,7 @@ describe('integrated membership application and payment flow', () => {
       fireEvent.click(confirmPayment);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+
     expect(fetch.mock.calls.some(([url, options]) => (
       String(url).endsWith('/terms-consent') && options?.method === 'POST'
     ))).toBe(true);
@@ -290,6 +322,37 @@ describe('integrated membership application and payment flow', () => {
     expect(await screen.findByText('Member dashboard destination')).toBeInTheDocument();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/membership/razorpay/verify'))).toBe(true);
     expect(container).toBeInTheDocument();
+  });
+
+  test('shows and logs an agreement content load error instead of an empty modal', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    fetch.mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '',
+    }));
+
+    render(
+      <AgreementReaderModal
+        languages={termsManifest.languages}
+        version="v1"
+        initialLanguage="en"
+        onClose={jest.fn()}
+        onRead={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Agreement content could not be loaded. Please retry.',
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      'Agreement content failed to load.',
+      expect.objectContaining({
+        language: 'en',
+        url: 'http://localhost:5000/terms/v1/en.html',
+        error: expect.any(Error),
+      }),
+    );
   });
 
   test('blocks over-age child profiles and lets nominees be added without family pricing fields', async () => {
@@ -325,6 +388,88 @@ describe('integrated membership application and payment flow', () => {
     expect(request[1].body.get('memberType')).toBe('nominee');
     expect(request[1].body.get('dob')).toBe('');
     expect(request[1].body.get('workEmail')).toBe('casey@example.test');
+  });
+
+  test('saves each family relationship without unrelated sides and shows parent sides in review', async () => {
+    const draftMembership = {
+      status: 'draft',
+      plan: { _id: 'plan-1', slug: 'gold' },
+    };
+    setUpApi('verified', { membership: draftMembership, family: [] });
+    renderMembership('/luxury-membership?step=3');
+    expect(await screen.findByRole('heading', { name: 'Family details' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Riya Spouse' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1990-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
+    expect(await screen.findByText('Riya Spouse')).toBeInTheDocument();
+    let request = fetch.mock.calls.find(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    ));
+    expect(request[1].body.has('parentSide')).toBe(false);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Children' }));
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ari Child' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '2015-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
+    expect(await screen.findByText('Ari Child')).toBeInTheDocument();
+    request = fetch.mock.calls.filter(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    )).at(-1);
+    expect(request[1].body.has('parentSide')).toBe(false);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Extended family' }));
+    const sideSelector = screen.getByLabelText('Whose parent?');
+    expect(sideSelector).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Member Father' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1960-01-01' } });
+    const addFamilyButton = screen.getByRole('button', { name: 'Add family profile' });
+    fireEvent.click(addFamilyButton);
+    expect(await screen.findByText(/Choose whether this is the member’s parent/)).toBeInTheDocument();
+    expect(fetch.mock.calls.filter(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    ))).toHaveLength(2);
+    fireEvent.change(sideSelector, { target: { value: 'member' } });
+    fireEvent.click(addFamilyButton);
+    expect(await screen.findByText('Member Father')).toBeInTheDocument();
+    request = fetch.mock.calls.filter(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    )).at(-1);
+    expect(request[1].body.get('parentSide')).toBe('member');
+
+    fireEvent.change(sideSelector, { target: { value: 'spouse' } });
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Spouse Mother' } });
+    fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1962-01-01' } });
+    fireEvent.click(addFamilyButton);
+    expect(await screen.findByText('Spouse Mother')).toBeInTheDocument();
+    request = fetch.mock.calls.filter(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    )).at(-1);
+    expect(request[1].body.get('parentSide')).toBe('spouse');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Nominees' }));
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'Friend' } });
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Casey Nominee' } });
+    fireEvent.change(screen.getByLabelText('Designation'), { target: { value: 'Advisor' } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'casey@example.test' } });
+    fireEvent.change(screen.getByLabelText('Phone'), { target: { value: '9876543210' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add nominee' }));
+    expect(await screen.findByText('Casey Nominee')).toBeInTheDocument();
+    request = fetch.mock.calls.filter(([url, options]) => (
+      String(url).endsWith('/member/family') && options?.method === 'POST'
+    )).at(-1);
+    expect(request[1].body.has('parentSide')).toBe(false);
+
+    const continueButton = screen.getByRole('button', { name: 'Continue to review' });
+    await waitFor(() => expect(continueButton).toBeEnabled());
+    fireEvent.click(continueButton);
+    expect(await screen.findByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
+    const review = screen.getByRole('region', { name: 'Family profiles and nominees' });
+    expect(within(review).getByText('Riya Spouse')).toBeInTheDocument();
+    expect(within(review).getByText('Ari Child')).toBeInTheDocument();
+    expect(within(review).getByText(/Father · Member’s parent/)).toBeInTheDocument();
+    expect(within(review).getByText(/Mother · Spouse’s parent/)).toBeInTheDocument();
+    expect(within(review).getByText(/Nominee · Friend/)).toBeInTheDocument();
   });
 
   test('restores pending payment details directly from the route token', async () => {
@@ -499,8 +644,9 @@ describe('integrated membership application and payment flow', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Send password setup link' }));
 
-    expect(await screen.findByText('If the address can be used, instructions will be sent shortly.'))
-      .toBeInTheDocument();
+    const info = await screen.findByText('If the address can be used, instructions will be sent shortly.');
+    expect(info).toHaveAttribute('role', 'status');
+    expect(info).toHaveClass('jm-password-link-message-info');
     expect(screen.getByRole('button', { name: 'Send password setup link' })).toBeEnabled();
   });
 

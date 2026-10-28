@@ -7,6 +7,10 @@ import {
 const email = z.string().trim().email('Enter a valid email address').transform((value) => value.toLowerCase());
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid membership plan ID.');
 const gender = z.enum(['male', 'female', 'other', 'prefer_not_to_say']);
+const parentSideSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.enum(['member', 'spouse']).optional(),
+);
 const formBoolean = z.union([z.boolean(), z.enum(['true', 'false'])])
   .transform((value) => value === true || value === 'true');
 const validateFamilyDraft = (member, context) => {
@@ -17,7 +21,11 @@ const validateFamilyDraft = (member, context) => {
   if (isNominee && !member.workEmail) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['workEmail'], message: 'A nominee work email is required.' });
   }
-  if (['father', 'mother'].includes(member.memberType) && !member.parentSide) {
+  if (
+    (['father', 'mother'].includes(member.memberType)
+      || ['father', 'mother'].includes(member.relationship.toLowerCase()))
+    && !member.parentSide
+  ) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['parentSide'], message: 'Choose whose parent this is.' });
   }
   validateFamilyAnniversary(member, context);
@@ -31,7 +39,7 @@ const familyDraftFields = z.object({
   photoUrl: z.string().max(300).optional(),
   memberType: z.enum(['spouse', 'child', 'father', 'mother', 'nominee_gm', 'nominee_hr', 'nominee']).optional(),
   isNominee: formBoolean.optional().default(false),
-  parentSide: z.enum(['member', 'spouse']).optional(),
+  parentSide: parentSideSchema,
   anniversaryDate: optionalAnniversaryDateSchema,
   wantsOwnMembership: formBoolean.optional().default(false),
   nomineeRole: z.string().trim().max(80).optional().default(''),

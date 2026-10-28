@@ -76,10 +76,9 @@ async function shutdown(signal) {
 
 process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.once('SIGINT', () => shutdown('SIGINT'));
-process.on('unhandledRejection', () => {
-  logger.error('Unhandled rejection; shutting down.');
-  process.exitCode = 1;
-  void shutdown('unhandled rejection');
+process.on('unhandledRejection', (reason) => {
+  const details = reason instanceof Error ? reason.stack || reason.message : String(reason);
+  logger.error(`Unhandled rejection; the failed task requires investigation.\n${details}`);
 });
 
 startServer().catch((error) => {

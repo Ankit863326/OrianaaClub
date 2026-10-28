@@ -23,14 +23,20 @@ export const confirmOfflinePayment = asyncHandler(async (request, response) => {
     request.validated.params.id,
     request.user._id,
   );
-  await recordRequestAction(request, {
-    action: 'membership.payment.confirm',
-    entityType: 'payment',
-    entityId: result.payment._id,
-    summary: `Confirmed offline payment; membership status is ${result.status}.`,
-    after: { paymentStatus: result.payment.status, membershipStatus: result.status },
+  if (!result.alreadyConfirmed) {
+    await recordRequestAction(request, {
+      action: 'membership.payment.confirm',
+      entityType: 'payment',
+      entityId: result.payment._id,
+      summary: `Confirmed offline payment; membership status is ${result.status}.`,
+      after: { paymentStatus: result.payment.status, membershipStatus: result.status },
+    });
+  }
+  response.json({
+    success: true,
+    data: result,
+    message: result.alreadyConfirmed ? 'Offline payment was already confirmed.' : 'Offline payment confirmed.',
   });
-  response.json({ success: true, data: result, message: 'Offline payment confirmed.' });
 });
 
 export const approveVerification = asyncHandler(async (request, response) => {

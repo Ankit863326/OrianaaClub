@@ -106,12 +106,19 @@ export const familyPatchSchema = z.object({
 export const paymentsQuerySchema = paginationSchema.extend({
   status: z.enum(['created', 'pending', 'pending_verification', 'confirmed', 'paid', 'failed', 'rejected', 'refunded', 'partially_refunded']).optional(),
   method: z.enum(['razorpay', 'bank_transfer', 'netbanking', 'cheque', 'rtgs', 'cash', 'manual']).optional(),
-  from: z.string().trim().optional(),
-  to: z.string().trim().optional(),
+  from: z.preprocess((value) => value === '' ? undefined : value,
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
+  to: z.preprocess((value) => value === '' ? undefined : value,
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
 }).refine((query) => {
-  const fromValid = !query.from || !Number.isNaN(Date.parse(query.from));
-  const toValid = !query.to || !Number.isNaN(Date.parse(query.to));
-  return fromValid && toValid && (!query.from || !query.to || Date.parse(query.from) <= Date.parse(query.to));
+  const isValidDate = (value) => {
+    if (!value) return true;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  return isValidDate(query.from)
+    && isValidDate(query.to)
+    && (!query.from || !query.to || query.from <= query.to);
 }, 'Payment date range must contain valid dates in chronological order.');
 
 export const refundBodySchema = z.object({

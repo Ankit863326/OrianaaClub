@@ -70,7 +70,7 @@ const emptyFamilyForm = {
   gender: 'prefer_not_to_say',
   relationship: 'Spouse',
   dob: '',
-  parentSide: 'member',
+  parentSide: '',
   anniversaryDate: '',
   wantsOwnMembership: false,
   nomineeRole: '',
@@ -393,6 +393,7 @@ function MembershipFlow({ upgradeMode = false }) {
   const [passwordLinkEmail, setPasswordLinkEmail] = useState('');
   const [passwordLinkSent, setPasswordLinkSent] = useState(false);
   const [passwordLinkMessage, setPasswordLinkMessage] = useState('');
+  const [passwordLinkRequestError, setPasswordLinkRequestError] = useState(false);
   const [passwordLinkResendSeconds, setPasswordLinkResendSeconds] = useState(0);
   const [helpRequestBusy, setHelpRequestBusy] = useState(false);
   const [helpRequestMessage, setHelpRequestMessage] = useState('');
@@ -417,6 +418,7 @@ function MembershipFlow({ upgradeMode = false }) {
   const [familyPricesError, setFamilyPricesError] = useState('');
   const [familyPricesRetry, setFamilyPricesRetry] = useState(0);
   const [parentAnniversaries, setParentAnniversaries] = useState({ member: '', spouse: '' });
+  const [parentSideError, setParentSideError] = useState('');
   const [loading, setLoading] = useState(true);
   const [applicationLoadError, setApplicationLoadError] = useState('');
   const [applicationLoadRetry, setApplicationLoadRetry] = useState(0);
@@ -986,6 +988,7 @@ function MembershipFlow({ upgradeMode = false }) {
   }
 
   function resetFamilyForm() {
+    setParentSideError('');
     setFamilyForm({
       ...emptyFamilyForm,
       relationship: familyTab === 'children' ? 'Son'
@@ -998,6 +1001,12 @@ function MembershipFlow({ upgradeMode = false }) {
 
   async function submitFamily(event) {
     event.preventDefault();
+    const isParent = ['father', 'mother'].includes(familyForm.relationship.toLowerCase());
+    if (familyTab === 'extended' && isParent && !familyForm.parentSide) {
+      setParentSideError('Choose whether this is the member’s parent or the spouse’s parent.');
+      return;
+    }
+    setParentSideError('');
     const isCorporate = familyPrices?.tier === 'corporate';
     const isNominee = familyTab === 'nominees' || isCorporate;
     const memberType = isNominee
@@ -1045,13 +1054,15 @@ function MembershipFlow({ upgradeMode = false }) {
       const existingParents = existingRelatives.filter((member) => (
         ['father', 'mother'].includes(familyMemberType(member))
       ));
-      if (existingParents.length >= (familyPrices.limits?.parents ?? 0)) {
-        setError(`This tier allows up to ${familyPrices.limits?.parents ?? 0} parents.`);
+      const parentsLimit = Math.min(familyPrices.limits?.parents ?? 4, 4);
+      if (existingParents.length >= parentsLimit) {
+        setError(`This tier allows up to ${parentsLimit} parents.`);
         return;
       }
+      const parentsPerSideLimit = Math.min(familyPrices.limits?.parentsPerSide ?? 2, 2);
       if (existingParents.filter((member) => member.parentSide === familyForm.parentSide).length
-        >= (familyPrices.limits?.parentsPerSide ?? 0)) {
-        setError(`A maximum of ${familyPrices.limits?.parentsPerSide ?? 0} parents is allowed on that side.`);
+        >= parentsPerSideLimit) {
+        setError(`A maximum of ${parentsPerSideLimit} parents is allowed on that side.`);
         return;
       }
     }
@@ -1078,7 +1089,9 @@ function MembershipFlow({ upgradeMode = false }) {
       memberType,
       isNominee,
       dob: isNominee ? '' : dob,
-      parentSide: memberType === 'father' || memberType === 'mother' ? familyForm.parentSide : '',
+      ...(memberType === 'father' || memberType === 'mother'
+        ? { parentSide: familyForm.parentSide }
+        : {}),
       anniversaryDate: familyTab === 'spouse'
         ? familyForm.anniversaryDate
         : familyTab === 'extended'
@@ -1140,6 +1153,7 @@ function MembershipFlow({ upgradeMode = false }) {
           : 'extended';
     const existingRelationship = String(member.relationship || '').toLowerCase();
     setFamilyTab(tab);
+    setParentSideError('');
     setEditingFamilyId(member._id);
     setFamilyForm({
       fullName: member.fullName,
@@ -1154,7 +1168,7 @@ function MembershipFlow({ upgradeMode = false }) {
             ? 'Spouse'
             : member.relationship || 'Nominee',
       dob: dateInputValue(member.dob),
-      parentSide: member.parentSide || 'member',
+      parentSide: ['father', 'mother'].includes(type) ? member.parentSide || '' : '',
       anniversaryDate: dateInputValue(member.anniversaryDate),
       wantsOwnMembership: Boolean(member.wantsOwnMembership),
       nomineeRole: member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : ''),
@@ -1180,6 +1194,7 @@ function MembershipFlow({ upgradeMode = false }) {
 
   function selectFamilyTab(tab) {
     setFamilyTab(tab);
+    setParentSideError('');
     setError('');
     setEditingFamilyId(null);
     setFamilyPhoto(null);
@@ -1491,19 +1506,33 @@ function MembershipFlow({ upgradeMode = false }) {
       const result = response.data || response;
       if (result.sent && result.maskedEmail) {
         setPasswordLinkSent(true);
+        setPasswordLinkRequestError(false);
         setPasswordLinkMessage(`Password link sent to ${result.maskedEmail}`);
         setPasswordLinkResendSeconds(60);
         setProfile((current) => ({ ...current, email: passwordLinkEmail.trim() }));
       } else {
         setPasswordLinkSent(false);
+        setPasswordLinkRequestError(false);
         setPasswordLinkMessage(result.message || response.message || 'If the address can be used, a password link will be sent.');
       }
     } catch (requestError) {
       setPasswordLinkSent(false);
+      setPasswordLinkRequestError(true);
       setPasswordLinkResendSeconds(0);
       setPasswordLinkMessage(requestError.message || 'The password setup link could not be requested.');
     }
   }
+
+  useEffect(() => {
+    if (step === 6) {
+      setError('');
+      setTermsNotice('');
+      setPaymentError('');
+      setPasswordLinkMessage('');
+      setPasswordLinkRequestError(false);
+      setPasswordLinkSent(false);
+    }
+  }, [step]);
 
   async function requestAdminHelp() {
     if (!passwordLinkEmail.trim() || helpRequestBusy) return;
@@ -1598,6 +1627,8 @@ function MembershipFlow({ upgradeMode = false }) {
     || String(selectedPlan?.slug || selectedPlan?.id || '').toLowerCase() === 'corporate';
   const nomineeLimit = familyPrices?.maxNominees ?? 0;
   const familyLimits = familyPrices?.limits;
+  const parentLimit = Math.min(familyLimits?.parents ?? 4, 4);
+  const parentSideLimit = Math.min(familyLimits?.parentsPerSide ?? 2, 2);
   const familyTotal = familyMembers.reduce((sum, member) => {
     const price = priceForFamilyMember(member, familyPrices);
     return sum + (price?.totalPayable ?? 0);
@@ -1933,7 +1964,7 @@ function MembershipFlow({ upgradeMode = false }) {
                 <h2>{corporateTier ? 'Add your nominees' : 'Family details'}</h2>
                 <p>{corporateTier
                   ? 'Nominees are added at no extra cost. Add one General Manager (GM) and one Human Resources (HR) nominee.'
-                  : `Add ${spouseCount}/${familyLimits?.spouse ?? '—'} spouse, ${familyLimits?.children === null ? 'unlimited' : `up to ${familyLimits?.children ?? '—'}`} children (${childCount} added), up to ${familyLimits?.parents ?? '—'} parents (${familyLimits?.parentsPerSide ?? '—'} per side; ${parentMembers.length} added), and up to ${nomineeLimit} nominees. A family profile is not a membership; the person becomes a member when they pay.`}</p>
+                  : `Add ${spouseCount}/${familyLimits?.spouse ?? '—'} spouse, ${familyLimits?.children === null ? 'unlimited' : `up to ${familyLimits?.children ?? '—'}`} children (${childCount} added), up to ${parentLimit} parents (${parentSideLimit} per side; ${parentMembers.length} added), and up to ${nomineeLimit} nominees. A family profile is not a membership; the person becomes a member when they pay.`}</p>
               </header>
 
               {familyPricesLoading && <p className="jm-quote-status" role="status">Loading family prices…</p>}
@@ -2053,16 +2084,30 @@ function MembershipFlow({ upgradeMode = false }) {
 
                   <form className="jm-application-grid jm-family-form" onSubmit={submitFamily}>
                     {familyTab === 'extended' && (
-                      <label className="jm-field">Whose parents?
+                      <div className="jm-field">
+                        <label htmlFor="jm-parent-side">Whose parent?</label>
                         <select
+                          id="jm-parent-side"
                           className="jm-input jm-select"
+                          aria-required="true"
+                          aria-invalid={Boolean(parentSideError)}
+                          aria-describedby={parentSideError ? 'jm-parent-side-error' : undefined}
                           value={familyForm.parentSide}
-                          onChange={(event) => setFamilyForm({ ...familyForm, parentSide: event.target.value })}
+                          onChange={(event) => {
+                            setFamilyForm({ ...familyForm, parentSide: event.target.value });
+                            setParentSideError('');
+                          }}
                         >
-                          <option value="member">Member’s parents</option>
-                          <option value="spouse">Spouse’s parents</option>
+                          <option value="">Select a parent side</option>
+                          <option value="member">Member’s parent</option>
+                          <option value="spouse">Spouse’s parent</option>
                         </select>
-                      </label>
+                        {parentSideError && (
+                          <span id="jm-parent-side-error" className="jm-api-message jm-api-message--error" role="alert">
+                            {parentSideError}
+                          </span>
+                        )}
+                      </div>
                     )}
                     <label className="jm-field">Full name
                       <input className="jm-input" required minLength="2" maxLength="120" value={familyForm.fullName}
@@ -2156,7 +2201,7 @@ function MembershipFlow({ upgradeMode = false }) {
                       {member.photoUrl && <img className="jm-family-photo" src={apiFileUrl(member.photoUrl)} alt="" />}
                       <div className="jm-family-added-card__details">
                         <strong>{member.fullName}</strong>
-                        <span>{isNominee ? `Nominee · ${member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : `${member.relationship}${member.parentSide ? ` · ${member.parentSide === 'member' ? 'Member’s parents' : 'Spouse’s parents'}` : ''}`}</span>
+                        <span>{isNominee ? `Nominee · ${member.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : `${member.relationship}${member.parentSide ? ` · ${member.parentSide === 'member' ? 'Member’s parent' : 'Spouse’s parent'}` : ''}`}</span>
                         {isNominee ? (
                           <span>No cost · No discount · No points</span>
                         ) : (
@@ -2234,7 +2279,11 @@ function MembershipFlow({ upgradeMode = false }) {
                         return (
                           <div className="jm-family-review-item" key={member?._id || member?.id || member?.fullName}>
                             <strong>{member?.fullName || 'Family member'}</strong>
-                            <span>{isNominee ? `Nominee · ${member?.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}` : member?.relationship || 'Family member'}</span>
+                            <span>{isNominee
+                              ? `Nominee · ${member?.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}`
+                              : `${member?.relationship || 'Family member'}${['father', 'mother'].includes(type) && member?.parentSide
+                                ? ` · ${member.parentSide === 'member' ? 'Member’s parent' : 'Spouse’s parent'}`
+                                : ''}`}</span>
                             {isNominee ? (
                               <span>No extra cost</span>
                             ) : price ? (
@@ -2534,11 +2583,14 @@ function MembershipFlow({ upgradeMode = false }) {
                       setPasswordLinkEmail(event.target.value);
                       setPasswordLinkSent(false);
                       setPasswordLinkMessage('');
+                      setPasswordLinkRequestError(false);
                     }}
                   />
                 </label>
                 {passwordLinkSent && <p className="mt-3" role="status">{passwordLinkMessage}</p>}
-                {passwordLinkMessage && !passwordLinkSent
+                {passwordLinkMessage && !passwordLinkSent && !passwordLinkRequestError
+                  && <p className="mt-3 jm-password-link-message-info" role="status">{passwordLinkMessage}</p>}
+                {passwordLinkMessage && !passwordLinkSent && passwordLinkRequestError
                   && <p className="mt-3 jm-payment-error" role="alert">{passwordLinkMessage}</p>}
                 <p className="mt-3 text-sm">Check your inbox and spam folder.</p>
                 <button

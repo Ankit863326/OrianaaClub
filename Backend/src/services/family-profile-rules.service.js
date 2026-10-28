@@ -95,15 +95,16 @@ export async function validateFamilyProfileSet({ plan, members, purchaseDate = n
   ))) {
     throw new ApiError(400, 'Choose whether each parent is from the member or spouse side.');
   }
+  const maxParentsPerSide = Math.min(limits.parentsPerSide ?? 2, 2);
+  for (const side of ['member', 'spouse']) {
+    if (parents.filter(({ member }) => (
+      (member.parentSide || 'member') === side
+    )).length > maxParentsPerSide) {
+      throw new ApiError(409, `A maximum of ${maxParentsPerSide} parents is allowed per side.`);
+    }
+  }
   if (limits.parents != null && parents.length > limits.parents) {
     throw new ApiError(409, `This tier allows up to ${limits.parents} parents.`);
-  }
-  for (const side of ['member', 'spouse']) {
-    if (limits.parentsPerSide != null && parents.filter(({ member }) => (
-      (member.parentSide || 'member') === side
-    )).length > limits.parentsPerSide) {
-      throw new ApiError(409, `A maximum of ${limits.parentsPerSide} parents is allowed per side.`);
-    }
   }
 
   const children = relatives.filter(({ type }) => type === 'child');

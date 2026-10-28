@@ -45,6 +45,7 @@ describe('Step 3 family prices and profile rules', () => {
       relation: 'Spouse',
       dateOfBirth: '1965-01-01',
       anniversaryDate: '',
+      parentSide: '',
     });
     expect(emptyAnniversary.status).toBe(201);
     expect(emptyAnniversary.body.data.anniversaryDate).toBeFalsy();
@@ -232,7 +233,7 @@ describe('Step 3 family prices and profile rules', () => {
     expect(response.body.data.prices).toHaveProperty('child');
   });
 
-  test('member family requests accept unlimited children and parents on either side, and appear in admin queue', async () => {
+  test('member family requests accept unlimited children, cap parents at two per side, and appear in admin queue', async () => {
     const plan = await createFamilyPlan();
     const member = await createMember({
       membership: { plan: plan._id, status: 'active', memberType: 'primary' },
@@ -291,6 +292,16 @@ describe('Step 3 family prices and profile rules', () => {
       .filter((item) => item.relation.toLowerCase() === 'father' || item.relation.toLowerCase() === 'mother')
       .map((item) => item.parentSide))
       .toEqual(['member', 'member', 'spouse', 'spouse']);
+
+    const thirdMemberParent = await addMember({
+      name: 'Third Member Parent',
+      relation: 'Father',
+      parentSide: 'member',
+      dateOfBirth: '1955-01-01',
+      phone: '9000000000',
+    });
+    expect(thirdMemberParent.status).toBe(409);
+    expect(thirdMemberParent.body.message).toMatch(/maximum of 2 parents.*per side/i);
   });
 
   test('lists plans using family defaults when persisted settings predate family membership', async () => {

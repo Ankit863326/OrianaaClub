@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { apiResourceUrl } from '../config/api.js';
 import { getCurrentTermsManifest } from '../lib/termsApi.js';
 import './TermsConsentCard.css';
 
@@ -72,7 +73,8 @@ export default function TermsConsentCard({
           acceptedConsent: accepted,
         });
       })
-      .catch(() => {
+      .catch((requestError) => {
+        console.error('Agreement manifest failed to load.', requestError);
         if (active) setManifestError('Could not load the agreement. Retry.');
       });
     return () => { active = false; };
@@ -194,7 +196,7 @@ export default function TermsConsentCard({
             {selectedLanguage?.pdfUrl && (
               <a
                 className="terms-consent-card__download"
-                href={selectedLanguage.pdfUrl}
+                href={apiResourceUrl(selectedLanguage.pdfUrl)}
                 target="_blank"
                 rel="noreferrer"
                 download

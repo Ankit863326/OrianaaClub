@@ -661,21 +661,21 @@ export async function getMembershipDetails(membershipId) {
 export async function getMembershipQueue(query = {}) {
   const { page, limit, skip } = pagination(query);
   const membershipFilter = { status: { $in: ['pending_verification', 'pending_payment'] } };
-  const [memberships, membershipCount, familyRequests] = await Promise.all([
+  const [unpagedMemberships, familyRequests] = await Promise.all([
     Membership.find(membershipFilter)
       .sort({ updatedAt: 1 })
-      .skip(skip)
-      .limit(limit)
       .populate('user', 'firstName email')
       .populate('plan', 'name price')
       .lean(),
-    Membership.countDocuments(membershipFilter),
     FamilyMember.find({ pendingAction: { $in: ['add', 'update', 'remove', 'nominee'] } })
       .sort({ updatedAt: 1 })
       .limit(limit)
       .populate({ path: 'membership', select: 'memberCode memberId memberNumber user', populate: { path: 'user', select: 'firstName' } })
       .lean(),
   ]);
+  const eligibleMemberships = unpagedMemberships.filter((membership) => membership.user && membership.plan);
+  const membershipCount = eligibleMemberships.length;
+  const memberships = eligibleMemberships.slice(skip, skip + limit);
   const payments = await Payment.find({ status: 'pending', membership: { $in: memberships.map((m) => m._id) } })
     .select('_id membership method totalAmount amount reference createdAt')
     .sort({ createdAt: 1 })
@@ -691,7 +691,7 @@ export async function getMembershipQueue(query = {}) {
     })),
     membershipPagination: { page, limit, total: membershipCount, pages: Math.ceil(membershipCount / limit) },
     payments,
-    familyRequests: familyRequests.map((member) => ({
+    familyRequests: familyRequests.filter((member) => member.membership).map((member) => ({
       ...member,
       memberId: member.isNominee ? '' : (isMemberId(member.memberId || member.memberNo)
         ? member.memberId || member.memberNo

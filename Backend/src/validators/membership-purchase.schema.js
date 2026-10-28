@@ -47,14 +47,21 @@ export const membershipPaymentOrderSchema = z.object({
 
 export const offlinePaymentSchema = z.object({
   membershipId: objectId,
-  method: z.enum(['bank_transfer', 'cheque', 'rtgs']),
+  method: z.enum(['bank_transfer', 'cheque', 'rtgs', 'cash', 'netbanking', 'manual']),
   amount: z.number().positive().max(Number.MAX_SAFE_INTEGER)
     .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8, 'Amount can have at most two decimal places.')
     .optional(),
-  reference: z.string().trim().min(1).max(200),
+  reference: z.string().trim().max(200).optional().default(''),
   paymentDate: z.coerce.date().optional(),
   note: z.string().trim().max(500).optional().default(''),
 }).superRefine((body, context) => {
+  if (body.method === 'bank_transfer' && !body.reference) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reference'],
+      message: 'A bank reference is required.',
+    });
+  }
   if (body.method === 'rtgs'
     && (!/^[a-z\d/-]{6,50}$/i.test(body.reference) || !body.paymentDate)) {
     context.addIssue({

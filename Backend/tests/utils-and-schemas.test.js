@@ -6,6 +6,7 @@ import { buildMemberId } from '../src/utils/memberCode.js';
 import { safeCsvCell, writeCsvHeader, writeCsvRow } from '../src/utils/csv.js';
 import * as auth from '../src/validators/auth.schema.js';
 import * as member from '../src/validators/member.schema.js';
+import * as family from '../src/validators/family.schema.js';
 import * as payment from '../src/validators/payment.schema.js';
 import * as admin from '../src/validators/admin.schema.js';
 import * as content from '../src/validators/content.schema.js';
@@ -21,6 +22,7 @@ import {
 } from '../src/validators/identity-verification.schema.js';
 import { validateIdentityNumber } from '../src/utils/identityDocumentValidation.js';
 import IdentityVerification from '../src/models/IdentityVerification.js';
+import { membershipDraftFamilyMemberSchema } from '../src/validators/membership-draft.schema.js';
 
 // Small focused tests document how common money and formatting helpers behave.
 describe('utility functions', () => {
@@ -304,5 +306,82 @@ test('cross-field validation rejects invalid password and date ranges', () => {
   expect(content.enquiriesQuerySchema.safeParse({ from: '2022-01-01', to: '2021-01-01' }).success).toBe(false);
   expect(points.pointsBulkCreditSchema.safeParse({
     membershipIds: [validId], filter: { planSlug: 'standard' }, amount: 1, reason: 'Award',
+  }).success).toBe(false);
+});
+
+test('family side is optional for non-parents and required for parents', () => {
+  const spouse = membershipDraftFamilyMemberSchema.safeParse({
+    fullName: 'Sam Spouse',
+    gender: 'female',
+    relationship: 'Spouse',
+    memberType: 'spouse',
+    dob: '1990-01-01',
+    parentSide: '',
+  });
+  expect(spouse.success).toBe(true);
+  expect(spouse.data.parentSide).toBeUndefined();
+
+  const child = membershipDraftFamilyMemberSchema.safeParse({
+    fullName: 'Sam Child',
+    gender: 'male',
+    relationship: 'Son',
+    memberType: 'child',
+    dob: '2015-01-01',
+    parentSide: '',
+  });
+  expect(child.success).toBe(true);
+  expect(child.data.parentSide).toBeUndefined();
+
+  const nominee = membershipDraftFamilyMemberSchema.safeParse({
+    fullName: 'Sam Nominee',
+    gender: 'prefer_not_to_say',
+    relationship: 'Nominee',
+    memberType: 'nominee',
+    isNominee: true,
+    dob: '',
+    workEmail: 'nominee@example.invalid',
+    parentSide: '',
+  });
+  expect(nominee.success).toBe(true);
+  expect(nominee.data.parentSide).toBeUndefined();
+
+  const parent = membershipDraftFamilyMemberSchema.safeParse({
+    fullName: 'Sam Parent',
+    gender: 'female',
+    relationship: 'Mother',
+    memberType: 'mother',
+    dob: '1960-01-01',
+    parentSide: '',
+  });
+  expect(parent.success).toBe(false);
+  expect(parent.error.issues.some((issue) => issue.path.includes('parentSide'))).toBe(true);
+
+  const memberSpouse = member.familyMemberSchema.safeParse({
+    fullName: 'Sam Spouse',
+    gender: 'female',
+    relationship: 'Spouse',
+    memberType: 'spouse',
+    dob: '1990-01-01',
+    parentSide: '',
+  });
+  expect(memberSpouse.success).toBe(true);
+  expect(memberSpouse.data.parentSide).toBeUndefined();
+
+  const memberParent = member.familyMemberSchema.safeParse({
+    fullName: 'Sam Parent',
+    gender: 'female',
+    relationship: 'Mother',
+    memberType: 'mother',
+    dob: '1960-01-01',
+    parentSide: '',
+  });
+  expect(memberParent.success).toBe(false);
+  expect(memberParent.error.issues.some((issue) => issue.path.includes('parentSide'))).toBe(true);
+
+  expect(family.familyMemberSchema.safeParse({
+    name: 'Sam Spouse', relation: 'Spouse', parentSide: '',
+  }).success).toBe(true);
+  expect(family.familyMemberSchema.safeParse({
+    name: 'Sam Parent', relation: 'Mother', parentSide: '',
   }).success).toBe(false);
 });

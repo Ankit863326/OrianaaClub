@@ -5,6 +5,10 @@ import {
 } from './family-anniversary.schema.js';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid identifier.');
+const parentSideSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.enum(['member', 'spouse']).optional(),
+);
 
 export const familyMemberParamsSchema = z.object({ familyId: objectId });
 export const membershipFamilyParamsSchema = z.object({ id: objectId });
@@ -19,7 +23,7 @@ const familyMemberFields = {
   workEmail: z.string().trim().email().max(254).optional().or(z.literal('')),
   nomineeRole: z.string().trim().max(80).optional().default(''),
   designation: z.string().trim().max(120).optional().default(''),
-  parentSide: z.enum(['member', 'spouse']).optional(),
+  parentSide: parentSideSchema,
   anniversaryDate: optionalAnniversaryDateSchema,
 };
 function validateFamilyMember(member, context) {

@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiResourceUrl } from '../config/api.js';
 import './TermsConsentCard.css';
 
 const FONT_SIZE_STORAGE_KEY = 'agreement-reader-font-size';
@@ -53,8 +54,10 @@ export default function AgreementReaderModal({
   const activeLanguage = languages.find((item) => item.code === language);
   const html = documents[language] || '';
   const missingHtml = !activeLanguage?.htmlUrl;
-  const loadError = loadErrors[language] || (missingHtml ? 'Could not load the agreement.' : '');
+  const loadError = loadErrors[language]
+    || (missingHtml ? 'Agreement content is unavailable for this language.' : '');
   const loading = missingHtml ? false : Boolean(loadingLanguages[language] ?? !html);
+  const contentUrl = activeLanguage?.htmlUrl ? apiResourceUrl(activeLanguage.htmlUrl) : '';
 
   const safeHtml = useMemo(() => (html ? DOMPurify.sanitize(html) : ''), [html]);
   const sections = useMemo(() => getSectionHeadings(safeHtml), [safeHtml]);
@@ -80,22 +83,32 @@ export default function AgreementReaderModal({
 
   useEffect(() => {
     const controller = new AbortController();
-    if (!activeLanguage?.htmlUrl) return () => controller.abort();
+    if (!contentUrl) return () => controller.abort();
 
-    fetch(activeLanguage.htmlUrl, { signal: controller.signal })
+    fetch(contentUrl, { signal: controller.signal })
       .then((response) => {
-        if (!response.ok) throw new Error('Could not load the agreement.');
+        if (!response.ok) {
+          throw new Error(`Agreement request failed with status ${response.status}.`);
+        }
         return response.text();
       })
       .then((value) => {
+        if (getSectionHeadings(value).length !== 21) {
+          throw new Error('Agreement content is empty or missing one or more sections.');
+        }
         setDocuments((current) => ({ ...current, [language]: value }));
         setLoadErrors((current) => ({ ...current, [language]: '' }));
       })
       .catch((error) => {
         if (error.name !== 'AbortError') {
+          console.error('Agreement content failed to load.', {
+            language,
+            url: contentUrl,
+            error,
+          });
           setLoadErrors((current) => ({
             ...current,
-            [language]: 'Could not load the agreement.',
+            [language]: 'Agreement content could not be loaded. Please retry.',
           }));
         }
       })
@@ -105,7 +118,7 @@ export default function AgreementReaderModal({
         }
       });
     return () => controller.abort();
-  }, [activeLanguage?.htmlUrl, attempt, language]);
+  }, [attempt, contentUrl, language]);
 
   const checkForEnd = useCallback(() => {
     const container = textContainerRef.current;
@@ -261,7 +274,7 @@ export default function AgreementReaderModal({
                   setAttempt((count) => count + 1);
                 }}>Retry</button>
                 {activeLanguage?.pdfUrl && (
-                  <a href={activeLanguage.pdfUrl} target="_blank" rel="noreferrer" download>
+                  <a href={apiResourceUrl(activeLanguage.pdfUrl)} target="_blank" rel="noreferrer" download>
                     Download PDF instead
                   </a>
                 )}

@@ -60,17 +60,24 @@ export default function MembershipPendingQueuePage() {
         membershipApi.approvalQueue({ page: nextPages.approval, limit: pageSize }),
         membershipApi.familyVerificationQueue(),
       ]);
-      const paymentMemberships = [...new Set(payments.items.map((payment) => membershipId(payment.membership)).filter(Boolean))];
-      const paymentDetails = await Promise.all(paymentMemberships.map(async (id) => (
-        [id, await membershipApi.member(id)]
-      )));
+      const paymentDetails = await Promise.all(payments.items.map(async (payment) => {
+        const id = membershipId(payment.membership);
+        if (!id || !payment.user || !payment.plan) return [String(payment._id), null];
+        try {
+          return [String(payment._id), await membershipApi.member(id)];
+        } catch (failure) {
+          if (failure.response?.status === 404) return [String(payment._id), null];
+          throw failure;
+        }
+      }));
+      const detailsByPayment = new Map(paymentDetails);
       setData({
         verification,
         payments: {
           ...payments,
           items: payments.items.map((payment) => ({
             ...payment,
-            memberDetail: paymentDetails.find(([id]) => id === membershipId(payment.membership))?.[1],
+            memberDetail: detailsByPayment.get(String(payment._id)),
           })),
         },
         family,
@@ -210,7 +217,12 @@ export default function MembershipPendingQueuePage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.approval.items.map((row) => <tr key={row._id}>
-                  <td className="px-4 py-3.5 text-slate-700">{memberLink(row._id, row.memberName || row.user?.firstName || row.user?.email || 'Member')}</td>
+                  <td className="px-4 py-3.5 text-slate-700">{memberLink(
+                    row._id,
+                    row.brokenReferences?.length
+                      ? 'Reference unavailable'
+                      : row.memberName || row.user?.firstName || row.user?.email || 'Member',
+                  )}</td>
                   <td className="px-4 py-3.5 text-slate-700">{row.memberCode || row.memberNo || '—'}</td>
                   <td className="px-4 py-3.5 text-slate-700">{row.plan?.name || row.plan?.title || row.tier || '—'}</td>
                   <td className="px-4 py-3.5 text-slate-700">{String(row.memberType || 'primary').replaceAll('_', ' ')}</td>
@@ -226,10 +238,12 @@ export default function MembershipPendingQueuePage() {
                   <td className="px-4 py-3.5">
                     <div className="grid justify-items-start gap-1">
                       <Button
-                        disabled={busy || !row.nomineesConfirmed}
+                        disabled={busy || !row.nomineesConfirmed || row.brokenReferences?.length > 0}
                         onClick={() => requestAction({ type: 'approve-membership', row })}
                       >Approve</Button>
                       {!row.nomineesConfirmed && <span className="font-semibold text-amber-800">Nominee not confirmed</span>}
+                      {row.brokenReferences?.length > 0
+                        && <span className="font-semibold text-amber-800">Missing {row.brokenReferences.join(', ')}</span>}
                     </div>
                   </td>
                 </tr>)}
@@ -249,17 +263,34 @@ export default function MembershipPendingQueuePage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.payments.items.map((row) => {
-                  const detail = row.memberDetail;
                   const id = membershipId(row.membership);
+                  const brokenReferences = [
+                    (!row.membership || (row.user && row.plan && !row.memberDetail)) && 'membership',
+                    !row.user && 'member',
+                    !row.plan && 'plan',
+                    row.memberDetail && !row.memberDetail.profile && 'profile',
+                  ].filter(Boolean);
+                  const brokenReference = brokenReferences.some((item) => item !== 'profile');
+                  const memberName = row.memberDetail?.profile?.fullName || row.user?.firstName || row.user?.email || 'Member';
                   return <tr key={row._id}>
-                    <td className="px-4 py-3.5 text-slate-700">{memberLink(id, detail?.profile?.fullName || row.user?.firstName || row.user?.email || 'Member')}</td>
-                    <td className="px-4 py-3.5 text-slate-700">{detail?.membership?.memberCode ? formatMemberCode(detail.membership.memberCode) : '—'}</td>
+                    <td className="px-4 py-3.5 text-slate-700">
+                      {memberLink(id, brokenReference ? 'Reference unavailable' : memberName)}
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-700">
+                      {row.memberDetail?.membership?.memberCode
+                        ? formatMemberCode(row.memberDetail.membership.memberCode)
+                        : '—'}
+                    </td>
                     <td className="px-4 py-3.5 text-slate-700">{row.plan?.name || row.plan?.title || '—'}</td>
                     <td className="px-4 py-3.5"><Badge tone={row.status}>{row.method || '—'}</Badge></td>
                     <td className="px-4 py-3.5 text-slate-700">{formatINR(paymentAmount(row))}</td>
                     <td className="px-4 py-3.5 text-slate-700">{row.reference || row.utr || '—'}</td>
                     <td className="px-4 py-3.5 text-slate-700">{formatDate(row.createdAt)}</td>
-                    <td className="px-4 py-3.5"><Button disabled={busy} onClick={() => requestAction({ type: 'confirm-payment', row })}>Confirm</Button></td>
+                    <td className="px-4 py-3.5">
+                      {brokenReferences.length > 0
+                        && <span className="mr-2 text-amber-800">Missing {brokenReferences.join(', ')}</span>}
+                      <Button disabled={busy || brokenReference} onClick={() => requestAction({ type: 'confirm-payment', row })}>Confirm</Button>
+                    </td>
                   </tr>;
                 })}
                 {!data.payments.items.length && <tr><td className="px-4 py-8 text-center text-slate-500" colSpan="8">Nothing pending.</td></tr>}
@@ -280,6 +311,7 @@ export default function MembershipPendingQueuePage() {
                 {data.family.items.map((row) => {
                   const membership = row.membership;
                   const id = membershipId(membership);
+                  const brokenReference = !membership || !membership.user;
                   const hasPendingAnniversary = row.pendingAction === 'update'
                     && Object.hasOwn(row.pendingChanges || {}, 'anniversaryDate');
                   const anniversaryDate = hasPendingAnniversary
@@ -289,12 +321,15 @@ export default function MembershipPendingQueuePage() {
                     <td className="px-4 py-3.5 text-slate-700">{row.name || row.fullName || 'Family member'}</td>
                     <td className="px-4 py-3.5"><Badge>{String(row.pendingAction || 'request').replaceAll('_', ' ')}</Badge></td>
                     <td className="px-4 py-3.5 text-slate-700">{anniversaryDate ? formatDate(anniversaryDate) : '—'}</td>
-                    <td className="px-4 py-3.5 text-slate-700">{memberLink(id, membership?.user?.firstName || membership?.user?.email || 'Member')}</td>
+                    <td className="px-4 py-3.5 text-slate-700">{memberLink(id, brokenReference
+                      ? 'Reference unavailable'
+                      : membership.user.firstName || membership.user.email || 'Member')}</td>
                     <td className="px-4 py-3.5 text-slate-700">{membership?.memberCode ? formatMemberCode(membership.memberCode) : '—'}</td>
                     <td className="px-4 py-3.5 text-slate-700">{formatDate(row.updatedAt || row.createdAt)}</td>
                     <td className="px-4 py-3.5"><div className="flex gap-2">
-                      <Button disabled={busy} onClick={() => requestAction({ type: 'approve-family', row })}>Approve</Button>
-                      <Button variant="danger" disabled={busy} onClick={() => requestAction({ type: 'reject-family', row })}>Reject</Button>
+                      {brokenReference && <span className="text-amber-800">Membership reference unavailable</span>}
+                      <Button disabled={busy || brokenReference} onClick={() => requestAction({ type: 'approve-family', row })}>Approve</Button>
+                      <Button variant="danger" disabled={busy || brokenReference} onClick={() => requestAction({ type: 'reject-family', row })}>Reject</Button>
                     </div></td>
                   </tr>;
                 })}

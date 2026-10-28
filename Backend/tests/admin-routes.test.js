@@ -8,6 +8,8 @@ import Verification from '../src/models/Verification.js';
 import Payment from '../src/models/Payment.js';
 import User from '../src/models/User.js';
 import MembershipDraft from '../src/models/MembershipDraft.js';
+import Plan from '../src/models/Plan.js';
+import EmailLog from '../src/models/EmailLog.js';
 
 const app = createApp();
 
@@ -93,6 +95,145 @@ describe('admin member and plan routes', () => {
       gstAmount: 18000,
       totalAmount: 118000,
     });
+
+  });
+
+  test('returns empty queue lists, skips broken references, and lists one pending payment', async () => {
+    const admin = await createAdmin();
+    const empty = await adminRequest(admin, 'get', '/api/admin/membership-queue');
+    expect(empty.status).toBe(200);
+    expect(empty.body.data).toMatchObject({
+      memberships: [],
+      payments: [],
+      familyRequests: [],
+    });
+
+    const plan = await createPlan();
+    const member = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    await Promise.all([
+      User.deleteOne({ _id: member.user._id }),
+      Plan.deleteOne({ _id: plan._id }),
+    ]);
+
+    const broken = await adminRequest(admin, 'get', '/api/admin/membership-queue');
+    expect(broken.status).toBe(200);
+    expect(broken.body.data.memberships).toEqual([]);
+    expect(broken.body.data.payments).toEqual([]);
+
+    const activePlan = await createPlan();
+    const pendingMember = await createMember({
+      membership: { plan: activePlan._id, status: 'pending_payment' },
+    });
+    await Payment.create({
+      user: pendingMember.user._id,
+      membership: pendingMember.membership._id,
+      plan: activePlan._id,
+      method: 'bank_transfer',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+    });
+    const onePayment = await adminRequest(admin, 'get', '/api/admin/membership-queue');
+    expect(onePayment.status).toBe(200);
+    expect(onePayment.body.data.payments).toHaveLength(1);
+  });
+
+  test('lists payments with broken references and accepts empty date filters', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const member = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    const payment = await Payment.create({
+      user: member.user._id,
+      membership: member.membership._id,
+      plan: plan._id,
+      method: 'cheque',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+    });
+    await Promise.all([
+      User.deleteOne({ _id: member.user._id }),
+      Plan.deleteOne({ _id: plan._id }),
+    ]);
+
+    const response = await adminRequest(
+      admin,
+      'get',
+      '/api/admin/payments?status=pending&method=cheque&from=&to=',
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toHaveLength(1);
+    expect(response.body.data.items[0]).toMatchObject({
+      _id: String(payment._id),
+      user: null,
+      plan: null,
+      brokenReferences: ['user', 'plan'],
+    });
+    const exported = await adminRequest(
+      admin,
+      'get',
+      '/api/admin/payments/export?status=pending&method=cheque',
+    );
+    expect(exported.status).toBe(200);
+    expect(exported.headers['content-type']).toContain('text/csv');
+    expect(exported.text).toContain('cheque');
+  });
+
+  test('records cheque and cash without UTR, confirms idempotently and logs email failures', async () => {
+    const admin = await createAdmin();
+    const plan = await createPlan();
+    const chequeMember = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    globalThis.__orianaMailTransport.sendMail.mockClear();
+    globalThis.__orianaMailTransport.sendMail.mockRejectedValueOnce(
+      Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }),
+    );
+    const chequeRecorded = await adminRequest(admin, 'post', '/api/admin/payments')
+      .send({ membershipId: String(chequeMember.membership._id), method: 'cheque' });
+    expect(chequeRecorded.status).toBe(201);
+    const chequeId = chequeRecorded.body.data._id;
+
+    const firstConfirm = await adminRequest(admin, 'patch', `/api/admin/payments/${chequeId}/confirm`);
+    expect(firstConfirm.status).toBe(200);
+    expect(firstConfirm.body.data.payment).toMatchObject({
+      status: 'paid',
+      method: 'cheque',
+      reference: '',
+      utr: '',
+    });
+    expect(firstConfirm.body.data.payment.invoiceNumber).toMatch(/^INV-\d{4}-\d{6}$/);
+    expect(firstConfirm.body.data.payment.receiptNumber).toMatch(/^OC-R-\d{4}-\d{6}$/);
+    expect(firstConfirm.body.data.membership.status).toBe('pending_approval');
+    expect(await EmailLog.exists({ template: 'payment-success', status: 'failed' })).toBeTruthy();
+    expect(await AuditLog.exists({
+      action: 'membership.payment.confirmation_email.failed',
+      entityId: String(chequeId),
+    })).toBeTruthy();
+
+    const secondConfirm = await adminRequest(admin, 'patch', `/api/admin/payments/${chequeId}/confirm`);
+    expect(secondConfirm.status).toBe(200);
+    expect(secondConfirm.body.data.alreadyConfirmed).toBe(true);
+    expect(secondConfirm.body.data.payment.invoiceNumber).toBe(firstConfirm.body.data.payment.invoiceNumber);
+    expect(secondConfirm.body.data.payment.receiptNumber).toBe(firstConfirm.body.data.payment.receiptNumber);
+    expect(globalThis.__orianaMailTransport.sendMail).toHaveBeenCalledTimes(1);
+
+    const cashMember = await createMember({
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    const cashRecorded = await adminRequest(admin, 'post', '/api/admin/payments')
+      .send({ membershipId: String(cashMember.membership._id), method: 'cash' });
+    expect(cashRecorded.status).toBe(201);
+    const cashConfirm = await adminRequest(admin, 'patch', `/api/admin/payments/${cashRecorded.body.data._id}/confirm`);
+    expect(cashConfirm.status).toBe(200);
+    expect(cashConfirm.body.data.payment).toMatchObject({ method: 'cash', reference: '', utr: '' });
+    expect(cashConfirm.body.data.payment.invoiceNumber).toBeTruthy();
   });
 
   test('membership settings omit cancellation rules and expose no refund-rule route', async () => {
@@ -127,6 +268,8 @@ describe('admin member and plan routes', () => {
     const admin = await createAdmin();
     const plan = await createPlan({ slug: 'approval-route-plan' });
     const member = await createMember({
+      status: 'pending',
+      activationRequiresMembershipPayment: true,
       membership: {
         plan: plan._id,
         status: 'pending_approval',
@@ -142,9 +285,18 @@ describe('admin member and plan routes', () => {
     const queue = await adminRequest(admin, 'get', '/api/admin/membership-approval-queue');
     expect(queue.status).toBe(200);
     expect(queue.body.data.items.map((item) => item._id)).toContain(String(member.membership._id));
+    globalThis.__orianaMailTransport.sendMail.mockRejectedValueOnce(
+      Object.assign(new Error('temporary SMTP outage'), { code: 'ECONNECTION' }),
+    );
     const approved = await adminRequest(admin, 'post', `/api/admin/memberships/${member.membership._id}/approve`);
     expect(approved.status).toBe(200);
     expect(approved.body.data.membership).toMatchObject({ status: 'active', approvalSeq: 1 });
+    expect(approved.body.data.emailFailures).toHaveLength(1);
+    expect(await AuditLog.exists({ action: 'membership.approval_email.failed' })).toBeTruthy();
+    expect(await User.findById(member.user._id)).toMatchObject({
+      status: 'active',
+      activationRequiresMembershipPayment: false,
+    });
   });
 
   test('loads the family tree by member number only for an administrator', async () => {
@@ -403,7 +555,11 @@ describe('admin payments routes', () => {
     await Payment.init();
     const admin = await createAdmin();
     const plan = await createPlan({ pointsTiers: [{ label: 'Standard', points: 10, fromMember: 1, toMember: null }] });
-    const member = await createMember({ membership: { plan: plan._id, status: 'pending_payment' } });
+    const member = await createMember({
+      status: 'pending',
+      activationRequiresMembershipPayment: true,
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
     const values = {
       user: member.user._id, membership: member.membership._id, plan: plan._id,
       method: 'bank_transfer', status: 'pending_verification',
@@ -411,7 +567,12 @@ describe('admin payments routes', () => {
     };
     const payment = await Payment.create(values);
     await expect(Payment.create(values)).rejects.toMatchObject({ code: 11000 });
-    expect((await adminRequest(admin, 'post', `/api/admin/payments/${payment._id}/approve`)).status).toBe(200);
+    const approved = await adminRequest(admin, 'post', `/api/admin/payments/${payment._id}/approve`);
+    expect(approved.status).toBe(200);
+    expect((await Membership.findById(member.membership._id)).status).toBe('pending_approval');
+    expect((await Payment.findById(payment._id)).status).toBe('paid');
+    expect((await Membership.findById(member.membership._id)).memberId).toBe('');
+    expect((await User.findById(member.user._id)).status).toBe('pending');
     const rejectedPayment = await Payment.create({
       ...values, utr: 'UTR-UNIQUE-2', status: 'pending_verification',
     });

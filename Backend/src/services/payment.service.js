@@ -9,11 +9,13 @@ import FamilyMember from '../models/FamilyMember.js';
 import Profile from '../models/Profile.js';
 import PointLedger from '../models/PointLedger.js';
 import AuditLog from '../models/AuditLog.js';
+import EmailLog from '../models/EmailLog.js';
 import Counter from '../models/Counter.js';
 import { getNextMemberNumber } from './membership-id.service.js';
 import { getSettings } from '../models/Setting.js';
 import { getMembershipMemberCode } from '../utils/memberCode.js';
 import User from '../models/User.js';
+import MembershipDraft from '../models/MembershipDraft.js';
 import Plan from '../models/Plan.js';
 import { sendMail } from './mail.service.js';
 import { getPayableAmount, paiseToRupees, rupeesToPaise } from '../utils/money.js';
@@ -827,6 +829,26 @@ async function activateMembershipInTransaction(
   if (activation.modifiedCount !== 1) {
     throw new ApiError(409, 'Membership activation was already completed or is no longer available.');
   }
+  const activatedAccount = await User.updateOne({
+    _id: membership.user,
+    role: 'member',
+    status: 'pending',
+    activationRequiresMembershipPayment: true,
+    passwordHash: { $exists: true },
+  }, {
+    $set: {
+      status: 'active',
+      activationRequiresMembershipPayment: false,
+      activatedAt: now,
+    },
+  }, { session });
+  if (activatedAccount.modifiedCount) {
+    await MembershipDraft.updateMany(
+      { user: membership.user, status: 'password_pending' },
+      { $set: { status: 'active' } },
+      { session },
+    );
+  }
 
   if (pointsGranted > 0) {
     await PointLedger.create([{
@@ -1004,20 +1026,21 @@ export async function processMembershipRazorpayWebhook(rawBody, signature, event
 export async function recordOfflineMembershipPayment(adminId, {
   membershipId, method, amount, reference, paymentDate, note,
 }) {
-  if (!['bank_transfer', 'cheque', 'rtgs'].includes(method)) {
-    throw new ApiError(400, 'New offline payments must use bank transfer, cheque, or RTGS.');
+  if (!['bank_transfer', 'cheque', 'rtgs', 'cash', 'netbanking', 'manual'].includes(method)) {
+    throw new ApiError(400, 'The selected offline payment method is not supported.');
   }
-  if (!reference?.trim()) {
-    throw new ApiError(400, 'A bank reference or cheque number is required.');
+  const paymentReference = reference?.trim() || '';
+  if (method === 'bank_transfer' && !paymentReference) {
+    throw new ApiError(400, 'A bank reference is required.');
   }
-  if (method === 'rtgs' && (!/^[a-z\d/-]{6,50}$/i.test(reference.trim()) || !paymentDate)) {
+  if (method === 'rtgs' && (!/^[a-z\d/-]{6,50}$/i.test(paymentReference) || !paymentDate)) {
     throw new ApiError(400, 'A valid RTGS UTR and transfer date are required.');
   }
-  if (method === 'rtgs' && await Payment.exists({ utr: reference.trim() })) {
+  if (method === 'rtgs' && await Payment.exists({ utr: paymentReference })) {
     const existingPayment = await Payment.findOne({
       membership: membershipId,
       method: 'rtgs',
-      utr: reference.trim(),
+      utr: paymentReference,
       status: 'pending',
     }).select('_id');
     if (!existingPayment) throw new ApiError(409, 'This RTGS UTR has already been used.');
@@ -1027,7 +1050,8 @@ export async function recordOfflineMembershipPayment(adminId, {
     status: { $in: ['pending_payment', 'payment_pending'] },
   });
   if (!membership) throw new ApiError(404, 'Pending membership was not found.');
-  const plan = await MembershipPlan.findById(membership.plan);
+  const PlanModel = membership.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
+  const plan = await PlanModel.findById(membership.plan);
   if (!plan) throw new ApiError(404, 'Membership plan was not found.');
   const existing = await Payment.findOne({ membership: membership._id, status: 'pending' })
     .sort({ createdAt: -1 });
@@ -1060,13 +1084,13 @@ export async function recordOfflineMembershipPayment(adminId, {
     user: membership.user,
     membership: membership._id,
     plan: plan._id,
-    planModel: 'MembershipPlan',
+    planModel: membership.planModel || 'Plan',
     amount: paiseToRupees(breakdown.baseAmount),
     method,
     status: 'pending',
     ...breakdown,
-    reference: reference.trim(),
-    ...(method === 'rtgs' ? { utr: reference.trim() } : {}),
+    reference: paymentReference,
+    ...(method === 'rtgs' ? { utr: paymentReference } : {}),
     transferDate: paymentDate || new Date(),
     recordedBy: adminId,
     note: note || '',
@@ -1102,11 +1126,76 @@ export async function confirmOfflineMembershipPayment(paymentId, adminId) {
   const payment = await Payment.findOne({
     _id: paymentId,
     method: { $in: ['bank_transfer', 'cheque', 'rtgs', 'cash', 'manual', 'netbanking'] },
-    status: 'pending',
   });
-  if (!payment) throw new ApiError(404, 'Pending offline payment was not found.');
+  if (!payment) throw new ApiError(404, 'Offline payment was not found.');
+  if (['confirmed', 'paid'].includes(payment.status)) {
+    const membership = await Membership.findById(payment.membership);
+    if (!membership) throw new ApiError(409, 'The payment membership could not be found.');
+    return { payment, membership, status: membership.status, alreadyConfirmed: true };
+  }
+  if (payment.status !== 'pending') throw new ApiError(404, 'Pending offline payment was not found.');
   const result = await settleMembershipPayment(payment._id, { adminId });
-  return { payment: result.payment, membership: result.membership, status: result.status };
+  await sendOfflinePaymentConfirmation(result.payment, adminId);
+  return {
+    payment: result.payment,
+    membership: result.membership,
+    status: result.status,
+    alreadyConfirmed: false,
+  };
+}
+
+async function sendOfflinePaymentConfirmation(payment, adminId) {
+  let user;
+  let emailAttempted = false;
+  try {
+    user = await User.findById(payment.user).select('firstName email').lean();
+    if (!user?.email) throw new Error('Member email address is unavailable.');
+    const PlanModel = payment.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
+    const plan = await PlanModel.findById(payment.plan).select('title name').lean();
+    emailAttempted = true;
+    await sendMail({
+      to: user.email,
+      subject: 'Your Orianaa Club membership payment receipt',
+      template: 'payment-success',
+      data: {
+        firstName: user.firstName,
+        planName: plan?.title || plan?.name || 'Orianaa Club',
+        invoiceNumber: payment.invoiceNumber,
+        baseAmount: (payment.baseAmount / 100).toFixed(2),
+        gstAmount: (payment.gstAmount / 100).toFixed(2),
+        totalAmount: (payment.totalAmount / 100).toFixed(2),
+      },
+    });
+  } catch (error) {
+    const code = String(error?.code || error?.name || 'unknown').slice(0, 100);
+    console.error(`[payment] Confirmation email failed for payment=${payment._id} code=${code}`);
+    if (!emailAttempted || !user?.email) {
+      try {
+        await EmailLog.create({
+          to: user?.email || 'unknown@invalid.local',
+          template: 'payment-success',
+          status: 'failed',
+          error: `Receipt email could not be attempted (code=${code}).`,
+        });
+      } catch (logError) {
+        console.error(`[payment] Could not write missing-recipient email log for payment=${payment._id}: ${logError?.name || 'Error'}`);
+      }
+    }
+    try {
+      await AuditLog.create({
+        actorType: 'admin',
+        actorId: adminId,
+        admin: adminId,
+        action: 'membership.payment.confirmation_email.failed',
+        entityType: 'payment',
+        entityId: String(payment._id),
+        summary: 'The payment was confirmed, but the receipt email could not be sent.',
+        after: { emailTemplate: 'payment-success', emailStatus: 'failed', errorCode: code },
+      });
+    } catch (logError) {
+      console.error(`[payment] Could not write confirmation-email audit log for payment=${payment._id}: ${logError?.name || 'Error'}`);
+    }
+  }
 }
 
 export async function approveMembershipVerification(membershipId, adminId) {
