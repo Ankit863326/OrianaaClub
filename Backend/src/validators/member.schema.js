@@ -13,6 +13,10 @@ const formBooleanSchema = z.union([
 const dateSchema = z.coerce.date().refine((date) => !Number.isNaN(date.getTime()) && date < new Date(), {
   message: 'Date of birth must be a valid date in the past.',
 });
+const parentSideSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.enum(['member', 'spouse']).optional(),
+);
 const promoSchema = z.union([z.boolean(), z.enum(['true', 'false'])])
   .transform((value) => value === true || value === 'true');
 
@@ -24,7 +28,7 @@ export const profileSchema = z.object({
   dob: dateSchema,
   interestArea: z.string().trim().min(1).max(100),
   address: z.string().trim().max(1000).optional().default(''),
-  parentSide: z.enum(['member', 'spouse']).optional(),
+  parentSide: parentSideSchema,
   agreePromo: promoSchema.optional().default(false),
 });
 
@@ -51,7 +55,7 @@ export const familyMemberSchema = z.object({
     'spouse', 'child', 'father', 'mother', 'nominee_gm', 'nominee_hr', 'nominee',
   ]).optional(),
   isNominee: formBooleanSchema.optional().default(false),
-  parentSide: z.enum(['member', 'spouse']).optional(),
+  parentSide: parentSideSchema,
   anniversaryDate: optionalAnniversaryDateSchema,
   wantsOwnMembership: formBooleanSchema.optional().default(false),
 }).superRefine((member, context) => {
@@ -62,7 +66,11 @@ export const familyMemberSchema = z.object({
   if (isNominee && !member.workEmail) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['workEmail'], message: 'A nominee work email is required.' });
   }
-  if (['father', 'mother'].includes(member.memberType) && !member.parentSide) {
+  if (
+    (['father', 'mother'].includes(member.memberType)
+      || ['father', 'mother'].includes(member.relationship.toLowerCase()))
+    && !member.parentSide
+  ) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['parentSide'], message: 'Choose whose parent this is.' });
   }
   validateFamilyAnniversary(member, context);
