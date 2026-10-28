@@ -644,8 +644,9 @@ describe('integrated membership application and payment flow', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Send password setup link' }));
 
-    expect(await screen.findByText('If the address can be used, instructions will be sent shortly.'))
-      .toBeInTheDocument();
+    const info = await screen.findByText('If the address can be used, instructions will be sent shortly.');
+    expect(info).toHaveAttribute('role', 'status');
+    expect(info).toHaveClass('jm-password-link-message-info');
     expect(screen.getByRole('button', { name: 'Send password setup link' })).toBeEnabled();
   });
 

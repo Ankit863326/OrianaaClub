@@ -393,6 +393,7 @@ function MembershipFlow({ upgradeMode = false }) {
   const [passwordLinkEmail, setPasswordLinkEmail] = useState('');
   const [passwordLinkSent, setPasswordLinkSent] = useState(false);
   const [passwordLinkMessage, setPasswordLinkMessage] = useState('');
+  const [passwordLinkRequestError, setPasswordLinkRequestError] = useState(false);
   const [passwordLinkResendSeconds, setPasswordLinkResendSeconds] = useState(0);
   const [helpRequestBusy, setHelpRequestBusy] = useState(false);
   const [helpRequestMessage, setHelpRequestMessage] = useState('');
@@ -1505,19 +1506,33 @@ function MembershipFlow({ upgradeMode = false }) {
       const result = response.data || response;
       if (result.sent && result.maskedEmail) {
         setPasswordLinkSent(true);
+        setPasswordLinkRequestError(false);
         setPasswordLinkMessage(`Password link sent to ${result.maskedEmail}`);
         setPasswordLinkResendSeconds(60);
         setProfile((current) => ({ ...current, email: passwordLinkEmail.trim() }));
       } else {
         setPasswordLinkSent(false);
+        setPasswordLinkRequestError(false);
         setPasswordLinkMessage(result.message || response.message || 'If the address can be used, a password link will be sent.');
       }
     } catch (requestError) {
       setPasswordLinkSent(false);
+      setPasswordLinkRequestError(true);
       setPasswordLinkResendSeconds(0);
       setPasswordLinkMessage(requestError.message || 'The password setup link could not be requested.');
     }
   }
+
+  useEffect(() => {
+    if (step === 6) {
+      setError('');
+      setTermsNotice('');
+      setPaymentError('');
+      setPasswordLinkMessage('');
+      setPasswordLinkRequestError(false);
+      setPasswordLinkSent(false);
+    }
+  }, [step]);
 
   async function requestAdminHelp() {
     if (!passwordLinkEmail.trim() || helpRequestBusy) return;
@@ -2568,11 +2583,14 @@ function MembershipFlow({ upgradeMode = false }) {
                       setPasswordLinkEmail(event.target.value);
                       setPasswordLinkSent(false);
                       setPasswordLinkMessage('');
+                      setPasswordLinkRequestError(false);
                     }}
                   />
                 </label>
                 {passwordLinkSent && <p className="mt-3" role="status">{passwordLinkMessage}</p>}
-                {passwordLinkMessage && !passwordLinkSent
+                {passwordLinkMessage && !passwordLinkSent && !passwordLinkRequestError
+                  && <p className="mt-3 jm-password-link-message-info" role="status">{passwordLinkMessage}</p>}
+                {passwordLinkMessage && !passwordLinkSent && passwordLinkRequestError
                   && <p className="mt-3 jm-payment-error" role="alert">{passwordLinkMessage}</p>}
                 <p className="mt-3 text-sm">Check your inbox and spam folder.</p>
                 <button

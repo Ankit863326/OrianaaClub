@@ -28,6 +28,7 @@ import {
   activateAccount,
   inspectActivation,
   requestDraftPasswordLink,
+  requestPasswordReset,
 } from '../src/services/auth.service.js';
 import { verifyRecaptcha } from '../src/services/recaptcha.service.js';
 import { listActivePlans, findActivePlan } from '../src/services/plan.service.js';
@@ -130,6 +131,94 @@ describe('redemption cancellation', () => {
 });
 
 describe('guest membership payment verification', () => {
+  test('returns a generic response and audits an unknown password-reset email', async () => {
+    const email = 'wrong-address@example.invalid';
+    await expect(requestPasswordReset(email)).resolves.toMatchObject({
+      message: 'If the address can be used, instructions will be sent shortly.',
+    });
+    expect(await EmailLog.exists({
+      to: email,
+      template: 'reset',
+      status: 'failed',
+      error: 'Password-link skipped: user_not_found',
+    })).toBeTruthy();
+    expect(await AuditLog.exists({
+      action: 'password_reset_link.skipped',
+      reason: 'user_not_found',
+    })).toBeTruthy();
+  });
+
+  test('keeps ineligible password-link responses generic and records skip reasons', async () => {
+    const draft = await MembershipDraft.create({
+      email: 'unknown-password-link@example.invalid',
+      firstName: 'Unknown',
+      tokenHash: 'd'.repeat(64),
+      expiresAt: new Date(Date.now() + 60_000),
+      status: 'payment_pending',
+    });
+
+    await expect(requestDraftPasswordLink(draft, draft.email)).resolves.toMatchObject({
+      sent: false,
+      message: 'If the address can be used, instructions will be sent shortly.',
+    });
+    expect(await EmailLog.exists({
+      to: draft.email,
+      template: 'activation',
+      status: 'failed',
+      error: 'Password-link skipped: draft_has_no_user',
+    })).toBeTruthy();
+    expect(await AuditLog.exists({
+      action: 'password_link.skipped',
+      entityType: 'membership_password_link',
+      reason: 'draft_has_no_user',
+    })).toBeTruthy();
+  });
+
+  test('sends a setup link for an offline payment saved as payment_pending', async () => {
+    const plan = await createPlan();
+    const member = await createMember({
+      email: 'offline-payment-link@example.invalid',
+      status: 'pending',
+      emailVerified: true,
+      passwordHash: undefined,
+      activationRequiresMembershipPayment: true,
+      membership: { plan: plan._id, status: 'pending_payment' },
+    });
+    const payment = await Payment.create({
+      user: member.user._id,
+      membership: member.membership._id,
+      plan: plan._id,
+      method: 'bank_transfer',
+      status: 'pending',
+      baseAmount: 10000,
+      gstAmount: 1800,
+      totalAmount: 11800,
+    });
+    const draft = await MembershipDraft.create({
+      email: member.user.email,
+      firstName: member.user.firstName,
+      tokenHash: 'c'.repeat(64),
+      expiresAt: new Date(Date.now() + 60_000),
+      status: 'payment_pending',
+      user: member.user._id,
+      membership: member.membership._id,
+      payment: payment._id,
+    });
+
+    const result = await requestDraftPasswordLink(draft, member.user.email);
+    expect(result.sent).toBe(true);
+    const sentEmail = globalThis.__orianaMailTransport.sendMail.mock.calls.at(-1)[0];
+    const rawToken = sentEmail.html.match(/token=([a-f\d]{64})/i)?.[1];
+    await expect(inspectActivation(rawToken)).resolves.toMatchObject({ email: member.user.email });
+    const activated = await activateAccount({ token: rawToken, password: 'GuestPassword123' });
+    const savedMembership = await Membership.findById(member.membership._id);
+    expect(activated).toMatchObject({
+      user: { status: 'pending', passwordSet: true },
+      awaitingApproval: true,
+    });
+    expect(savedMembership).toMatchObject({ status: 'pending_payment', memberId: '' });
+  });
+
   test('uses the signed frontend callback in development and marks its payment paid', async () => {
     const plan = await MembershipPlan.create({
       name: 'Guest callback test plan',
@@ -209,7 +298,10 @@ describe('guest membership payment verification', () => {
     expect(tokenRecord.expiresAt.getTime()).toBeGreaterThan(Date.now());
     await expect(inspectActivation(rawToken)).resolves.toMatchObject({ email: paidDraft.email });
     const activated = await activateAccount({ token: rawToken, password: 'GuestPassword123' });
-    expect(activated.user.status).toBe('active');
+    expect(activated).toMatchObject({
+      user: { status: 'pending', passwordSet: true },
+      awaitingApproval: true,
+    });
   });
 
   test('releases the resend cooldown when password-link delivery fails', async () => {

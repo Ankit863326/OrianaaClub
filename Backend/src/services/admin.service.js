@@ -297,7 +297,10 @@ export async function listPayments(query) {
   }
   const [items, total] = await Promise.all([
     Payment.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
-      .populate('user', 'firstName email').populate('plan', 'title name slug').lean(),
+      .populate('user', 'firstName email')
+      .populate('plan', 'title name slug')
+      .populate('membership', 'memberId memberCode memberNo memberNumber status')
+      .lean(),
     Payment.countDocuments(filter),
   ]);
   return {

@@ -14,6 +14,7 @@ import { getNextMemberNumber } from './membership-id.service.js';
 import { getSettings } from '../models/Setting.js';
 import { getMembershipMemberCode } from '../utils/memberCode.js';
 import User from '../models/User.js';
+import MembershipDraft from '../models/MembershipDraft.js';
 import Plan from '../models/Plan.js';
 import { sendMail } from './mail.service.js';
 import { getPayableAmount, paiseToRupees, rupeesToPaise } from '../utils/money.js';
@@ -826,6 +827,26 @@ async function activateMembershipInTransaction(
   );
   if (activation.modifiedCount !== 1) {
     throw new ApiError(409, 'Membership activation was already completed or is no longer available.');
+  }
+  const activatedAccount = await User.updateOne({
+    _id: membership.user,
+    role: 'member',
+    status: 'pending',
+    activationRequiresMembershipPayment: true,
+    passwordHash: { $exists: true },
+  }, {
+    $set: {
+      status: 'active',
+      activationRequiresMembershipPayment: false,
+      activatedAt: now,
+    },
+  }, { session });
+  if (activatedAccount.modifiedCount) {
+    await MembershipDraft.updateMany(
+      { user: membership.user, status: 'password_pending' },
+      { $set: { status: 'active' } },
+      { session },
+    );
   }
 
   if (pointsGranted > 0) {

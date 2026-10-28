@@ -68,6 +68,15 @@ export const verifyActivation = asyncHandler(async (request, response) => {
 export const activate = asyncHandler(async (request, response) => {
   const result = await authService.activateAccount(request.validated.body);
   clearOnboardingCookie(response);
+  if (result.awaitingApproval) {
+    clearSessionCookies(response);
+    response.json({
+      user: result.user,
+      awaitingApproval: true,
+      message: 'Your password is set. Your account will be available after membership approval.',
+    });
+    return;
+  }
   setSessionCookies(response, result);
   response.json({ user: result.user });
 });

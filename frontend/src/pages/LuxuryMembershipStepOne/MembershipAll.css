@@ -1790,6 +1790,17 @@
 
 .jm-family-discount {
   width: fit-content;
+}
+
+.jm-password-link-message-info {
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  background: #eff6ff;
+}
+
+.jm-password-link-info {
   padding: 8px 12px;
   border-radius: 999px;
   background: var(--jm-gold-light);

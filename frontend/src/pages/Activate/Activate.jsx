@@ -61,11 +61,18 @@ export default function Activate() {
     }
     setSubmitting(true);
     try {
-      await apiClient.post('/auth/activate', {
+      const result = await apiClient.post('/auth/activate', {
         token: token.trim(),
         password,
         confirmPassword,
       });
+      if (result.awaitingApproval) {
+        navigate('/login', {
+          replace: true,
+          state: { message: result.message || 'Your password is set. Your account will be available after membership approval.' },
+        });
+        return;
+      }
       await refreshUser();
       navigate('/dashboard', { replace: true });
     } catch (requestError) {

@@ -1,7 +1,9 @@
 // Phase 0: Convert thrown errors into consistent JSON responses.
 import { env } from '../config/env.js';
+import logger from '../utils/logger.js';
 
 export default function errorHandler(error, request, response, next) {
+  logger.error(`[http] ${request.method} ${request.path}\n${error.stack || error.message || 'Unknown error'}`);
   if (response.headersSent) {
     next(error);
     return;

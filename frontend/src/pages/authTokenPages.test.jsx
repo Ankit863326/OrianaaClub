@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AuthContext from '../context/auth-context.js';
 import Activate from './Activate/Activate.jsx';
 import ResetPassword from './ResetPassword/ResetPassword.jsx';
@@ -22,11 +22,16 @@ function renderPage(page, route = '/') {
           <Route path="*" element={page} />
           <Route path="/luxury-membership" element={<p>Membership destination</p>} />
           <Route path="/dashboard" element={<p>Dashboard destination</p>} />
-          <Route path="/login" element={<p>Login destination</p>} />
+          <Route path="/login" element={<LoginDestination />} />
         </Routes>
       </MemoryRouter>
     </AuthContext.Provider>,
   );
+}
+
+function LoginDestination() {
+  const location = useLocation();
+  return <p>{location.state?.message || 'Login destination'}</p>;
 }
 
 // Token-state pages are tested with local fetch responses; no request leaves the test process.
@@ -59,6 +64,24 @@ describe('password setup and reset pages', () => {
       password: 'Password123',
       confirmPassword: 'Password123',
     });
+  });
+
+  test('a paid membership stays restricted after password setup until approval', async () => {
+    fetch
+      .mockResolvedValueOnce(jsonResponse({ email: 'member@example.test', firstName: 'Ari' }))
+      .mockResolvedValueOnce(jsonResponse({
+        awaitingApproval: true,
+        message: 'Your password is set. Your account will be available after membership approval.',
+      }));
+    renderPage(<Activate />, '/set-password?token=test-token');
+    expect(await screen.findByText('Use at least 8 characters.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Password123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+    expect(await screen.findByText(
+      'Your password is set. Your account will be available after membership approval.',
+    )).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   test('reset page handles missing token, mismatched passwords, and successful reset', async () => {

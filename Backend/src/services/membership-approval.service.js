@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import AuditLog from '../models/AuditLog.js';
 import FamilyMember from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
+import MembershipDraft from '../models/MembershipDraft.js';
 import MembershipPlan from '../models/MembershipPlan.js';
 import Plan from '../models/Plan.js';
 import Profile from '../models/Profile.js';
@@ -69,8 +70,24 @@ async function sendApprovalEmails(approved, planName) {
       if (!mail.to) throw new Error('No email address is available for the approved member.');
       await sendMail(mail);
     } catch (error) {
-      console.error(`[membership-approval] Approval email failed for member ${member._id}: ${error.message}`);
-      failures.push({ memberId: String(member._id), message: error.message });
+      const reason = `${error?.name || 'Error'}:${error?.code || 'unknown'}`;
+      console.error(`[membership-approval] Approval email failed for member ${member._id}: ${reason}`);
+      try {
+        await AuditLog.create({
+          actorType: 'system',
+          action: 'membership.approval_email.failed',
+          entityType: 'membership',
+          entityId: String(member._id),
+          summary: 'Membership approval email could not be delivered.',
+          reason,
+        });
+      } catch (auditError) {
+        console.error(
+          `[membership-approval] Could not audit approval email failure for member ${member._id}: `
+          + `${auditError?.name || 'Error'}:${auditError?.code || 'unknown'}`,
+        );
+      }
+      failures.push({ memberId: String(member._id), message: 'Approval email could not be sent.' });
     }
   }
   return failures;
@@ -108,6 +125,10 @@ export async function getMembershipApprovalQueue({ page = 1, limit = 20 } = {}, 
   return {
     items: items.map((membership) => ({
       ...membership,
+      brokenReferences: [
+        !membership.user && 'member',
+        !membership.plan && 'plan',
+      ].filter(Boolean),
       memberName: profileByUser.get(String(membership.user?._id))?.fullName || membership.user?.firstName || membership.user?.email || 'Member',
       memberCode: getMembershipMemberCode(membership),
       amountPaid: {
@@ -241,6 +262,26 @@ export async function approveMembership(membershipId, adminId, now = new Date())
         membership.membershipExpireAt = primaryExpiry;
       }
       await membership.save({ session });
+      const activatedAccount = await User.updateOne({
+        _id: membership.user,
+        role: 'member',
+        status: 'pending',
+        activationRequiresMembershipPayment: true,
+        passwordHash: { $exists: true },
+      }, {
+        $set: {
+          status: 'active',
+          activationRequiresMembershipPayment: false,
+          activatedAt: now,
+        },
+      }, { session });
+      if (activatedAccount.modifiedCount) {
+        await MembershipDraft.updateMany(
+          { user: membership.user, status: 'password_pending' },
+          { $set: { status: 'active' } },
+          { session },
+        );
+      }
       const ledgerEntry = await creditPoints(session, membership, primarySeq);
       if (ledgerEntry) {
         membership.pointsGranted = ledgerEntry.points;
