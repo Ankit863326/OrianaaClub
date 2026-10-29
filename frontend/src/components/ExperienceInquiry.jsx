@@ -139,7 +139,8 @@ const Orianaaleadform = () => {
               <span className="form-mini-tag">Premium Access</span>
               <h2>Request an Exclusive Experience</h2>
               <p>
-Share your details and our team will curate your experience.              </p>
+                Share your details, and our team will curate your personalized experience.
+              </p>
             </div>
 
             <form className="form-wrapper" onSubmit={handleSubmit}>

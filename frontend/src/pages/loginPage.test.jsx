@@ -28,7 +28,7 @@ describe('member login page', () => {
   test('validates email and password and lets the member reveal the password', () => {
     renderLogin(jest.fn());
     fireEvent.click(screen.getByRole('button', { name: 'Log In' }));
-    expect(screen.getByText('Please enter your E-mail ID')).toBeInTheDocument();
+    expect(screen.getByText('Please enter your email address')).toBeInTheDocument();
     expect(screen.getByText('Please enter your password')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
@@ -38,7 +38,7 @@ describe('member login page', () => {
   test('shows a login error returned from the authentication context', async () => {
     const login = jest.fn().mockRejectedValue(new Error('Invalid email or password.'));
     renderLogin(login);
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'member@example.test' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'member@example.test' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Log In' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.');
@@ -50,7 +50,7 @@ describe('member login page', () => {
     const login = jest.fn().mockResolvedValue({ name: 'Member' });
     fetch.mockResolvedValueOnce(jsonResponse({ data: { membership: { status: 'active' } } }));
     renderLogin(login);
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: ' member@example.test ' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: ' member@example.test ' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } });
     fireEvent.click(screen.getByRole('button', { name: 'Log In' }));
     expect(await screen.findByText(/Welcome back! Redirecting/)).toBeInTheDocument();

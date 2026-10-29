@@ -253,9 +253,9 @@ export default function Events() {
               <h1 className="ev2-hero__heading" id="ev2-hero-title">
                 Events & Celebrations
               </h1>
-              <p className="ev2-hero__sub">A 25-year lifestyle membership</p>
+              <p className="ev2-hero__sub">A 25-Year Lifestyle Membership</p>
               <p className="ev2-hero__desc">
-                Grand celebrations tailored to perfection amidst serene resort landscapes and unforgettable luxury ambiance.
+                Grand celebrations tailored to perfection amidst serene resort landscapes and an unforgettable, luxurious ambience.
               </p>
             </Motion.div>
 
@@ -267,7 +267,7 @@ export default function Events() {
                 whileHover={{ scale: 1.04, y: -2 }}
                 whileTap={{ scale: 0.97 }}
               >
-                Buy Membership
+                Join Membership
               </Motion.button>
             </div>
           </div>

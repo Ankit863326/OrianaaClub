@@ -440,7 +440,7 @@ export default function LuxuryContactDrawer({ open, onOpenChange }) {
                 animate="visible"
                 variants={headerMotion}
               >
-                A 25-year lifestyle membership bringing together stays, wellness, dining
+                A 25-year lifestyle membership bringing together stays, wellness, dining, and curated experiences.
               </Motion.p>
               <Motion.div
                 className="lux-contact__divider"

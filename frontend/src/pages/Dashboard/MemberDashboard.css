@@ -40,11 +40,10 @@
 
 .member-hub__tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
   margin: 0 0 20px;
   padding: 4px 2px 10px;
-  scrollbar-width: thin;
 }
 
 .member-hub__tab {
@@ -489,6 +488,10 @@
 }
 
 @media (max-width: 720px) {
+  .member-hub__tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
   .member-hub {
     padding-top: 112px;
   }
@@ -523,3 +526,4 @@
     flex-wrap: wrap;
   }
 }
+

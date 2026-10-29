@@ -20,14 +20,14 @@ const storiesData = [
       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80",
     name: "Sakshi Mehta",
     since: "Member since 2016",
-    text: `With OrianaaClub, we can holiday at amazing resorts without denting our pocket. There is something fun for everyone. The warm hospitality, well-maintained properties, and curated experiences make every trip memorable. It always feels like we’re stepping into comfort, relaxation, and quality family time together.`,
+    text: `With OrianaaClub, we can holiday at amazing resorts while enjoying exceptional value. There is something fun for everyone. The warm hospitality, well-maintained properties, and curated experiences make every trip memorable. It always feels like we’re stepping into comfort, relaxation, and quality family time together.`,
   },  {
     id: 3,
     image:
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRWhmp49vm1O9Y0DTTvRoaAkcxkvAzDOqd9dA&s",
     avatar:
       "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80",
-    name: "John Doe",
+    name: "Kabir Sharma",
     since: "Member since 2017",
     text: `Whether it is a quick weekend getaway or a long family vacation, we just pick a destination, pack our bags, and go. The warm hospitality, beautiful properties, and curated experiences make every trip memorable. It's like having a second home wherever we travel, and every holiday becomes truly special.`,
   },

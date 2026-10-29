@@ -145,14 +145,14 @@
   color: #fff;
 }
 
-.home-nav:not(.is-scrolled) .home-nav__sign-in:not(.home-nav__membership) {
+.home-nav:not(.is-scrolled) .home-nav__sign-in:not(.home-nav__membership):not(.home-nav__login) {
   border-color: rgba(255, 255, 255, 0.78);
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.24);
 }
 
-.home-nav:not(.is-scrolled) .home-nav__sign-in:not(.home-nav__membership):hover {
+.home-nav:not(.is-scrolled) .home-nav__sign-in:not(.home-nav__membership):not(.home-nav__login):hover {
   background: rgba(255, 255, 255, 0.18);
 }
 
@@ -404,8 +404,66 @@
   color: #fff;
 }
 
-.home-nav__sign-in:not(.home-nav__membership):hover {
+.home-nav__sign-in:not(.home-nav__membership):not(.home-nav__login):hover {
   background: #f5f5f3;
+}
+
+.home-nav__login {
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+  padding: 0 20px !important;
+  min-height: 44px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.home-nav__login:hover {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-2px) !important;
+}
+
+.home-nav__login:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+.home-nav.is-scrolled .home-nav__login {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(23, 24, 22, 0.18) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #171816 !important;
+  text-shadow: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+}
+
+.home-nav.is-scrolled .home-nav__login:hover {
+  background: #ffffff !important;
+  border-color: #000000 !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-2px) !important;
+}
+
+.home-nav__login.is-active {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.home-nav.is-scrolled .home-nav__login.is-active {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-color: rgba(0, 0, 0, 0.4) !important;
 }
 
 .home-nav__membership:hover {

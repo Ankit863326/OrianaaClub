@@ -74,7 +74,6 @@ export default function ResetPassword() {
             {token && (
               <div className="login-footer-prompt">
                 <Link className="login-register-link" to="/forgot-password">Request a new reset link</Link>
-                <span aria-hidden="true"> · </span>
                 <Link className="login-register-link" to="/login">Return to login</Link>
               </div>
             )}

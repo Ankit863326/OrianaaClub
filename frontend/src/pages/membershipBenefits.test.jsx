@@ -34,7 +34,7 @@ describe('membership benefits page', () => {
     expect(await screen.findByRole('heading', { name: 'Founders Circle' })).toBeInTheDocument();
     expect(screen.getByText('₹1,50,000')).toBeInTheDocument();
     expect(screen.getByText('25,000')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Buy Membership' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Join Membership' }).length).toBeGreaterThan(0);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

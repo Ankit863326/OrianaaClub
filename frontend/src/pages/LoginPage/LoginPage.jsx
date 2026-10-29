@@ -68,7 +68,7 @@ const LoginPage = () => {
     setNotice("");
 
     if (!email.trim()) {
-      newErrors.email = "Please enter your E-mail ID";
+      newErrors.email = "Please enter your email address";
     } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
       newErrors.email = "Please enter a valid email address";
     }
@@ -156,7 +156,7 @@ const LoginPage = () => {
               transition={{ duration: 0.65, delay: 0.15 }}
             >
               <h1 className="login-title">Member Login</h1>
-              <p className="login-subtitle">Please enter your Details</p>
+              <p className="login-subtitle">Please enter your details to sign in</p>
             </Motion.div>
 
             {/* Success Alert */}
@@ -185,16 +185,16 @@ const LoginPage = () => {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="login-form" noValidate>
-              {/* E-mail Field */}
+              {/* Email Field */}
               <div className="login-field">
                 <label htmlFor="login-email" className="login-label">
-                  E-mail
+                  Email
                 </label>
                 <div className="login-input-wrapper">
                   <input
                     id="login-email"
                     type="email"
-                    placeholder="Enter your E-mail ID"
+                    placeholder="Enter your email address"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);

@@ -411,7 +411,7 @@ export default function RoomCategories() {
             animate="visible"
             variants={heroVariants}
           >
-            <Sparkles size={13} className="destinations-sparkle" /> The Orianaa universe
+            <Sparkles size={13} className="destinations-sparkle" /> The Orianaa Universe
           </Motion.p>
           <Motion.h1
             id="destinations-hero-title"
@@ -433,7 +433,7 @@ export default function RoomCategories() {
               className="home-button home-button--green destinations-hero__cta"
               onClick={scrollToGrid}
             >
-              Explore Accommodation <ArrowRight size={17} />
+              Explore Accommodations <ArrowRight size={17} />
             </Button>
           </Motion.div>
         </div>
@@ -853,16 +853,16 @@ export default function RoomCategories() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <p className="home-eyebrow">Every Stay Included</p>
+            <p className="home-eyebrow">Included with Every Stay</p>
             <h2>Thoughtfully Prepared Comfort</h2>
           </Motion.div>
 
           <div className="destinations-experience__features">
             {[
               { num: "01", title: "24×7 Concierge Service", desc: "Dedicated staff catering to your every request day and night." },
-              { num: "02", title: "Scenic Private Balconies", desc: "Uninterrupted views of natural surrounding gardens and hills." },
+              { num: "02", title: "Scenic Private Balconies", desc: "Uninterrupted views of surrounding natural gardens and serene hills." },
               { num: "03", title: "Artisanal Fine Dining", desc: "In-room dining curated with organic regional produce." },
-              { num: "04", title: "Holistic Wellness Spa", desc: "Complimentary access to spa and rejuvenation sanctuary." },
+              { num: "04", title: "Holistic Wellness Spa", desc: "Complimentary access to our spa and rejuvenation sanctuary." },
             ].map((item, idx) => (
               <Motion.div
                 key={item.num}

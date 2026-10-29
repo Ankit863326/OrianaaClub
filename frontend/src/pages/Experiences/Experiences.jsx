@@ -273,7 +273,7 @@ function ExperienceRow({ exp, index }) {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.96 }}
         >
-          Join <span>→</span>
+          Explore <span>→</span>
         </Motion.a>
       </Motion.div>
     </div>
@@ -368,7 +368,7 @@ const Experiences = () => {
           >
             Moments that
             <br />
-            <em>becomes memories</em>
+            <em>become memories</em>
           </Motion.h1>
 
           <Motion.p
@@ -477,7 +477,7 @@ const Experiences = () => {
             </Motion.p>
 
             <Motion.a
-              href="/contact"
+              href="/#enquiry"
               className="exp-join__btn"
               initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
