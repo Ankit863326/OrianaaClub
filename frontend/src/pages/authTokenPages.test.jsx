@@ -57,7 +57,7 @@ describe('password setup and reset pages', () => {
     expect(await screen.findByText('Use at least 8 characters.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123' } });
     fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Password123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set Password' }));
     expect(await screen.findByText('Dashboard destination')).toBeInTheDocument();
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({
       token: 'test-token',
@@ -77,7 +77,7 @@ describe('password setup and reset pages', () => {
     expect(await screen.findByText('Use at least 8 characters.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123' } });
     fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Password123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set Password' }));
     expect(await screen.findByText(
       'Your password is set. Your account will be available after membership approval.',
     )).toBeInTheDocument();

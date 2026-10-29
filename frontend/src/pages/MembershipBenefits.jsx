@@ -113,7 +113,7 @@ export default function MembershipBenefits() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            Key privileges in an exclusive club placed with unique amenities, recreation and curated assistance. Orianaa Club is all about legacy.
+            Distinctive privileges in an exclusive club offering premium amenities, bespoke recreation, and personalized assistance. Orianaa Club is crafted to endure as your lasting family legacy.
           </motion.p>
 
           <motion.div
@@ -122,7 +122,7 @@ export default function MembershipBenefits() {
             transition={{ duration: 0.7, delay: 0.45 }}
           >
             <Link to="/luxury-membership" className="mb-hero__cta">
-              Buy Membership
+              Join Membership
             </Link>
           </motion.div>
         </div>
@@ -166,7 +166,7 @@ export default function MembershipBenefits() {
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--after">After 1,000 Members</span>
-               <p>Early Bird Offer</p>
+               <p>Tier 2 Advantage</p>
             </div>
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
@@ -182,7 +182,7 @@ export default function MembershipBenefits() {
           {plansError && <p role="alert">{plansError}</p>}
           {!plansLoading && !plansError && plans.length === 0 && <p>No membership plans are available right now.</p>}
           {plans.map((plan, index) => (
-            <PlanCard key={plan.id} plan={mapPlanToCard(plan)} index={index} buttonLabel="Buy Membership" to="/luxury-membership" />
+            <PlanCard key={plan.id} plan={mapPlanToCard(plan)} index={index} buttonLabel="Join Membership" to="/luxury-membership" />
           ))}
         </div>
       </section>

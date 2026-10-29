@@ -43,7 +43,7 @@ export default function ForgotPassword() {
             {error && <p className="auth-form-error" role="alert">{error}</p>}
             <form className="login-form" onSubmit={handleSubmit}>
               <div className="login-field">
-                <label className="login-label" htmlFor="forgot-email">E-mail</label>
+                <label className="login-label" htmlFor="forgot-email">Email</label>
                 <div className="login-input-wrapper">
                   <input className="login-input" id="forgot-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
                 </div>

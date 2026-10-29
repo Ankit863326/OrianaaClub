@@ -522,9 +522,9 @@ export default function MemberDashboardPage() {
           {qrUrl && <img className="member-hub__qr" src={qrUrl} alt={`Membership QR code for ${formatMemberCode(membership.memberCode || membership.memberNo)}`} />}
         </article>
         <article className="member-hub__points">
-          <span className="member-hub__points-label">Available points</span>
+          <span className="member-hub__points-label">Available Points</span>
           <strong className="member-hub__points-value">{formatPts(pointsBalance)}</strong>
-          <span className="member-hub__points-equivalent">Value equivalent: {formatINR(pointsBalance)}</span>
+          <span className="member-hub__points-equivalent">Equivalent value: {formatINR(pointsBalance)}</span>
           {membership.pointsExpireAt && <span className="member-hub__points-validity">
             Valid until {formatValidityDate(membership.pointsExpireAt)}
           </span>}
@@ -536,7 +536,7 @@ export default function MemberDashboardPage() {
   return <main className="member-hub">
     <div className="member-hub__inner">
       <header>
-        <p className="member-hub__eyebrow">ORI A N A A  C L U B</p>
+        <p className="member-hub__eyebrow">O R I A N A A  C L U B</p>
         <h1 className="member-hub__heading">My Dashboard</h1>
         <p className="member-hub__intro">Your membership, bookings, and rewards in one place.</p>
       </header>

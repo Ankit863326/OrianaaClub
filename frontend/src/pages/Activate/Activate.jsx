@@ -103,7 +103,7 @@ export default function Activate() {
         <section className="login-form-panel">
           <div className="login-form-inner">
             <header className="login-header">
-              <h1 className="login-title">Set your password</h1>
+              <h1 className="login-title">Set Your Password</h1>
               <p className="login-subtitle">
                 {account
                   ? `Welcome, ${account.firstName}. Choose a password for your OrianaaClub account.`
@@ -148,7 +148,7 @@ export default function Activate() {
                     />
                   </div>
                 </div>
-                <button className="login-submit-btn" type="submit" disabled={submitting || password.length < 8 || password !== confirmPassword}>{submitting ? 'Saving…' : 'Set password'}</button>
+                <button className="login-submit-btn" type="submit" disabled={submitting || password.length < 8 || password !== confirmPassword}>{submitting ? 'Saving…' : 'Set Password'}</button>
               </form>
             )}
             {!account && !loading && (

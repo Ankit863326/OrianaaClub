@@ -27,19 +27,19 @@ const destinations = [
 
 const events = [
   {
-    type: "Events and celebration",
-    title: "Wedding",
+    type: "Events & Celebrations",
+    title: "Weddings",
     image:
       "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=90",
   },
   {
-    type: "Wellness and renewal",
+    type: "Wellness & Renewal",
     title: "A slower kind of escape",
     image:
       "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1800&q=90",
   },
   {
-    type: "Time together",
+    type: "Cherished Moments",
     title: "Make room for wonder",
     image:
       "https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=1800&q=90",
@@ -266,7 +266,7 @@ export default function HomePage() {
       <section className="home-universe" id="universe" ref={universeRef}>
         <div className="home-universe__copy">
           <p className="home-eyebrow home-eyebrow--dark">Universe</p>
-          <h2>The Orianaa universe, one world, six connections</h2>
+          <h2>The Orianaa Universe: One World, Six Connections</h2>
           <p className="home-body-copy">
             At the center stands Orianaa. Around it, six experiences move in
             orbit. Each one feeds the next, creating a life that is greater
@@ -274,7 +274,7 @@ export default function HomePage() {
           </p>
           <div className="home-inline-actions">
             <Button asChild>
-              <a className="home-button home-button--green" href="/resorts">Explore Destination</a>
+              <a className="home-button home-button--green" href="/resorts">Explore Destinations</a>
             </Button>
             <a className="home-text-link" href="/membership-benefits">
               About Membership <ArrowRight size={16} aria-hidden="true" />
@@ -528,17 +528,17 @@ export default function HomePage() {
           <div className="home-benefit-points">
             <article>
               <Leaf size={30} strokeWidth={1.5} aria-hidden="true" />
-              <h3>Upto 50% point redemption</h3>
+              <h3>Up to 50% points redemption</h3>
               <p>25% Exclusive Member Discount on resort stays.</p>
             </article>
             <article>
               <Trees size={30} strokeWidth={1.5} aria-hidden="true" />
               <h3>Closer to the land</h3>
-              <p>Gym and sports facilities. Healthy nature lifestyle with clean air near to nature resort. Spa and naturopathy centre.</p>
+              <p>State-of-the-art sports and fitness facilities, an invigorating lifestyle with pristine natural surroundings, and holistic spa and naturopathy centers.</p>
             </article>
           </div>
           <Button asChild>
-            <a className="home-button home-button--green" href="/luxury-membership">Buy Membership</a>
+            <a className="home-button home-button--green" href="/luxury-membership">Join Membership</a>
           </Button>
         </Motion.div>
       </section>

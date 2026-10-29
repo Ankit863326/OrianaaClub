@@ -82,7 +82,7 @@ export default function NotFound() {
           transition={{ delay: 0.55, duration: 0.6 }}
         >
           The private retreat or page you are seeking does not exist or may have been relocated.
-          Allow us to guide you back to familiar sanctuary.
+          Allow us to guide you back to a familiar sanctuary.
         </Motion.p>
 
         {/* Suggested Quick Links */}

@@ -67,7 +67,7 @@ export default function Footer() {
           </nav>
 
           <div className="site-footer__invitation">
-            <p className="site-footer__eyebrow">Your world, everyday</p>
+            <p className="site-footer__eyebrow">Your world, every day</p>
             <h2>Make room for more.</h2>
             <p>Find your place in a club made for memorable time away.</p>
             <Link className="site-footer__join" to="/luxury-membership">

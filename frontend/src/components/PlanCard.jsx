@@ -70,7 +70,7 @@ export default function PlanCard({
       <div className="mb-card__header">
         <h3 className="mb-card__title">{plan.title}</h3>
         <p className="mb-card__subtitle">{plan.subtitle}</p>
-        <p className="mb-card__redemption-rate">1 Redemption points = 1 Rupee</p>
+        <p className="mb-card__redemption-rate">1 Redemption point = 1 Rupee</p>
       </div>
 
       {cohorts.length > 0 && <div className="mb-card__cohorts">
