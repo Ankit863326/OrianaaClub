@@ -6,6 +6,7 @@ import AuthContext from './auth-context.js';
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [membershipResetKey, setMembershipResetKey] = useState(0);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -40,6 +41,7 @@ export function AuthProvider({ children }) {
       await apiClient.post('/auth/logout', {});
     } finally {
       setUser(null);
+      setMembershipResetKey((current) => current + 1);
     }
   }, []);
 
@@ -61,7 +63,8 @@ export function AuthProvider({ children }) {
     login,
     logout,
     refreshUser,
-  }), [user, loading, login, logout, refreshUser]);
+    membershipResetKey,
+  }), [user, loading, login, logout, refreshUser, membershipResetKey]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

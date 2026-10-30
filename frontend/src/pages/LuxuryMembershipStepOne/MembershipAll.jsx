@@ -34,7 +34,6 @@ import TermsConsentCard from '../../components/TermsConsentCard.jsx';
 import {
   addMembershipDraftFamily,
   deleteMembershipDraftFamily,
-  getMembershipDraft,
   getMembershipDraftBankDetails,
   getMembershipDraftQuote,
   getMembershipDraftFamilyPrices,
@@ -57,11 +56,11 @@ import './MembershipAll.css';
 
 const emptyProfile = {
   fullName: '',
-  gender: 'male',
+  gender: '',
   countryCode: '+91',
   mobile: '',
   dob: '',
-  interestArea: 'Luxury Stays',
+  interestArea: '',
   agreePromo: false,
 };
 
@@ -213,7 +212,7 @@ class MembershipErrorBoundary extends Component {
 }
 
 export default function MembershipAll() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, membershipResetKey = 0 } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const userIdentity = user?._id || user?.id || user?.email || null;
@@ -297,7 +296,10 @@ export default function MembershipAll() {
 
   return (
     <MembershipErrorBoundary onBack={handleBack}>
-      <MembershipFlow upgradeMode={Boolean(user && membershipCheck.membership?.status === 'active' && isUpgradeSelection)} />
+      <MembershipFlow
+        key={`${userIdentity || 'guest'}:${membershipResetKey}`}
+        upgradeMode={Boolean(user && membershipCheck.membership?.status === 'active' && isUpgradeSelection)}
+      />
     </MembershipErrorBoundary>
   );
 }
@@ -331,6 +333,11 @@ function dateInputValue(value) {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+}
+
+function normalizeGender(value) {
+  const gender = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return ['male', 'female', 'other', 'prefer_not_to_say'].includes(gender) ? gender : '';
 }
 
 function formatPlainDate(value) {
@@ -585,49 +592,24 @@ function MembershipFlow({ upgradeMode = false }) {
         memberData,
         identityData,
       }))
-      : getMembershipDraft().then((draft) => ({
-        draft,
-        memberData: {
-          profile: draft.profile,
-          family: (draft.family ?? []).map((member) => ({
-            ...(member ?? {}),
-            _id: member?._id || member?.id,
-          })),
-          membership: draft.planId ? { status: 'draft', plan: { _id: draft.planId } } : null,
-        },
-        identityData: draft.identity,
-      }));
+      : Promise.resolve({
+        memberData: { profile: null, membership: null, family: [] },
+        identityData: null,
+      });
     loadApplication
-      .then(({ memberData, identityData, draft }) => {
+      .then(({ memberData, identityData }) => {
         if (!active) return;
-        if (draft) {
-          setDraftStarted(true);
-          setDraftEmailVerified(Boolean(draft.emailVerified));
-          setTermsApplicationId(draft.id || '');
-          setExistingTermsConsent(draft.termsConsent || null);
-          setProfile((current) => ({
-            ...current,
-            ...draft.profile,
-            email: draft.email || current.email,
-            dob: dateInputValue(draft.profile?.dob),
-          }));
-          setPasswordLinkEmail(draft.email || '');
-          if (['payment_pending', 'payment_submitted', 'paid', 'password_pending'].includes(draft.status)) {
-            setStep(6);
-            setPaymentSubmittedMethod(draft.paymentMethod || '');
-            setSearchParams({ step: '6' }, { replace: true });
-          }
-        }
         setMembership(memberData.membership);
         setFamily((memberData.family ?? []).map((member) => ({
           ...(member ?? {}),
           _id: member?._id || member?.id,
         })));
         setIdentityVerification(identityData);
-        if (memberData.profile && !draft) {
+        if (isLoggedIn && memberData.profile) {
           setProfile({
             ...emptyProfile,
             ...memberData.profile,
+            gender: normalizeGender(memberData.profile.gender),
             email: user?.email || '',
             dob: dateInputValue(memberData.profile.dob),
           });
@@ -636,18 +618,13 @@ function MembershipFlow({ upgradeMode = false }) {
       })
       .catch((requestError) => {
         if (!active) return;
-        if (!isLoggedIn && requestError.status === 401) {
-          setDraftStarted(false);
-          setDraftEmailVerified(false);
-          return;
-        }
         setApplicationLoadError(requestError.message || 'Could not load your application.');
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [applicationLoadRetry, isLoggedIn, setSearchParams, user?.email]);
+  }, [applicationLoadRetry, isLoggedIn, user?.email]);
 
   useEffect(() => {
     const applicationId = user?._id || user?.id || '';
@@ -1734,6 +1711,7 @@ function MembershipFlow({ upgradeMode = false }) {
                 <label className="jm-field">Gender
                   <select className="jm-input jm-select" value={profile.gender}
                     onChange={(event) => setProfile({ ...profile, gender: event.target.value })}>
+                    <option value="">Select gender</option>
                     <option value="male">Male</option><option value="female">Female</option>
                     <option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option>
                   </select>
@@ -1746,7 +1724,11 @@ function MembershipFlow({ upgradeMode = false }) {
                     required={!isLoggedIn}
                     value={profile.email}
                     readOnly={isLoggedIn || draftStarted}
-                    onChange={(event) => setProfile({ ...profile, email: event.target.value })}
+                    onChange={(event) => {
+                      setProfile({ ...profile, email: event.target.value });
+                      setDraftEmailVerified(false);
+                      setOtpCode('');
+                    }}
                   />
                 </label>
                 <label className="jm-field">Country code
@@ -1764,6 +1746,7 @@ function MembershipFlow({ upgradeMode = false }) {
                 <label className="jm-field">Interest area
                   <select className="jm-input jm-select" value={profile.interestArea}
                     onChange={(event) => setProfile({ ...profile, interestArea: event.target.value })}>
+                    <option value="">Select an interest area</option>
                     {['Luxury Stays', 'Fine Dining', 'Wellness & Spa', 'Family Vacations', 'Celebrations']
                       .map((interest) => <option key={interest}>{interest}</option>)}
                   </select>

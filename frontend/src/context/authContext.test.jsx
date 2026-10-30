@@ -13,6 +13,7 @@ function ContextReader() {
   return (
     <div>
       <span>{auth.loading ? 'loading' : auth.user?.name || 'guest'}</span>
+      <span data-testid="membership-reset-key">{auth.membershipResetKey}</span>
       <button onClick={() => auth.login({ email: 'member@example.test' })}>Log in</button>
       <button onClick={() => auth.logout()}>Log out</button>
       <button onClick={() => auth.refreshUser()}>Refresh</button>
@@ -38,6 +39,7 @@ describe('authentication context and protected routes', () => {
     expect(screen.getByText('Signed in')).toBeInTheDocument();
     await act(async () => screen.getByRole('button', { name: 'Log out' }).click());
     expect(screen.getByText('guest')).toBeInTheDocument();
+    expect(screen.getByTestId('membership-reset-key')).toHaveTextContent('1');
     expect(get).toHaveBeenCalledWith('/auth/me');
     expect(post).toHaveBeenNthCalledWith(1, '/auth/login', { email: 'member@example.test' });
     expect(post).toHaveBeenNthCalledWith(2, '/auth/logout', {});

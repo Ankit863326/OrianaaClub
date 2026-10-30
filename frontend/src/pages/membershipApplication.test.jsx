@@ -54,6 +54,7 @@ function setUpApi(identityStatus = 'verified', {
   membership: currentMembership = member.membership,
   membershipGate = null,
   family: currentFamily = member.family,
+  profile: currentProfile = member.profile,
 } = {}) {
   fetch.mockImplementation(async (url, options = {}) => {
     const requestUrl = new URL(url, window.location.href);
@@ -77,7 +78,7 @@ function setUpApi(identityStatus = 'verified', {
       return { ok: true, status: 200, text: async () => termsHtml(agreementPath[1]) };
     }
     if (path.endsWith('/member/me')) return jsonResponse({
-      data: { ...member, membership: currentMembership, family: currentFamily },
+      data: { ...member, profile: currentProfile, membership: currentMembership, family: currentFamily },
     });
     if (path.endsWith('/family-prices')) return jsonResponse({ data: {
       tier: 'founder-legacy',
@@ -171,13 +172,14 @@ function setUpApi(identityStatus = 'verified', {
   });
 }
 
-function renderMembership(
-  route = '/luxury-membership?step=1',
-  user = { _id: userId, email: 'member@example.test', status: 'active', emailVerified: true },
+function membershipTree(
+  route,
+  user,
   refreshUser = jest.fn(),
+  membershipResetKey = 0,
 ) {
-  return render(
-    <AuthContext.Provider value={{ user, refreshUser }}>
+  return (
+    <AuthContext.Provider value={{ user, refreshUser, membershipResetKey }}>
       <MemoryRouter initialEntries={[route]}>
         <Routes>
           <Route path="/luxury-membership" element={<MembershipAll />} />
@@ -185,8 +187,16 @@ function renderMembership(
           <Route path="/login" element={<p>Login destination</p>} />
         </Routes>
       </MemoryRouter>
-    </AuthContext.Provider>,
+    </AuthContext.Provider>
   );
+}
+
+function renderMembership(
+  route = '/luxury-membership?step=1',
+  user = { _id: userId, email: 'member@example.test', status: 'active', emailVerified: true },
+  refreshUser = jest.fn(),
+) {
+  return render(membershipTree(route, user, refreshUser));
 }
 
 // Each endpoint is resolved from an in-memory response; payment uses a fake SDK object.
@@ -197,6 +207,44 @@ describe('integrated membership application and payment flow', () => {
     URL.createObjectURL = jest.fn((file) => `blob:${file.name}`);
     URL.revokeObjectURL = jest.fn();
     setUpApi();
+  });
+
+  test('normalizes and allows gender changes, then clears the complete form on logout', async () => {
+    setUpApi('verified', {
+      profile: { ...member.profile, gender: 'Male' },
+    });
+    const refreshUser = jest.fn();
+    const view = renderMembership('/luxury-membership?step=1', undefined, refreshUser);
+
+    expect(await screen.findByLabelText('Full name')).toHaveValue('Ari Member');
+    const gender = screen.getByLabelText('Gender');
+    expect(gender).toHaveValue('male');
+    fireEvent.change(gender, { target: { value: 'female' } });
+    expect(gender).toHaveValue('female');
+
+    view.rerender(membershipTree('/luxury-membership?step=1', null, refreshUser, 1));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Full name')).toHaveValue('');
+      expect(screen.getByLabelText('Account email')).toHaveValue('');
+      expect(screen.getByLabelText('Gender')).toHaveValue('');
+      expect(screen.getByLabelText('Mobile number')).toHaveValue('');
+      expect(screen.getByLabelText('Date of birth')).toHaveValue('');
+      expect(screen.getByLabelText('Interest area')).toHaveValue('');
+    });
+    expect(screen.getByLabelText('Account email')).toBeEnabled();
+    expect(screen.queryByText(/Email verified/)).not.toBeInTheDocument();
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/membership/draft'))).toBe(false);
+  });
+
+  test('clears loaded family details when a member logs out from a later step', async () => {
+    const refreshUser = jest.fn();
+    const view = renderMembership('/luxury-membership?step=3', undefined, refreshUser);
+
+    expect(await screen.findByText('Sam Member')).toBeInTheDocument();
+    view.rerender(membershipTree('/luxury-membership?step=3', null, refreshUser, 1));
+
+    await waitFor(() => expect(screen.queryByText('Sam Member')).not.toBeInTheDocument());
   });
 
   test('saves personal details, chooses a plan, manages family, reviews and completes mocked payment', async () => {
