@@ -74,9 +74,10 @@ export const familyTree = asyncHandler(async (request, response) => {
 });
 
 export const identityVerificationDetails = asyncHandler(async (request, response) => {
-  const membership = await Membership.findById(request.validated.params.id).select('user');
+  const membership = await Membership.findById(request.validated.params.id).select('_id user');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
-  const data = await identityVerificationService.getAdminIdentityVerification(membership.user);
+  const identifiers = { membershipId: membership._id, userId: membership.user };
+  const data = await identityVerificationService.getAdminIdentityVerification(identifiers);
   await recordRequestAction(request, {
     action: 'identity_verification.view',
     entityType: 'identity_verification',
@@ -87,10 +88,10 @@ export const identityVerificationDetails = asyncHandler(async (request, response
 });
 
 export const identityVerificationDocument = asyncHandler(async (request, response) => {
-  const membership = await Membership.findById(request.validated.params.id).select('user');
+  const membership = await Membership.findById(request.validated.params.id).select('_id user');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
   const { document, buffer } = await identityVerificationService.readAdminIdentityDocument(
-    membership.user,
+    { membershipId: membership._id, userId: membership.user },
     request.validated.params.documentId,
   );
   await recordRequestAction(request, {
@@ -111,11 +112,11 @@ export const identityVerificationDocument = asyncHandler(async (request, respons
 });
 
 export const reviewIdentityVerification = asyncHandler(async (request, response) => {
-  const membership = await Membership.findById(request.validated.params.id).select('user');
+  const membership = await Membership.findById(request.validated.params.id).select('_id user');
   if (!membership) throw new ApiError(404, 'Membership was not found.');
   const { status, reason = '' } = request.validated.body;
   const data = await identityVerificationService.reviewIdentityVerification(
-    membership.user,
+    { membershipId: membership._id, userId: membership.user },
     request.user._id,
     { status, reason },
   );

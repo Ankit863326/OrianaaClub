@@ -151,49 +151,55 @@ function IdentityDocumentsPanel() {
     }
   }
 
-  const needsUpload = !record || ['not_submitted', 'rejected'].includes(record.status);
+  const hasSubmitted = Boolean(record && record.status !== 'not_submitted');
+  const needsUpload = !hasSubmitted || record.status === 'rejected';
   return <section className="member-hub__panel">
     <h2>Document verification</h2>
     {loading ? <p className="member-hub__loading" role="status">Loading your document status…</p> : <>
       {error && <ErrorMessage message={error} />}
       {notice && <p className="member-hub__warning" role="status">{notice}</p>}
-      {record && <div className="member-hub__membership">
-        <p><strong>Status:</strong> {String(record.status).replaceAll('_', ' ')}</p>
+      {hasSubmitted && <div className="member-hub__membership member-hub__document-summary">
+        <p><strong>Status:</strong> {record.status === 'verified' ? 'approved' : String(record.status).replaceAll('_', ' ')}</p>
         {record.panMask && <p><strong>PAN:</strong> {record.panMask}</p>}
         {record.idMask && <p><strong>{record.idType.replaceAll('_', ' ')}:</strong> {record.idMask}</p>}
         {record.rejectionReason && <p className="member-hub__warning"><strong>Reason:</strong> {record.rejectionReason}</p>}
       </div>}
-      {needsUpload ? <form className="mt-5 grid gap-4" onSubmit={submit}>
-        <label className="member-hub__filter">PAN number
+      {needsUpload ? <form className="member-hub__document-form" onSubmit={submit}>
+        <div className="member-hub__document-fields">
+        <label className="member-hub__document-field">PAN number
           <input value={panNumber} maxLength="10" autoCapitalize="characters" required onChange={(event) => setPanNumber(event.target.value.toUpperCase())} />
         </label>
-        <label className="member-hub__filter">Second ID type
+        <label className="member-hub__document-field">Second ID type
           <select value={idType} onChange={(event) => { setIdType(event.target.value); setIdNumber(''); setFiles((current) => ({ ...current, secondFront: null, secondBack: null })); }}>
             <option value="aadhaar">Aadhaar Card</option>
             <option value="driving_licence">Driving Licence</option>
             <option value="passport">Passport</option>
           </select>
         </label>
-        <label className="member-hub__filter">Document number
+        <label className="member-hub__document-field">Document number
           <input value={idNumber} maxLength="30" autoCapitalize="characters" required onChange={(event) => setIdNumber(event.target.value.toUpperCase())} />
         </label>
         {[
           ['panFront', 'PAN card front'],
           ['secondFront', `${idType.replaceAll('_', ' ')} front`],
           ['secondBack', `${idType.replaceAll('_', ' ')} back`],
-        ].map(([key, label]) => <label className="member-hub__filter" key={key}>{label} (JPG, PNG, or PDF; max 5 MB)
-          <input ref={(element) => { inputRefs.current[key] = element; }} className={files[key] ? 'sr-only' : ''} type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required={!files[key]} onChange={(event) => chooseFile(key, event)} />
+        ].map(([key, label]) => <label className="member-hub__document-field" key={key}>{label}
+          <span className="member-hub__document-hint">JPG, PNG, or PDF; max 5 MB</span>
+          <input ref={(element) => { inputRefs.current[key] = element; }} className="member-hub__document-file" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required={!files[key]} onChange={(event) => chooseFile(key, event)} />
           {files[key] && <span className="member-hub__subtle">
             {previewUrls[key] && (files[key].type.startsWith('image/')
-              ? <img className="my-2 block size-20 rounded-lg border object-cover" src={previewUrls[key]} alt={`${label} preview`} />
-              : <iframe className="my-2 block h-24 w-36 rounded-lg border" src={previewUrls[key]} title={`${label} preview`} />)}
+              ? <img className="member-hub__document-preview" src={previewUrls[key]} alt={`${label} preview`} />
+              : <iframe className="member-hub__document-preview" src={previewUrls[key]} title={`${label} preview`} />)}
             {files[key].name}{' '}
-            <button className="member-hub__retry" type="button" onClick={() => inputRefs.current[key]?.click()}>Replace</button>{' '}
-            <button className="member-hub__retry" type="button" onClick={() => setFiles((current) => ({ ...current, [key]: null }))}>Remove</button>
+            <span className="member-hub__document-actions">
+              <button className="member-hub__document-action" type="button" onClick={() => inputRefs.current[key]?.click()}>Replace</button>
+              <button className="member-hub__document-action" type="button" onClick={() => setFiles((current) => ({ ...current, [key]: null }))}>Remove</button>
+            </span>
           </span>}
         </label>)}
+        </div>
         <p className="member-hub__subtle">I consent to Orianaa Club storing my identity documents for membership verification.</p>
-        <button className="member-hub__retry" type="submit" disabled={saving}>{saving ? 'Submitting…' : 'Submit documents'}</button>
+        <button className="member-hub__document-submit" type="submit" disabled={saving}>{saving ? 'Submitting…' : 'Submit documents'}</button>
       </form> : <p className="member-hub__subtle">Your identity documents have already been submitted. Full document numbers are not shown.</p>}
     </>}
   </section>;

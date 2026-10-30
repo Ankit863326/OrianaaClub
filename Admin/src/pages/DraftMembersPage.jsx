@@ -69,27 +69,18 @@ export default function DraftMembersPage() {
     setBusy(true);
     setError('');
     try {
-      if (action === 'resend-link') {
-        await adminApi.resendDraftLink(row._id);
-        setNotice(`Password setup link requested for ${row.email}.`);
-      } else if (action === 'mark-paid') {
+      if (action === 'mark-paid') {
         await adminApi.markDraftPaid(row._id, {
           transactionId: form.transactionId,
           note: form.note,
         });
         setNotice('Membership payment marked paid.');
-      } else if (action === 'set-temp-password') {
-        const result = await adminApi.setDraftTemporaryPassword(row._id);
-        setNotice(`Temporary password for ${row.email}: ${result.temporaryPassword}`);
       } else if (action === 'edit') {
         await adminApi.updateDraft(row._id, {
           email: form.email,
           ...(form.phone ? { phone: form.phone } : {}),
         });
         setNotice('Draft member details updated.');
-      } else if (action === 'activate') {
-        await adminApi.activateDraftMember(row._id);
-        setNotice('Member activated.');
       } else if (action === 'delete') {
         await adminApi.deleteDraft(row._id);
         setNotice('Draft member deleted.');
@@ -123,13 +114,9 @@ export default function DraftMembersPage() {
       key: 'actions',
       label: 'Actions',
       render: (row) => {
-        const paymentConfirmed = ['paid', 'confirmed'].includes(row.paymentStatus);
         return <div className="flex min-w-72 flex-wrap gap-1.5">
         <Button variant="secondary" className="px-2.5 py-1.5 text-xs" onClick={() => requestAction('edit', row)}>Edit</Button>
-        <Button variant="secondary" className="px-2.5 py-1.5 text-xs" disabled={!row.memberId || row.passwordSet || row.status === 'active'} onClick={() => requestAction('resend-link', row)}>Resend link</Button>
-        <Button variant="secondary" className="px-2.5 py-1.5 text-xs" disabled={!row.memberId || paymentConfirmed} onClick={() => requestAction('mark-paid', row)}>Mark paid</Button>
-        <Button variant="secondary" className="px-2.5 py-1.5 text-xs" disabled={!paymentConfirmed} onClick={() => requestAction('set-temp-password', row)}>Temp password</Button>
-        <Button variant="secondary" className="px-2.5 py-1.5 text-xs" disabled={row.status !== 'password_pending' || !paymentConfirmed} onClick={() => requestAction('activate', row)}>Activate</Button>
+        <Button variant="secondary" className="px-2.5 py-1.5 text-xs" onClick={() => requestAction('mark-paid', row)}>Mark paid</Button>
         <Button variant="danger" className="px-2.5 py-1.5 text-xs" onClick={() => requestAction('delete', row)}>Delete</Button>
         </div>;
       },
@@ -137,11 +124,8 @@ export default function DraftMembersPage() {
   ];
 
   const actionTitle = {
-    'resend-link': 'Resend password setup link?',
     'mark-paid': 'Mark membership payment as paid?',
-    'set-temp-password': 'Set a temporary password?',
     edit: 'Update draft member details?',
-    activate: 'Activate member account?',
     delete: 'Delete this draft application?',
   };
 

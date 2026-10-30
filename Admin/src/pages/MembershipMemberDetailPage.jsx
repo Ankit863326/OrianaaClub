@@ -17,6 +17,7 @@ export default function MembershipMemberDetailPage() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [passwordLinkBusy, setPasswordLinkBusy] = useState(false);
+  const [temporaryPasswordBusy, setTemporaryPasswordBusy] = useState(false);
   const [qr, setQr] = useState('');
   const [familyRequests, setFamilyRequests] = useState([]);
   const [bills, setBills] = useState(null);
@@ -101,6 +102,20 @@ export default function MembershipMemberDetailPage() {
       setError(errorMessage(failure));
     } finally {
       setPasswordLinkBusy(false);
+    }
+  }
+  async function setTemporaryPassword() {
+    if (!membership?.user?._id || !window.confirm('Set a temporary password and activate this member account?')) return;
+    setTemporaryPasswordBusy(true);
+    setError('');
+    try {
+      const result = await membershipApi.setTemporaryPassword(membership.user._id);
+      setNotice(`Temporary password for ${membership.user.email}: ${result.temporaryPassword}`);
+      await load();
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setTemporaryPasswordBusy(false);
     }
   }
   async function run(action) {
@@ -261,7 +276,12 @@ export default function MembershipMemberDetailPage() {
         <h2 className="font-semibold sm:col-span-2">Application lifecycle</h2>
         <p>Application state: <Badge>{membership.user?.status === 'active' ? 'Active' : membership.status === 'draft' ? 'Draft' : membership.status === 'pending_payment' ? 'Payment pending' : ['active', 'pending_verification'].includes(membership.status) ? 'Paid' : 'Password not set'}</Badge></p>
         <p>Password link status: <strong>{membership.user?.status === 'active' || membership.user?.activationEmailStatus === 'activated' ? 'Password set' : membership.user?.activationEmailStatus || 'not_sent'}</strong>{membership.user?.activationEmailSentAt ? ` · ${formatDate(membership.user.activationEmailSentAt)}` : ''}</p>
-        {membership.user?.status === 'pending' && <Button variant="secondary" disabled={passwordLinkBusy} onClick={resendPasswordLink}>{passwordLinkBusy ? 'Sending…' : 'Resend password link'}</Button>}
+        {['pending', 'pending_activation'].includes(membership.user?.status)
+          && !membership.user?.passwordSet
+          && <Button variant="secondary" disabled={passwordLinkBusy} onClick={resendPasswordLink}>{passwordLinkBusy ? 'Sending…' : 'Resend password link'}</Button>}
+        {membership.user?.status === 'pending_activation'
+          && !membership.user?.passwordSet
+          && <Button variant="secondary" disabled={temporaryPasswordBusy} onClick={setTemporaryPassword}>{temporaryPasswordBusy ? 'Setting…' : 'Temp password'}</Button>}
       </Panel>
       <Panel className="grid gap-3 text-sm sm:grid-cols-2">
         <h2 className="font-display text-2xl sm:col-span-2">{membership.plan?.name || membership.plan?.title || 'Membership'}</h2>

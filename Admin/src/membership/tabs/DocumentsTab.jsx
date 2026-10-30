@@ -137,7 +137,15 @@ export default function DocumentsTab() {
         name: document.kind.replaceAll('_', ' '),
       });
     } catch (failure) {
-      setError(errorMessage(failure));
+      const missingFile = failure.response?.data?.code === 'IDENTITY_DOCUMENT_FILE_MISSING';
+      setError(missingFile
+        ? 'File missing. Ask the member to re-upload.'
+        : errorMessage(failure));
+      if (missingFile) {
+        setIdentityReason((current) => current.trim()
+          ? current
+          : 'Identity document file is missing from storage. Please ask the member to re-upload.');
+      }
     }
   }
 

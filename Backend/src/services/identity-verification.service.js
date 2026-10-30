@@ -2,6 +2,7 @@ import { readFile, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import ApiError from '../utils/ApiError.js';
 import IdentityVerification from '../models/IdentityVerification.js';
+import MembershipDraftArchive from '../models/MembershipDraftArchive.js';
 import Membership from '../models/Membership.js';
 import Payment from '../models/Payment.js';
 import { decryptDocumentFile, encryptIdentityValue, hashIdentityValue } from '../utils/identityDocumentCrypto.js';
@@ -132,40 +133,79 @@ export async function submitMemberIdentityVerification(userId, values, uploadedD
   }
 }
 
-export async function getAdminIdentityVerification(userId) {
-  const record = await IdentityVerification.findOne({ user: userId }).lean();
+export async function getAdminIdentityVerification(identifiers) {
+  const record = await findAdminIdentityRecord(identifiers);
   return publicIdentityVerification(record);
 }
 
-export async function readAdminIdentityDocument(userId, documentId) {
-  const record = await IdentityVerification.findOne({ user: userId });
+function normalizeIdentityIdentifiers(identifiers) {
+  return typeof identifiers === 'string' || typeof identifiers?.toHexString === 'function'
+    ? { userId: String(identifiers) }
+    : identifiers || {};
+}
+
+async function findAdminIdentityRecord(identifiers) {
+  const { membershipId, userId, draftId } = normalizeIdentityIdentifiers(identifiers);
+  const lookupIds = [membershipId, userId, draftId].filter(Boolean);
+  if (!lookupIds.length) return null;
+
+  let archive = membershipId
+    ? await MembershipDraftArchive.findOne({ membership: membershipId }).select('draftId').lean()
+    : null;
+  if (!archive && userId) {
+    archive = await MembershipDraftArchive.findOne({ user: userId }).select('draftId').lean();
+  }
+  const candidates = [...new Set([...lookupIds, archive?.draftId].filter(Boolean).map(String))];
+  for (const identifier of candidates) {
+    const record = await IdentityVerification.findOne({ user: identifier });
+    if (record) return record;
+  }
+  return null;
+}
+
+export async function readAdminIdentityDocument(identifiers, documentId) {
+  const record = await findAdminIdentityRecord(identifiers);
+  if (!record) throw new ApiError(404, 'Identity verification record was not found.', 'IDENTITY_VERIFICATION_NOT_FOUND');
   const document = record?.documents.find((item) => item.id === documentId);
-  if (!document) throw new ApiError(404, 'Identity document was not found.');
+  if (!document) throw new ApiError(404, 'Identity document record was not found.', 'IDENTITY_DOCUMENT_RECORD_NOT_FOUND');
   let stored;
   try {
     stored = await readFile(identityDocumentPath(document.storageKey));
   } catch (error) {
-    if (error.code === 'ENOENT') throw new ApiError(404, 'Identity document was not found.');
+    if (error.code === 'ENOENT') {
+      throw new ApiError(
+        404,
+        'File missing. Ask the member to re-upload.',
+        'IDENTITY_DOCUMENT_FILE_MISSING',
+      );
+    }
     throw error;
   }
   return { document, buffer: decryptDocumentFile(stored) };
 }
 
-export async function reviewIdentityVerification(userId, adminId, { status, reason = '' }) {
+export async function reviewIdentityVerification(identifiers, adminId, { status, reason = '' }) {
+  identifiers = normalizeIdentityIdentifiers(identifiers);
+  const identityRecord = await findAdminIdentityRecord(identifiers);
+  if (!identityRecord) {
+    throw new ApiError(404, 'Identity verification record was not found.', 'IDENTITY_VERIFICATION_NOT_FOUND');
+  }
   const values = status === 'verified'
     ? { status, verifiedBy: adminId, verifiedAt: new Date(), rejectedBy: null, rejectedAt: null, rejectionReason: '' }
     : { status, rejectedBy: adminId, rejectedAt: new Date(), verifiedBy: null, verifiedAt: null, rejectionReason: reason };
   let record = await IdentityVerification.findOneAndUpdate(
-    { user: userId, status: 'pending' },
+    { _id: identityRecord._id, status: 'pending' },
     { $set: values },
     { new: true, runValidators: true },
   );
   if (!record && status === 'verified') {
-    record = await IdentityVerification.findOne({ user: userId, status: 'verified' });
+    record = await IdentityVerification.findOne({ _id: identityRecord._id, status: 'verified' });
   }
   if (!record) throw new ApiError(409, 'Identity documents are not awaiting review.');
   if (status === 'verified') {
-    const membership = await Membership.findOne({ user: userId, status: 'pending_verification' }).sort({ createdAt: -1 });
+    const membership = identifiers.userId
+      ? await Membership.findOne({ user: identifiers.userId, status: 'pending_verification' }).sort({ createdAt: -1 })
+      : null;
     if (membership) {
       const payment = await Payment.findOne({
         membership: membership._id,

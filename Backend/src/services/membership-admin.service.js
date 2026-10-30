@@ -282,7 +282,11 @@ export async function listMemberships(query) {
     if (!query.status) filter.status = 'pending_verification';
   }
   if (query.notActivated) {
-    const pendingUsers = await User.find({ role: 'member', status: 'pending', deletedAt: null }).distinct('_id');
+    const pendingUsers = await User.find({
+      role: 'member',
+      status: { $in: ['pending', 'pending_activation'] },
+      deletedAt: null,
+    }).distinct('_id');
     userFilter.$in = pendingUsers;
   }
   if (Object.keys(userFilter).length) filter.user = userFilter;

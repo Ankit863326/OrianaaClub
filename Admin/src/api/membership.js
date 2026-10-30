@@ -31,6 +31,10 @@ export const membershipApi = {
     const response = await api.post(`/admin/members/${encodeURIComponent(userId)}/resend-activation`, {});
     return { ...response.data.data, message: response.data.message };
   },
+  setTemporaryPassword: (userId) => data(api.post(
+    `/admin/members/${encodeURIComponent(userId)}/set-temp-password`,
+    {},
+  )),
   memberQr: (id) => api.get(`/admin/memberships/${id}/card-qr`, { responseType: 'blob' }),
   renew: (id, body) => data(api.post(`/admin/memberships/${id}/renew`, body)),
   deactivate: (id, reason) => data(api.patch(`/admin/memberships/${id}/deactivate`, { reason })),

@@ -401,6 +401,52 @@ describe('all operations routes render API records and visible errors', () => {
     statusConfirm.mockRestore();
   });
 
+  test.each(['posts', 'events'])('automatically creates slugs while composing %s', async (type) => {
+    adminApi.content.mockResolvedValueOnce({ items: [], page: 1, pages: 1, total: 0 });
+    withRoute(<OperationsPage type={type} />);
+    await screen.findByText(type === 'posts' ? 'No posts have been created yet.' : 'No events have been created yet.');
+    const title = screen.getByLabelText('Title');
+    const slug = screen.getByLabelText('Slug');
+
+    fireEvent.change(title, { target: { value: 'Café & Club Nights!' } });
+    expect(slug).toHaveValue('cafe-club-nights');
+
+    fireEvent.change(title, { target: { value: 'Summer Club Nights' } });
+    expect(slug).toHaveValue('summer-club-nights');
+  });
+
+  test('stops automatic slug updates after a manual edit', async () => {
+    adminApi.content.mockResolvedValueOnce({ items: [], page: 1, pages: 1, total: 0 });
+    withRoute(<OperationsPage type="posts" />);
+    await screen.findByText('No posts have been created yet.');
+    const title = screen.getByLabelText('Title');
+    const slug = screen.getByLabelText('Slug');
+
+    fireEvent.change(title, { target: { value: 'First title' } });
+    fireEvent.change(slug, { target: { value: 'editorial-url' } });
+    fireEvent.change(title, { target: { value: 'Second title' } });
+
+    expect(slug).toHaveValue('editorial-url');
+  });
+
+  test('does not alter a saved slug when editing the title', async () => {
+    const existingPost = {
+      _id: 'content-edit-1',
+      title: 'Original article',
+      slug: 'existing-custom-slug',
+      excerpt: 'Story excerpt',
+      content: 'Story content',
+      category: 'Travel',
+      status: 'draft',
+    };
+    adminApi.content.mockResolvedValueOnce({ items: [existingPost], page: 1, pages: 1, total: 1 });
+    withRoute(<OperationsPage type="posts" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed article' } });
+    expect(screen.getByLabelText('Slug')).toHaveValue('existing-custom-slug');
+  });
+
   test('previews an existing post image and preserves it when no replacement is selected', async () => {
     const existingPost = {
       _id: 'content-image-1',

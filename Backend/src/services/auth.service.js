@@ -25,7 +25,7 @@ export function publicUser(user) {
     status: user.status,
     emailVerified: user.emailVerified,
     passwordSet: Boolean(user.passwordHash),
-    onboarding: user.status === 'pending' && user.emailVerified && !user.passwordHash,
+    onboarding: ['pending', 'pending_activation'].includes(user.status) && user.emailVerified && !user.passwordHash,
   };
 }
 
@@ -136,7 +136,7 @@ export async function sendMembershipActivation(userId) {
     await logPasswordLinkAttempt({ email: '', userId, reason: 'user_not_found' });
     return false;
   }
-  if (user.status !== 'pending') {
+  if (!['pending', 'pending_activation'].includes(user.status)) {
     await logPasswordLinkAttempt({ email: user.email, userId: user._id, reason: 'user_not_pending' });
     return false;
   }
@@ -162,7 +162,9 @@ export async function sendAdminActivation(userId) {
     deletedAt: null,
   }).select('+passwordHash');
   if (!user) throw new ApiError(404, 'Member was not found.');
-  if (user.status !== 'pending') throw new ApiError(409, 'Only members who have not set a password can receive a password link.');
+  if (!['pending', 'pending_activation'].includes(user.status)) {
+    throw new ApiError(409, 'Only members who have not set a password can receive a password link.');
+  }
   if (user.passwordHash) throw new ApiError(409, 'A password has already been set for this member.');
   if (!await hasSubmittedMembershipPayment(user._id)) {
     throw new ApiError(409, 'A password link can be sent after payment is submitted.');
@@ -176,7 +178,9 @@ export async function registerAccount({ firstName, email, recaptchaToken }) {
   const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    if (existingUser.role === 'member' && existingUser.status === 'pending' && !existingUser.deletedAt) {
+    if (existingUser.role === 'member'
+      && ['pending', 'pending_activation'].includes(existingUser.status)
+      && !existingUser.deletedAt) {
       await issueAccountLink(existingUser, 'activation');
     } else if (existingUser.role === 'member' && existingUser.status === 'active' && !existingUser.deletedAt && env.nodeEnv === 'development') {
       console.log('[dev] account already active, no link sent');
@@ -196,7 +200,12 @@ export async function registerAccount({ firstName, email, recaptchaToken }) {
 
 export async function resendActivation(email) {
   const normalizedEmail = email.trim().toLowerCase();
-  const user = await User.findOne({ email: normalizedEmail, status: 'pending', deletedAt: null, role: 'member' });
+  const user = await User.findOne({
+    email: normalizedEmail,
+    status: { $in: ['pending', 'pending_activation'] },
+    deletedAt: null,
+    role: 'member',
+  });
   if (user && await hasSubmittedMembershipPayment(user._id)) {
     try {
       await issueAccountLink(user, 'activation');
@@ -290,7 +299,7 @@ async function requestPaidPendingPasswordLink(user, email) {
     await logPasswordLinkAttempt({ email, reason: 'user_not_found' });
     return { message: GENERIC_EMAIL_MESSAGE, sent: false };
   }
-  if (user.status !== 'pending') {
+  if (!['pending', 'pending_activation'].includes(user.status)) {
     await logPasswordLinkAttempt({ email: user.email, userId: user._id, reason: 'user_not_pending' });
     return { message: GENERIC_EMAIL_MESSAGE, sent: false };
   }
@@ -351,7 +360,7 @@ export async function requestDraftPasswordLink(draft, email) {
 
 export async function inspectActivation(token) {
   const record = await verifyEmailToken(token, 'activation');
-  if (record.user.status !== 'pending') {
+  if (!['pending', 'pending_activation'].includes(record.user.status)) {
     throw new ApiError(400, 'This password link is invalid, expired, or already used. Request a new link to continue.');
   }
   if (record.user.activationRequiresMembershipPayment
@@ -368,7 +377,8 @@ export async function inspectActivation(token) {
 
 export async function activateAccount({ token, password }) {
   const pending = await verifyEmailToken(token, 'activation');
-  if (pending.user.activationRequiresMembershipPayment
+  if (pending.user.status !== 'pending_activation'
+    && pending.user.activationRequiresMembershipPayment
     && !await hasSubmittedMembershipPayment(pending.user._id)) {
     await logPasswordLinkAttempt({
       email: pending.user.email,
@@ -378,15 +388,20 @@ export async function activateAccount({ token, password }) {
     throw new ApiError(409, 'Submit your membership payment before setting a password.');
   }
   const record = await consumeEmailToken(token, 'activation');
-  if (record.user.status !== 'pending') {
+  if (!['pending', 'pending_activation'].includes(record.user.status)) {
     throw new ApiError(400, 'This password link is invalid, expired, or already used. Request a new link to continue.');
   }
 
-  const membershipApproved = !pending.user.activationRequiresMembershipPayment
+  const membershipApproved = pending.user.status === 'pending_activation'
+    || !pending.user.activationRequiresMembershipPayment
     || await hasApprovedMembership(record.user._id);
   const accountStatus = membershipApproved ? 'active' : 'pending';
   const user = await User.findOneAndUpdate(
-    { _id: record.user._id, status: 'pending', passwordHash: { $exists: false } },
+    {
+      _id: record.user._id,
+      status: pending.user.status,
+      passwordHash: { $exists: false },
+    },
     {
       $set: {
         passwordHash: await bcrypt.hash(password, passwordCost),
@@ -418,7 +433,7 @@ export async function getOnboardingUser(userId) {
   const user = await User.findOne({
     _id: userId,
     role: 'member',
-    status: 'pending',
+    status: { $in: ['pending', 'pending_activation'] },
     emailVerified: true,
     passwordHash: { $exists: false },
     deletedAt: null,
@@ -436,11 +451,19 @@ export async function setOnboardingPassword(userId, { password }) {
   const activated = await User.findOneAndUpdate(
     {
       _id: user._id,
-      status: 'pending',
+      status: user.status,
       emailVerified: true,
       passwordHash: { $exists: false },
     },
-    { $set: { passwordHash, status: 'active', lastLoginAt: new Date() } },
+    {
+      $set: {
+        passwordHash,
+        status: 'active',
+        activationRequiresMembershipPayment: false,
+        activatedAt: new Date(),
+        lastLoginAt: new Date(),
+      },
+    },
     { new: true },
   ).select('+passwordHash');
   if (!activated) throw new ApiError(409, 'A password has already been set for this account.');
@@ -485,7 +508,7 @@ export async function requestPasswordReset(email) {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await User.findOne({
     email: normalizedEmail,
-    status: { $in: ['active', 'pending'] },
+    status: { $in: ['active', 'pending', 'pending_activation'] },
     emailVerified: true,
     deletedAt: null,
     role: 'member',
@@ -500,7 +523,8 @@ export async function requestPasswordReset(email) {
     return { message: GENERIC_EMAIL_MESSAGE };
   }
 
-  if (user.status === 'pending' && !await hasSubmittedMembershipPayment(user._id)) {
+  if (['pending', 'pending_activation'].includes(user.status)
+    && !await hasSubmittedMembershipPayment(user._id)) {
     await logPasswordLinkAttempt({
       email: user.email,
       userId: user._id,
@@ -510,7 +534,7 @@ export async function requestPasswordReset(email) {
     });
     return { message: GENERIC_EMAIL_MESSAGE };
   }
-  if (user.status === 'pending' && user.passwordHash) {
+  if (['pending', 'pending_activation'].includes(user.status) && user.passwordHash) {
     await logPasswordLinkAttempt({
       email: user.email,
       userId: user._id,
@@ -521,7 +545,7 @@ export async function requestPasswordReset(email) {
     return { message: GENERIC_EMAIL_MESSAGE };
   }
 
-  const type = user.status === 'pending' ? 'activation' : 'reset';
+  const type = ['pending', 'pending_activation'].includes(user.status) ? 'activation' : 'reset';
   console.log(`[auth] ${type} link requested for ${maskEmail(user.email)}.`);
   await issueAccountLink(user, type);
   return { message: GENERIC_EMAIL_MESSAGE };
@@ -529,14 +553,15 @@ export async function requestPasswordReset(email) {
 
 export async function resetPassword({ token, password }) {
   const verified = await verifyEmailToken(token, 'reset');
-  if (!['active', 'pending'].includes(verified.user.status) || !verified.user.emailVerified) {
+  if (!['active', 'pending', 'pending_activation'].includes(verified.user.status) || !verified.user.emailVerified) {
     throw new ApiError(400, 'This password reset link is no longer valid. Request a new link to continue.');
   }
-  if (verified.user.status === 'pending' && !await hasSubmittedMembershipPayment(verified.user._id)) {
+  if (['pending', 'pending_activation'].includes(verified.user.status)
+    && !await hasSubmittedMembershipPayment(verified.user._id)) {
     throw new ApiError(409, 'Submit a membership payment before setting your password.');
   }
   const record = await consumeEmailToken(token, 'reset');
-  if (!['active', 'pending'].includes(record.user.status) || !record.user.emailVerified) {
+  if (!['active', 'pending', 'pending_activation'].includes(record.user.status) || !record.user.emailVerified) {
     throw new ApiError(400, 'This password reset link is no longer valid. Request a new link to continue.');
   }
 

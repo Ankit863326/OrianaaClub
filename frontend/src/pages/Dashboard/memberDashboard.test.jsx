@@ -53,9 +53,11 @@ function expectNoExpiryDetails() {
 
 describe('member dashboard privacy guard', () => {
   let membershipResponse;
+  let identityResponse;
 
   beforeEach(() => {
     membershipResponse = dashboardData;
+    identityResponse = { status: 'not_submitted' };
     window.fetch = jest.fn(async (input) => {
       const path = new URL(input, window.location.href).pathname;
       if (path.endsWith('/me/membership')) return jsonResponse(membershipResponse);
@@ -76,7 +78,7 @@ describe('member dashboard privacy guard', () => {
         }]);
       }
       if (path.endsWith('/identity-verification')) {
-        return jsonResponse({ status: 'not_submitted' });
+        return jsonResponse(identityResponse);
       }
       return jsonResponse({}, 404);
     });
@@ -131,5 +133,47 @@ describe('member dashboard privacy guard', () => {
     expect(screen.getByText('27 Oct 2037')).toBeTruthy();
     expect(screen.getByText('11 years')).toBeTruthy();
     expect(screen.getByText('Valid until 27 Oct 2037')).toBeTruthy();
+  });
+
+  test.each([
+    ['pending', 'pending', ''],
+    ['verified', 'approved', ''],
+    ['rejected', 'rejected', 'The document image is unclear.'],
+  ])('shows the masked identity summary for %s records', async (status, displayStatus, rejectionReason) => {
+    identityResponse = {
+      status,
+      panMask: 'ABCDE••••F',
+      idType: 'aadhaar',
+      idMask: '•••• •••• 1234',
+      rejectionReason,
+      documents: [],
+    };
+
+    render(
+      <AuthContext.Provider value={{ user: { firstName: 'Amit' }, logout: jest.fn() }}>
+        <MemoryRouter>
+          <MemberDashboardPage />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Documents' }));
+    const statusLine = await screen.findByText((_, element) => (
+      element?.tagName === 'P' && element.textContent === `Status: ${displayStatus}`
+    ));
+    expect(statusLine.parentElement.textContent).toContain('ABCDE••••F');
+    expect(statusLine.parentElement.textContent).toContain('•••• •••• 1234');
+    expect(statusLine.parentElement.textContent).not.toContain('ABCDE1234F');
+    expect(statusLine.parentElement.textContent).not.toContain('123456781234');
+
+    const form = document.querySelector('.member-hub__document-form');
+    if (status === 'rejected') {
+      expect(statusLine.parentElement.textContent).toContain(rejectionReason);
+      expect(form).not.toBeNull();
+      expect(form.querySelectorAll('input[type="file"]')).toHaveLength(3);
+    } else {
+      expect(form).toBeNull();
+      expect(await screen.findByText(/Your identity documents have already been submitted/)).toBeTruthy();
+    }
   });
 });

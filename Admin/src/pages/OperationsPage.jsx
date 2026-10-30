@@ -5,6 +5,7 @@ import { errorMessage } from '../api/client.js';
 import { getImageUrl } from '../api/image.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { Badge, Button, DataTable, EmptyState, FormField, LoadingState, PageHeading, Pagination, Panel, Toast, controlClass, formatDate, formatPaise, formatPoints } from '../components/ui.jsx';
+import { slugify } from '../utils/slugify.js';
 
 const maxImageSize = 10 * 1024 * 1024;
 const pageTitles = {
@@ -36,6 +37,7 @@ export default function OperationsPage({ type }) {
   const [filters, setFilters] = useState({});
   const [form, setForm] = useState(newContent[type] || {});
   const [editingId, setEditingId] = useState('');
+  const [autoSlug, setAutoSlug] = useState(true);
   const [imagePreview, setImagePreview] = useState('');
   const [selected, setSelected] = useState(null);
   const [note, setNote] = useState('');
@@ -47,6 +49,7 @@ export default function OperationsPage({ type }) {
   useEffect(() => {
     setForm(newContent[type] || {});
     setEditingId('');
+    setAutoSlug(true);
     setImagePreview('');
     setSelected(null);
   }, [type]);
@@ -93,9 +96,21 @@ export default function OperationsPage({ type }) {
   function setField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
   }
+  function setTitle(value) {
+    setForm((current) => ({
+      ...current,
+      title: value,
+      ...(!editingId && autoSlug ? { slug: slugify(value) } : {}),
+    }));
+  }
+  function setSlug(value) {
+    setAutoSlug(false);
+    setField('slug', value);
+  }
   function resetForm() {
     setForm(newContent[type] || {});
     setEditingId('');
+    setAutoSlug(true);
     setImagePreview('');
   }
   async function saveContent(event) {
@@ -198,8 +213,8 @@ export default function OperationsPage({ type }) {
       <Panel className="mb-5">
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={saveContent}>
           <h2 className="font-display text-xl sm:col-span-2">{editingId ? `Edit ${type === 'posts' ? 'post' : 'event'}` : `Add ${type === 'posts' ? 'post' : 'event'}`}</h2>
-          <FormField label="Title"><input className={controlClass} required value={form.title || ''} onChange={(event) => setField('title', event.target.value)} /></FormField>
-          <FormField label="Slug"><input className={controlClass} required value={form.slug || ''} onChange={(event) => setField('slug', event.target.value)} /></FormField>
+          <FormField label="Title"><input className={controlClass} required value={form.title || ''} onChange={(event) => setTitle(event.target.value)} /></FormField>
+          <FormField label="Slug"><input className={controlClass} required value={form.slug || ''} onChange={(event) => setSlug(event.target.value)} /></FormField>
           {type === 'posts' ? <>
             <FormField label="Category"><input className={controlClass} required value={form.category || ''} onChange={(event) => setField('category', event.target.value)} /></FormField>
             <FormField label="Excerpt"><textarea className={controlClass} required value={form.excerpt || ''} onChange={(event) => setField('excerpt', event.target.value)} /></FormField>
@@ -253,7 +268,7 @@ export default function OperationsPage({ type }) {
         { key: 'actions', label: 'Actions', render: (item) => <div className="flex gap-2"><Button variant="secondary" onClick={() => {
           const edit = { ...item };
           if (type === 'events' && edit.date) edit.date = new Date(edit.date).toISOString().slice(0, 10);
-        setEditingId(item._id); setForm(edit); setImagePreview(getImageUrl(edit.coverImage || edit.image));
+        setEditingId(item._id); setAutoSlug(false); setForm(edit); setImagePreview(getImageUrl(edit.coverImage || edit.image));
         }}>Edit</Button><Button variant="danger" onClick={() => deleteContent(item._id)}>Delete</Button></div> },
       ]} rows={rows || []} empty={`No ${type} have been created yet.`} />}
       {!error && <Pagination info={pageInfo} onPage={setPage} />}

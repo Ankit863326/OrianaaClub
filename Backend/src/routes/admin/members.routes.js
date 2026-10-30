@@ -26,6 +26,7 @@ router.patch('/:userId', validate(userParamsSchema, 'params'), validate(memberPa
 router.post('/:userId/suspend', validate(userParamsSchema, 'params'), membersController.suspend);
 router.post('/:userId/activate', validate(userParamsSchema, 'params'), membersController.activate);
 router.post('/:userId/resend-activation', validate(userParamsSchema, 'params'), membersController.resendActivation);
+router.post('/:userId/set-temp-password', validate(userParamsSchema, 'params'), membersController.setTemporaryPassword);
 router.delete('/:userId', validate(userParamsSchema, 'params'), membersController.remove);
 router.get('/:userId', validate(userParamsSchema, 'params'), membersController.details);
 

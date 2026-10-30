@@ -58,6 +58,19 @@ export const resendActivation = asyncHandler(async (request, response) => {
   });
 });
 
+export const setTemporaryPassword = asyncHandler(async (request, response) => {
+  const data = await adminService.setMemberTemporaryPassword(request.validated.params.userId);
+  await recordRequestAction(request, {
+    action: 'member.set_temp_password', entityType: 'member', entityId: data.userId,
+    summary: 'Temporary member password set and account activated.',
+  });
+  response.json({
+    success: true,
+    data: { temporaryPassword: data.temporaryPassword },
+    message: 'Temporary password set. Copy it now; it will not be shown again.',
+  });
+});
+
 export const create = asyncHandler(async (request, response) => {
   const data = await adminService.createMember(request.validated.body, request.user._id);
   await recordRequestAction(request, {

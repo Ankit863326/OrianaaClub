@@ -1,5 +1,7 @@
 // Phase 5a: Provide paginated administration queries and audited business operations.
 import mongoose from 'mongoose';
+import { randomBytes } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import Counter from '../models/Counter.js';
 import FamilyMember from '../models/FamilyMember.js';
 import Membership from '../models/Membership.js';
@@ -29,7 +31,7 @@ function pagination(query) {
 export async function listMembers(query) {
   const { page, limit, skip } = pagination(query);
   const conditions = [{ role: 'member', deletedAt: null }];
-  if (query.notActivated) conditions.push({ status: 'pending' });
+  if (query.notActivated) conditions.push({ status: { $in: ['pending', 'pending_activation'] } });
   const membershipFilter = {};
   if (query.status) membershipFilter.status = query.status;
   if (query.plan) {
@@ -199,6 +201,38 @@ export async function softDeleteMember(userId) {
 export async function resendMemberActivation(userId) {
   const sent = await sendAdminActivation(userId);
   return { userId, sent };
+}
+
+export async function setMemberTemporaryPassword(userId) {
+  const user = await User.findOne({
+    _id: userId,
+    role: 'member',
+    status: 'pending_activation',
+    deletedAt: null,
+  }).select('+passwordHash');
+  if (!user) throw new ApiError(404, 'Member awaiting activation was not found.');
+  if (user.passwordHash) throw new ApiError(409, 'A password has already been set for this member.');
+  const membership = await Membership.findOne({
+    user: user._id,
+    status: { $in: ['pending_payment', 'pending_verification', 'pending_approval', 'active'] },
+  }).select('_id');
+  if (!membership || !await Payment.exists({
+    user: user._id,
+    membership: membership._id,
+    status: { $in: ['paid', 'confirmed'] },
+  })) {
+    throw new ApiError(409, 'Confirm the membership payment before setting a temporary password.');
+  }
+
+  const temporaryPassword = `TempA1${randomBytes(12).toString('hex')}`;
+  user.passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  user.emailVerified = true;
+  user.status = 'active';
+  user.activationRequiresMembershipPayment = false;
+  user.activationEmailStatus = 'activated';
+  user.activatedAt ||= new Date();
+  await user.save();
+  return { temporaryPassword, userId: String(user._id), status: user.status };
 }
 
 export async function createMember({ user: userValues, profile: profileValues, planSlug, offlinePayment }, adminId) {

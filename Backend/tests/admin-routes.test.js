@@ -9,6 +9,7 @@ import Verification from '../src/models/Verification.js';
 import Payment from '../src/models/Payment.js';
 import User from '../src/models/User.js';
 import MembershipDraft from '../src/models/MembershipDraft.js';
+import MembershipDraftArchive from '../src/models/MembershipDraftArchive.js';
 import Plan from '../src/models/Plan.js';
 import EmailLog from '../src/models/EmailLog.js';
 import Counter from '../src/models/Counter.js';
@@ -754,7 +755,7 @@ describe('admin points, content, enquiry and reports routes', () => {
 });
 
 describe('admin draft member routes', () => {
-  test('supports help requests, contact edits, payment resolution, password setup and activation', async () => {
+  test('supports help requests, contact edits, paid-draft finalization and member password setup', async () => {
     const admin = await createAdmin();
     const plan = await createPlan({ title: 'Draft Resolution Plan' });
     const member = await createMember({
@@ -813,17 +814,15 @@ describe('admin draft member routes', () => {
       status: 'paid',
       reference: 'BANK-REF-123',
     });
-
-    expect((await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/resend-link`)).status).toBe(200);
-    const password = await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/set-temp-password`);
+    expect(await MembershipDraft.findById(draft._id)).toBeNull();
+    expect(await MembershipDraftArchive.findOne({ draftId: draft._id })).not.toBeNull();
+    expect((await User.findById(member.user._id)).status).toBe('pending_activation');
+    expect((await adminRequest(admin, 'post', `/api/admin/members/${member.user._id}/resend-activation`)).status).toBe(200);
+    const password = await adminRequest(admin, 'post', `/api/admin/members/${member.user._id}/set-temp-password`);
     expect(password.status).toBe(200);
     expect(password.body.data.temporaryPassword).toMatch(/^TempA1[a-f\d]{24}$/);
-    expect((await adminRequest(admin, 'post', `/api/admin/drafts/${draft._id}/activate`)).status).toBe(200);
     expect((await User.findById(member.user._id)).status).toBe('active');
-    expect(await AuditLog.countDocuments({ entityType: 'membership_draft' })).toBeGreaterThanOrEqual(5);
-
-    expect((await adminRequest(admin, 'delete', `/api/admin/drafts/${draft._id}`)).status).toBe(200);
-    expect(await MembershipDraft.findById(draft._id)).toBeNull();
+    expect(await AuditLog.countDocuments({ entityType: 'membership_draft' })).toBeGreaterThanOrEqual(3);
   });
 });
 
