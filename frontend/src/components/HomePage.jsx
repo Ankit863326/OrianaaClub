@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 // import beachImage from "../assets/beachh.jpg";
 import heroVideo from "../assets/OrianaaClub_promo_video_creation_20261019122757.mp4";
 import LuxuryContactDrawer from "./LuxuryContactDrawer";
-import saptagiriimg from "../assets/Lush Luxury Resort Pool Retreat.jpg.jpeg"
+import saptagiriimg from "../assets/swimming pool.jpeg"
 import "./HomePage.css";
 
 const destinations = [
