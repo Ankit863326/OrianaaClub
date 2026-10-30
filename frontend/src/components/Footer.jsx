@@ -1,7 +1,7 @@
 import React from "react";
 import { createElement } from "react";
 import { ArrowRight } from "lucide-react";
-import { FaFacebookF, FaInstagram, FaLinkedinIn, FaYoutube } from "react-icons/fa6";
+import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import logoImg from "../assets/Oriana Club Luxury Emblem Transparent.png";
 import "./Footer.css";
@@ -21,8 +21,9 @@ const membershipLinks = [
 
 const socialLinks = [
   { label: "Instagram", href: "https://www.instagram.com/saptagiriresorts?obrf=NjN3Z243MzBndHhs", Icon: FaInstagram },
-  { label: "Facebook", href: "https://www.facebook.com/", Icon: FaFacebookF },
-  { label: "YouTube", href: "https://www.youtube.com/", Icon: FaYoutube },
+  { label: "Facebook", href: "https://www.facebook.com/share/1JtRYCZw7W/", Icon: FaFacebookF },
+  { label: "Twitter", href: "https://x.com/Saptagiriresort?s=20", Icon: FaXTwitter },
+  { label: "YouTube", href: "https://www.youtube.com/@SaptagiriResorts", Icon: FaYoutube },
   { label: "LinkedIn", href: "https://www.linkedin.com/company/saptagiri-hospitality-lifestyle/posts/?feedView=all", Icon: FaLinkedinIn },
 ];
 

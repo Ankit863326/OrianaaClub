@@ -1,5 +1,6 @@
 // Keep the six-step membership application synchronized with the member API.
 import { Component, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, KeyRound, ShieldCheck } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 // ESLint's core unused-vars rule does not detect the JSX member expression below.
 /* eslint-disable-next-line no-unused-vars */
@@ -348,6 +349,11 @@ function formatPlainDate(value) {
     : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(date);
 }
 
+function applicationIdFrom(value) {
+  const id = value?.applicationId || value?.userId || value?.user?._id || value?.user?.id || value?._id || value?.id;
+  return typeof id === 'string' ? id : String(id || '');
+}
+
 function familyMemberType(member = {}) {
   if (member.memberType?.startsWith('nominee_')) return member.memberType;
   if (member.isNominee) return 'nominee';
@@ -502,7 +508,10 @@ function MembershipFlow({ upgradeMode = false }) {
       || plan?._id === paymentMembership?.plan?._id
       || plan?.slug === paymentMembership?.plan?.slug
       || plan?.name === paymentMembership?.plan?.name
-      || plan?.title === paymentMembership?.plan?.name) || null,
+      || plan?.title === paymentMembership?.plan?.name)
+      || membership?.plan
+      || paymentMembership?.plan
+      || null,
     [plans, membership, paymentMembership],
   );
   useEffect(() => {
@@ -835,6 +844,8 @@ function MembershipFlow({ upgradeMode = false }) {
     setError('');
     try {
       const result = await verifyMembershipDraftOtp(otpCode);
+      const verifiedApplicationId = applicationIdFrom(result);
+      if (verifiedApplicationId) setTermsApplicationId(verifiedApplicationId);
       setDraftEmailVerified(Boolean(result.emailVerified));
       setOtpCode('');
       setError('');
@@ -871,6 +882,8 @@ function MembershipFlow({ upgradeMode = false }) {
           email: profile.email.trim(),
           profile: { fullName },
         });
+        const startedApplicationId = applicationIdFrom(started);
+        if (startedApplicationId) setTermsApplicationId(startedApplicationId);
         setDraftStarted(true);
         setDraftEmailVerified(Boolean(started.emailVerified));
         setPasswordLinkEmail(profile.email.trim());
@@ -910,6 +923,8 @@ function MembershipFlow({ upgradeMode = false }) {
       const saved = isLoggedIn
         ? await saveProfile(profileValues, profilePhoto)
         : await saveMembershipDraftProfile(profileValues, profilePhoto);
+      const savedApplicationId = applicationIdFrom(saved);
+      if (savedApplicationId) setTermsApplicationId(savedApplicationId);
       setProfile((current) => ({
         ...current,
         ...saved,
@@ -1918,30 +1933,82 @@ function MembershipFlow({ upgradeMode = false }) {
             ) : plansError ? (
               <div className="jm-plans-error" role="alert">
                 <p>{plansError}</p>
-                <button className="jm-btn-submit" type="button" onClick={loadPlans}>Retry</button>
+                <div className="jm-step-nav-bar" style={{ justifyContent: 'center', gap: '16px' }}>
+                  <button className="jm-btn-back" type="button" onClick={() => moveTo(1)}>
+                    <ArrowLeft size={16} aria-hidden="true" />
+                    <span>Back to Personal Details</span>
+                  </button>
+                  <button className="jm-btn-submit" type="button" style={{ width: 'auto' }} onClick={loadPlans}>Retry</button>
+                </div>
               </div>
             ) : plans.length === 0 ? (
-              <p className="jm-plans-empty">No active membership plans are available right now.</p>
-            ) : (
-              <div className="mb-plans-grid">
-                {plans.map((plan, index) => (
-                  <PlanCard
-                    key={plan.slug}
-                    plan={mapPlanToCard(plan)}
-                    index={index}
-                    featured
-                    buttonLabel={upgradeMode ? 'Upgrade unavailable' : 'Select Plan'}
-                    onSelect={() => choosePlan(plan)}
-                    selected={selectedPlan?.slug === plan.slug}
-                    disabled={saving || upgradeMode}
-                  />
-                ))}
+              <div className="jm-plans-empty-wrap">
+                <p className="jm-plans-empty">No active membership plans are available right now.</p>
+                <div className="jm-step-nav-bar" style={{ justifyContent: 'center' }}>
+                  <button className="jm-btn-back" type="button" onClick={() => moveTo(1)}>
+                    <ArrowLeft size={16} aria-hidden="true" />
+                    <span>Back to Personal Details</span>
+                  </button>
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="jm-step-nav-bar">
+                  <button
+                    type="button"
+                    className="jm-btn-back"
+                    onClick={() => moveTo(1)}
+                    aria-label="Back to Personal Details"
+                  >
+                    <ArrowLeft size={16} aria-hidden="true" />
+                    <span>Back to Personal Details</span>
+                  </button>
+                </div>
+
+                <div className="mb-plans-grid">
+                  {plans.map((plan, index) => (
+                    <PlanCard
+                      key={plan.slug}
+                      plan={mapPlanToCard(plan)}
+                      index={index}
+                      featured={selectedPlan?.slug === plan.slug}
+                      buttonLabel={upgradeMode ? 'Upgrade unavailable' : 'Select Plan'}
+                      onSelect={() => choosePlan(plan)}
+                      selected={selectedPlan?.slug === plan.slug}
+                      disabled={saving || upgradeMode}
+                    />
+                  ))}
+                </div>
+
+                <div className="jm-step-nav-bar jm-step-nav-bar--bottom">
+                  <button
+                    type="button"
+                    className="jm-btn-back"
+                    onClick={() => moveTo(1)}
+                    aria-label="Back to Personal Details"
+                  >
+                    <ArrowLeft size={16} aria-hidden="true" />
+                    <span>Back to Personal Details</span>
+                  </button>
+                </div>
+              </>
             )
           )}
 
           {step === 3 && (
-            <div className="jm-application-card jm-family-step">
+            <>
+              <div className="jm-step-nav-bar jm-step-nav-bar--form">
+                <button
+                  type="button"
+                  className="jm-btn-back"
+                  onClick={() => moveTo(2)}
+                  aria-label="Back to Select Plan"
+                >
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  <span>Back to Select Plan</span>
+                </button>
+              </div>
+              <div className="jm-application-card jm-hero-form jm-family-step">
               <header className="jm-family-step__header">
                 <p className="jm-family-step__eyebrow">{corporateTier ? 'Corporate membership' : 'Your membership family'}</p>
                 <h2>{corporateTier ? 'Add your nominees' : 'Family details'}</h2>
@@ -2215,17 +2282,59 @@ function MembershipFlow({ upgradeMode = false }) {
                   {saving ? 'Saving…' : 'Continue to review'}
                 </button>
               </div>
-            </div>
+              </div>
+            </>
           )}
 
           {step === 4 && (
+            <>
+            <div className="jm-step-nav-bar jm-step-nav-bar--form">
+              <button type="button" className="jm-btn-back" onClick={() => moveTo(3)} aria-label="Back to Family Details">
+                <ArrowLeft size={16} aria-hidden="true" />
+                <span>Back to Family Details</span>
+              </button>
+            </div>
             <div className="jm-review-layout">
-              <PlanCard
-                plan={mapPlanToCard(selectedPlan ?? {})}
-                featured
-                buttonLabel="Change Plan"
-                onSelect={() => moveTo(2)}
-              />
+              <section className="jm-review-plan" aria-label="Selected membership plan">
+                <p className="jm-review-plan__eyebrow">Your selection</p>
+                <PlanCard
+                  plan={mapPlanToCard(selectedPlan ?? {})}
+                  featured
+                  visible
+                  buttonLabel="Change Plan"
+                  onSelect={() => moveTo(2)}
+                />
+                <section className="jm-review-card jm-payment-details" aria-label="Payment details">
+                  <h2 className="jm-review-card__title">Payment Details</h2>
+                  {quoteLoading ? (
+                    <p className="jm-quote-status" role="status">Calculating your payment details…</p>
+                  ) : quoteError ? (
+                    <div className="jm-quote-status jm-quote-status--error" role="alert">
+                      <p>{quoteError}</p>
+                      <button className="jm-btn-pill-outline" type="button" onClick={() => setQuoteRetry((count) => count + 1)}>
+                        Retry
+                      </button>
+                    </div>
+                  ) : quote ? (
+                    <div className="jm-fee-rows">
+                      <div className="jm-fee-row">
+                        <span className="jm-fee-row__label">Plan fee</span>
+                        <strong>{money((quote?.planFee ?? 0) / 100)}</strong>
+                      </div>
+                      {quote?.gstEnabled && <div className="jm-fee-row">
+                        <span className="jm-fee-row__label">{quote.gstLabel || 'GST'} ({quote.gstPercent ?? 0}%)</span>
+                        <strong>{money((quote?.gst ?? 0) / 100)}</strong>
+                      </div>}
+                      <div className="jm-fee-row jm-fee-row--total">
+                        <span className="jm-fee-row__label">Total</span>
+                        <strong>{money((quote?.total ?? 0) / 100)}</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="jm-quote-status" role="status">Select a plan to view payment details.</p>
+                  )}
+                </section>
+              </section>
 
               <div className="jm-review-right">
                 <section className="jm-review-card" aria-readonly="true">
@@ -2261,24 +2370,24 @@ function MembershipFlow({ upgradeMode = false }) {
                         const isNominee = ['nominee', 'nominee_gm', 'nominee_hr'].includes(type);
                         return (
                           <div className="jm-family-review-item" key={member?._id || member?.id || member?.fullName}>
-                            <strong>{member?.fullName || 'Family member'}</strong>
-                            <span>{isNominee
-                              ? `Nominee · ${member?.nomineeRole || (type === 'nominee_gm' ? 'GM' : type === 'nominee_hr' ? 'HR' : '')}`
-                              : `${member?.relationship || 'Family member'}${['father', 'mother'].includes(type) && member?.parentSide
-                                ? ` · ${member.parentSide === 'member' ? 'Member’s parent' : 'Spouse’s parent'}`
-                                : ''}`}</span>
+                            <div className="jm-family-review-item__identity">
+                              <strong>{member?.fullName || 'Family member'}</strong>
+                              <span>{isNominee
+                                ? `Nominee${member?.nomineeRole ? ` · ${member.nomineeRole}` : type === 'nominee_gm' ? ' · GM' : type === 'nominee_hr' ? ' · HR' : ''}`
+                                : `${member?.relationship || 'Family member'}${['father', 'mother'].includes(type) && member?.parentSide
+                                  ? ` · ${member.parentSide === 'member' ? 'Member’s parent' : 'Spouse’s parent'}`
+                                  : ''}`}</span>
+                            </div>
                             {isNominee ? (
-                              <span>No extra cost</span>
+                              <span className="jm-family-review-item__free">Included</span>
                             ) : price ? (
-                              <>
-                                <span className="jm-family-discount">{price.discountPct ?? 0}% discount</span>
-                                <dl>
-                                  <div><dt>Base</dt><dd>{money(price.baseAmount ?? 0)}</dd></div>
-                                  <div><dt>GST</dt><dd>{money(price.gstAmount ?? 0)}</dd></div>
-                                  <div><dt>Total</dt><dd>{money(price.totalPayable ?? 0)}</dd></div>
-                                </dl>
-                              </>
-                            ) : <span>Price unavailable</span>}
+                              <dl>
+                                <div><dt>Discount</dt><dd>{price.discountPct ?? 0}%</dd></div>
+                                <div><dt>Base</dt><dd>{money(price.baseAmount ?? 0)}</dd></div>
+                                <div><dt>GST</dt><dd>{money(price.gstAmount ?? 0)}</dd></div>
+                                <div className="jm-family-review-item__total"><dt>Total</dt><dd>{money(price.totalPayable ?? 0)}</dd></div>
+                              </dl>
+                            ) : <span className="jm-family-review-item__unavailable">Price unavailable</span>}
                           </div>
                         );
                       })}
@@ -2286,36 +2395,6 @@ function MembershipFlow({ upgradeMode = false }) {
                   )}
                 </section>
 
-                <section className="jm-review-card jm-payment-details" aria-label="Payment details">
-                  <h2 className="jm-review-card__title">Payment Details</h2>
-                  {quoteLoading ? (
-                    <p className="jm-quote-status" role="status">Calculating your payment details…</p>
-                  ) : quoteError ? (
-                    <div className="jm-quote-status jm-quote-status--error" role="alert">
-                      <p>{quoteError}</p>
-                      <button className="jm-btn-pill-outline" type="button" onClick={() => setQuoteRetry((count) => count + 1)}>
-                        Retry
-                      </button>
-                    </div>
-                  ) : quote ? (
-                    <div className="jm-fee-rows">
-                      <div className="jm-fee-row">
-                        <span className="jm-fee-row__label">Plan fee</span>
-                        <strong>{money((quote?.planFee ?? 0) / 100)}</strong>
-                      </div>
-                      {quote?.gstEnabled && <div className="jm-fee-row">
-                        <span className="jm-fee-row__label">{quote.gstLabel || 'GST'} ({quote.gstPercent ?? 0}%)</span>
-                        <strong>{money((quote?.gst ?? 0) / 100)}</strong>
-                      </div>}
-                      <div className="jm-fee-row jm-fee-row--total">
-                        <span className="jm-fee-row__label">Total</span>
-                        <strong>{money((quote?.total ?? 0) / 100)}</strong>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="jm-quote-status" role="status">Select a plan to view payment details.</p>
-                  )}
-                </section>
                 <TermsConsentCard
                   savedLanguage={profile.language || user?.language}
                   existingConsent={existingTermsConsent}
@@ -2380,9 +2459,17 @@ function MembershipFlow({ upgradeMode = false }) {
                 )}
               </div>
             </div>
+            </>
           )}
 
           {step === 5 && (
+            <>
+            <div className="jm-step-nav-bar jm-step-nav-bar--form">
+              <button type="button" className="jm-btn-back" onClick={() => moveTo(4)} aria-label="Back to Review and Confirm">
+                <ArrowLeft size={16} aria-hidden="true" />
+                <span>Back to Review &amp; Confirm</span>
+              </button>
+            </div>
             <section className="jm-payment-page" aria-labelledby="jm-payment-heading">
               <h2 className="jm-payment-title" id="jm-payment-heading">Select Payment Method</h2>
               {paymentMembershipLoading ? (
@@ -2539,20 +2626,38 @@ function MembershipFlow({ upgradeMode = false }) {
                 </>
               ) : null}
             </section>
+            </>
           )}
 
           {step === 6 && (
-            <section className="jm-application-card jm-password-link-card" aria-labelledby="password-link-heading">
-              <h2 id="password-link-heading">Set Password</h2>
-              <p className="mt-2">
-                {paymentSubmittedMethod === 'razorpay'
-                  ? 'Payment received.'
-                  : 'Payment submitted, awaiting confirmation.'}
-              </p>
-              {paymentMembership?.status === 'active' && (paymentMembership.memberId || paymentMembership.memberCode)
-                ? <p className="mt-3">Member ID: <strong>{paymentMembership.memberId || paymentMembership.memberCode}</strong></p>
-                : <p className="mt-3">Member ID: <strong>—</strong> (assigned after membership approval)</p>}
-              <form className="jm-password-link-form mt-4" onSubmit={requestPasswordLink}>
+            <>
+            <div className="jm-step-nav-bar jm-step-nav-bar--form">
+              <button type="button" className="jm-btn-back" onClick={() => moveTo(5)} aria-label="Back to Payment">
+                <ArrowLeft size={16} aria-hidden="true" />
+                <span>Back to Payment</span>
+              </button>
+            </div>
+            <section className="jm-application-card jm-hero-form jm-password-link-card" aria-labelledby="password-link-heading">
+              <header className="jm-password-link-card__header">
+                <span className="jm-password-link-card__icon"><KeyRound size={22} aria-hidden="true" /></span>
+                <p className="jm-family-step__eyebrow">Your membership account</p>
+                <h2 id="password-link-heading">Set your password</h2>
+                <p>Secure your account to manage your membership and future journeys.</p>
+              </header>
+              <div className="jm-password-link-card__status" role="status">
+                <ShieldCheck size={20} aria-hidden="true" />
+                <span>{paymentSubmittedMethod === 'razorpay'
+                  ? 'Payment received. Your membership is being prepared.'
+                  : 'Payment submitted and awaiting confirmation.'}</span>
+              </div>
+              <div className="jm-password-link-card__member">
+                <span>Membership ID</span>
+                <strong>{paymentMembership?.status === 'active' && (paymentMembership.memberId || paymentMembership.memberCode)
+                  ? paymentMembership.memberId || paymentMembership.memberCode
+                  : 'Assigned after membership approval'}</strong>
+              </div>
+              <form className="jm-password-link-form" onSubmit={requestPasswordLink}>
+                <p className="jm-password-link-form__intro">We’ll send a secure password setup link to your email.</p>
                 <label className="jm-field" htmlFor="password-link-email">
                   Email
                   <input
@@ -2575,7 +2680,7 @@ function MembershipFlow({ upgradeMode = false }) {
                   && <p className="mt-3 jm-password-link-message-info" role="status">{passwordLinkMessage}</p>}
                 {passwordLinkMessage && !passwordLinkSent && passwordLinkRequestError
                   && <p className="mt-3 jm-payment-error" role="alert">{passwordLinkMessage}</p>}
-                <p className="mt-3 text-sm">Check your inbox and spam folder.</p>
+                <p className="jm-password-link-form__note">Check your inbox and spam folder for the setup link.</p>
                 <button
                   className="jm-btn-submit mt-4"
                   type="submit"
@@ -2590,7 +2695,7 @@ function MembershipFlow({ upgradeMode = false }) {
               </form>
               {paymentError && <p className="jm-payment-error mt-4" role="alert">{paymentError}</p>}
               {helpRequestMessage && <p className="mt-4" role="status">{helpRequestMessage}</p>}
-              <div className="mt-5 flex flex-wrap items-center gap-4 text-sm">
+              <div className="jm-password-link-card__support">
                 <button
                   className="jm-btn-submit"
                   type="button"
@@ -2603,6 +2708,7 @@ function MembershipFlow({ upgradeMode = false }) {
                 <a href="/forgot-password" className="underline">Forgot password?</a>
               </div>
             </section>
+            </>
           )}
         </motion.section>
       </AnimatePresence>

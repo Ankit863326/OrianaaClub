@@ -127,7 +127,7 @@ const Navbar = () => {
   };
 
   return (
-      <header ref={headerRef} className={`home-nav${location.pathname === "/" ? "" : " home-nav--interior"}${isScrolled ? " is-scrolled" : ""}`}>
+      <header ref={headerRef} className={`home-nav${location.pathname === "/" ? "" : " home-nav--interior"}${isScrolled || location.pathname.startsWith("/luxury-membership") ? " is-scrolled" : ""}`}>
         <div className="home-nav__inner">
           <Button
             variant="ghost"

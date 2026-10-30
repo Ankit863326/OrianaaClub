@@ -330,39 +330,27 @@
    ───────────────────────────────────────────────────────── */
 .exp-dual-card {
   position: relative;
-  background: #ffffff;
-  border: 1px solid rgba(226, 173, 50, 0.32);
-  border-radius: 12px;
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
   margin: 6px 0 24px;
-  box-shadow:
-    0 8px 24px -6px rgba(13, 74, 57, 0.07),
-    0 1px 2px rgba(0, 0, 0, 0.02);
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  box-shadow: none;
+  transition: none;
 }
 
 .exp-row--alt .exp-dual-card {
-  background: #ffffff;
-  border-color: rgba(226, 173, 50, 0.38);
+  background: transparent;
 }
 
 .exp-dual-card:hover {
-  border-color: rgba(226, 173, 50, 0.55);
-  box-shadow:
-    0 10px 30px -8px rgba(13, 74, 57, 0.1),
-    0 0 0 1px rgba(226, 173, 50, 0.2);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 /* Subtle gold top hairline */
 .exp-dual-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #e2ad32 0%, #f1d99c 50%, #e2ad32 100%);
-  z-index: 2;
+  content: none;
 }
 
 /* Header */
@@ -370,9 +358,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(13, 74, 57, 0.035) 0%, rgba(226, 173, 50, 0.06) 100%);
-  border-bottom: 1px solid rgba(13, 74, 57, 0.08);
+  padding: 0 0 12px;
+  background: transparent;
+  border: 0;
 }
 
 .exp-dual-card__kicker {
@@ -409,11 +397,9 @@
 
 /* Fixed Area Body (Locks height so the card never blows up!) */
 .exp-dual-card__body {
-  max-height: 285px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 12px 10px;
-  -webkit-overflow-scrolling: touch;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
 }
 
 .exp-dual-card__body::-webkit-scrollbar {
@@ -427,6 +413,99 @@
 .exp-dual-card__body::-webkit-scrollbar-thumb {
   background: rgba(226, 173, 50, 0.45);
   border-radius: 4px;
+}
+
+.exp-offering-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.exp-offering-column {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  max-height: 285px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 5px 2px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(226, 173, 50, 0.58) rgba(13, 74, 57, 0.04);
+  -webkit-overflow-scrolling: touch;
+}
+
+.exp-offering-column::-webkit-scrollbar {
+  width: 5px;
+}
+
+.exp-offering-column::-webkit-scrollbar-track {
+  background: rgba(13, 74, 57, 0.04);
+  border-radius: 5px;
+}
+
+.exp-offering-column::-webkit-scrollbar-thumb {
+  background: rgba(226, 173, 50, 0.58);
+  border-radius: 5px;
+}
+
+.exp-offering-item {
+  min-width: 0;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 11px;
+  row-gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid rgba(13, 74, 57, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(250, 248, 242, 0.84));
+  box-shadow: 0 3px 10px rgba(13, 74, 57, 0.035);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.exp-offering-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(226, 173, 50, 0.46);
+  box-shadow: 0 8px 18px rgba(13, 74, 57, 0.08);
+}
+
+.exp-offering-item__number {
+  grid-row: 1 / 3;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(226, 173, 50, 0.36);
+  border-radius: 50%;
+  background: rgba(226, 173, 50, 0.08);
+  color: #b38827;
+  font-family: var(--exp-serif);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.exp-offering-item__name {
+  min-width: 0;
+  color: var(--exp-ink);
+  font-family: var(--exp-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.exp-offering-item__type {
+  justify-self: start;
+  color: rgba(13, 74, 57, 0.7);
+  font-family: var(--exp-sans);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 /* Dual Tables Layout: 2 tables side-by-side */
@@ -807,7 +886,7 @@
   }
 
   .exp-dual-card__header {
-    padding: 8px 12px;
+    padding: 0 0 10px;
   }
 
   .exp-dual-card__kicker {
@@ -820,11 +899,17 @@
   }
 
   .exp-dual-card__body {
-    max-height: 290px;
-    padding: 6px 8px 8px;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
   }
 
   .exp-dual-card__tables {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .exp-offering-columns {
     grid-template-columns: 1fr;
     gap: 8px;
   }

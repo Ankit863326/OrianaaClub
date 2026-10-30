@@ -720,7 +720,7 @@ function ExperienceRow({ exp, index }) {
           {exp.description}
         </Motion.p>
 
-        {/* ── Compact Dual-Table Directory (Fixed Area) ── */}
+        {/* ── Two-part offering directory ── */}
         <Motion.div
           className="exp-dual-card"
           initial={{ opacity: 0, y: 18 }}
@@ -736,62 +736,21 @@ function ExperienceRow({ exp, index }) {
           </div>
 
           <div className="exp-dual-card__body">
-            <div className="exp-dual-card__tables">
-              {/* Left Table */}
-              <div className="exp-mini-table-wrap">
-                <table className="exp-mini-table">
-                  <thead>
-                    <tr>
-                      <th className="exp-mini-table__th--idx">#</th>
-                      <th className="exp-mini-table__th--name">Offering</th>
-                      <th className="exp-mini-table__th--type">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {table1Items.map((item, idx) => (
-                      <tr key={item.name} className="exp-mini-table__row">
-                        <td className="exp-mini-table__td--idx">
-                          {String(idx + 1).padStart(2, "0")}
-                        </td>
-                        <td className="exp-mini-table__td--name" title={item.highlight}>
-                          {item.name}
-                        </td>
-                        <td className="exp-mini-table__td--type">
-                          <span className="exp-mini-table__badge">{item.type}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Right Table */}
-              <div className="exp-mini-table-wrap">
-                <table className="exp-mini-table">
-                  <thead>
-                    <tr>
-                      <th className="exp-mini-table__th--idx">#</th>
-                      <th className="exp-mini-table__th--name">Offering</th>
-                      <th className="exp-mini-table__th--type">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {table2Items.map((item, idx) => (
-                      <tr key={item.name} className="exp-mini-table__row">
-                        <td className="exp-mini-table__td--idx">
-                          {String(midpoint + idx + 1).padStart(2, "0")}
-                        </td>
-                        <td className="exp-mini-table__td--name" title={item.highlight}>
-                          {item.name}
-                        </td>
-                        <td className="exp-mini-table__td--type">
-                          <span className="exp-mini-table__badge">{item.type}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="exp-offering-columns">
+              {[table1Items, table2Items].map((group, groupIndex) => (
+                <div className="exp-offering-column" role="list" key={`offering-part-${groupIndex}`}>
+                  {group.map((item, idx) => {
+                    const itemNumber = groupIndex === 0 ? idx + 1 : midpoint + idx + 1;
+                    return (
+                      <div key={item.name} className="exp-offering-item" role="listitem">
+                        <span className="exp-offering-item__number">{String(itemNumber).padStart(2, "0")}</span>
+                        <span className="exp-offering-item__name" title={item.highlight}>{item.name}</span>
+                        <span className="exp-offering-item__type">{item.type}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         </Motion.div>
