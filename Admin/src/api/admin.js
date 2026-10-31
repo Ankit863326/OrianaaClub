@@ -36,6 +36,8 @@ export const adminApi = {
   updatePlan: (id, body) => data(api.patch(`/admin/plans/${id}`, body)),
   points: (body) => data(api.post(`/admin/points/${body.filter || body.membershipIds ? 'bulk-credit' : body.type}`, body)),
   payments: (filters = {}) => data(api.get(`/admin/payments${query(filters)}`)),
+  memberReviews: (filters = {}) => data(api.get(`/admin/reviews${query(filters)}`)),
+  deleteMemberReview: (id) => data(api.delete(`/admin/reviews/${encodeURIComponent(id)}`)),
   recordOfflinePayment: (body) => data(api.post('/admin/payments', body)),
   changePaymentMethod: (id, body) => data(api.patch(`/admin/payments/${encodeURIComponent(id)}/method`, body)),
   confirmOfflinePayment: (id) => data(api.patch(`/admin/payments/${encodeURIComponent(id)}/confirm`, {})),

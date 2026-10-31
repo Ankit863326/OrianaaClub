@@ -13,6 +13,7 @@ const MemberDetailPage = lazy(() => import('./pages/MemberDetailPage.jsx'));
 const PlansPage = lazy(() => import('./pages/PlansPage.jsx'));
 const PointsPage = lazy(() => import('./pages/PointsPage.jsx'));
 const PaymentsPage = lazy(() => import('./pages/PaymentsPage.jsx'));
+const MemberReviewsPage = lazy(() => import('./pages/MemberReviewsPage.jsx'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage.jsx'));
 const MembershipMemberDetailPage = lazy(() => import('./membership/MembershipMemberDetailPage.jsx'));
 const MembershipFamilyTreePage = lazy(() => import('./membership/MembershipFamilyTreePage.jsx'));
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="plans" element={<Navigate to="/membership/plans" replace />} />
         <Route path="points" element={<PointsPage />} />
         <Route path="payments" element={<PaymentsPage />} />
+        <Route path="reviews" element={<MemberReviewsPage />} />
         <Route path="membership/plans" element={<NewMembershipPlansPage />} />
         <Route path="membership/members" element={<MembershipComingNextPage title="Members" />} />
         <Route path="membership/drafts" element={<DraftMembersPage />} />

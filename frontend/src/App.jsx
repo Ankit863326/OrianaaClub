@@ -101,9 +101,9 @@ function App() {
         <Navbar />
         <SiteScrollMotion />
         {isPreloading && (
-          <div className="site-preloader" role="status" aria-label="Orianaa Club is loading">
+          <div className="site-preloader" role="status" aria-label="Saptagiri Resorts and OrianaaClub are loading">
             <div className="site-preloader__content">
-              <img className="site-preloader__emblem" src={logoImg} alt="Orianaa Club Luxury Membership" />
+              <img className="site-preloader__emblem" src={logoImg} alt="OrianaaClub membership" />
               <p className="site-preloader__tagline">A private world, distinctly yours</p>
               <span className="site-preloader__rule" />
             </div>

@@ -249,13 +249,13 @@ export default function Events() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             >
-              <span className="ev2-hero__tag">A world of privileges awaits.</span>
+              <span className="ev2-hero__tag">Members are family.</span>
               <h1 className="ev2-hero__heading" id="ev2-hero-title">
                 Events & Celebrations
               </h1>
-              <p className="ev2-hero__sub">A 25-Year Lifestyle Membership</p>
+              <p className="ev2-hero__sub">Celebrations at Saptagiri Resorts</p>
               <p className="ev2-hero__desc">
-                Grand celebrations tailored to perfection amidst serene resort landscapes and an unforgettable, luxurious ambience.
+                Bring family and friends together for weddings, milestone celebrations, and retreats in settings shaped by nature.
               </p>
             </Motion.div>
 
@@ -290,12 +290,12 @@ export default function Events() {
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
             <p className="ev2-eyebrow">
-              <Sparkles size={12} className="ev2-sparkle-dark" /> The Orianaa Calendar
+              <Sparkles size={12} className="ev2-sparkle-dark" /> The Saptagiri Resorts Calendar
             </p>
             <h2 className="ev2-catalogue__title">Events & Celebrations</h2>
             <p className="ev2-catalogue__sub">
-              A curated calendar of celebrations, culinary occasions, cultural moments
-              and memorable experiences — exclusively for members.
+              Discover member weddings, family gatherings, milestone celebrations,
+              and retreats across the Saptagiri Resorts community.
             </p>
           </Motion.div>
 
@@ -413,7 +413,7 @@ export default function Events() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <Sparkles size={12} /> The Orianaa Way
+            <Sparkles size={12} /> The Saptagiri Promise
           </Motion.p>
           <Motion.h2
             className="ev2-manifesto__heading"
@@ -432,7 +432,7 @@ export default function Events() {
             viewport={{ once: true }}
             transition={{ delay: 0.3, duration: 0.6 }}
           >
-            Beautiful settings, thoughtful details and experiences designed around the people who matter.
+            Peaceful surroundings, nourishing vegetarian food, and caring service—so every visit feels like a return to balance.
           </Motion.p>
         </div>
       </section>

@@ -36,12 +36,13 @@ export default function Footer() {
         <div className="site-footer__rule" aria-hidden="true" />
         <div className="site-footer__grid">
           <div className="site-footer__brand">
-            <Link to="/" aria-label="Orianaa Club home">
-              <img src={logoImg} alt="Orianaa Club" />
+            <Link to="/" aria-label="Saptagiri Resorts and OrianaaClub home">
+              <img src={logoImg} alt="OrianaaClub" />
             </Link>
             <p>
-              A more considered way to get away. Discover stays, experiences and
-              time together, shaped around the way you want to travel.
+              OrianaaClub is the members-only community of Saptagiri Resorts,
+              bringing together nature-led stays, vegetarian hospitality,
+              wellness, and time with family.
             </p>
             <div className="site-footer__socials" aria-label="Social media">
               {socialLinks.map(({ label, href, Icon }) => (
@@ -52,7 +53,7 @@ export default function Footer() {
             </div>
           </div>
 
-          <nav className="site-footer__links" aria-label="Explore Orianaa">
+          <nav className="site-footer__links" aria-label="Explore Saptagiri Resorts">
             <h2>Explore</h2>
             {exploreLinks.map((link) => (
               <Link key={link.to} to={link.to}>{link.label}</Link>
@@ -68,9 +69,9 @@ export default function Footer() {
           </nav>
 
           <div className="site-footer__invitation">
-            <p className="site-footer__eyebrow">Your world, every day</p>
-            <h2>Make room for more.</h2>
-            <p>Find your place in a club made for memorable time away.</p>
+            <p className="site-footer__eyebrow">Members of nature</p>
+            <h2>Belong. Renew. Return.</h2>
+            <p>Find your place in a community shaped by nature, wellbeing, and togetherness.</p>
             <Link className="site-footer__join" to="/luxury-membership">
               Discover membership <ArrowRight size={16} aria-hidden="true" />
             </Link>
@@ -78,8 +79,8 @@ export default function Footer() {
         </div>
 
         <div className="site-footer__bottom">
-          <p>© 2026 Orianaa Club. All rights reserved.</p>
-          <p>Crafted for life away.</p>
+          <p>© 2026 OrianaaClub. All rights reserved.</p>
+          <p>Belong. Renew. Return.</p>
           {adminUrl && <a href={adminUrl} target="_blank" rel="noopener noreferrer">Admin Login</a>}
         </div>
       </div>

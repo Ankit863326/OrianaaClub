@@ -26,6 +26,8 @@ import {
 import rateLimit from 'express-rate-limit';
 import * as familyCheckoutController from '../controllers/family-checkout.controller.js';
 import { verifyPaymentSchema } from '../validators/payment.schema.js';
+import * as memberReviewController from '../controllers/member-review.controller.js';
+import { memberReviewSchema } from '../validators/member-review.schema.js';
 
 const router = Router();
 router.use(memberAccessAuth);
@@ -37,6 +39,8 @@ const verificationCodeLimiter = rateLimit({
   message: { success: false, message: 'Too many verification code requests. Please try again later.' },
 });
 router.get('/me', memberController.getMe);
+router.get('/review', memberReviewController.mine);
+router.put('/review', validate(memberReviewSchema), memberReviewController.saveMine);
 router.get('/identity-verification', identityController.getMine);
 router.put('/identity-verification', identityDocumentLimiter, identityDocumentUpload, identityController.submitMine);
 router.get('/points', validate(pointsHistorySchema, 'query'), getMyPoints);

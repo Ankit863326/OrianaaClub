@@ -110,6 +110,73 @@
   font-size: 14px;
 }
 
+.member-hub__notice {
+  margin: 0 0 16px;
+  border: 1px solid #b9dfc2;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #16543c;
+  background: #eff9f0;
+}
+
+.member-review-form {
+  display: grid;
+  gap: 20px;
+  max-width: 720px;
+}
+
+.member-review-form__rating {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.member-review-form__rating legend,
+.member-review-form__message {
+  color: var(--hub-green-dark);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.member-review-form__star {
+  border: 0;
+  padding: 2px 5px;
+  color: #b28a36;
+  background: transparent;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.member-review-form__star:focus-visible {
+  outline: 2px solid var(--hub-green);
+  outline-offset: 2px;
+}
+
+.member-review-form__message {
+  display: grid;
+  gap: 8px;
+}
+
+.member-review-form__message textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--hub-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--hub-ink);
+  background: #fff;
+  font: inherit;
+  font-weight: 400;
+}
+
+.member-review-form__message textarea:focus-visible {
+  outline: 2px solid var(--hub-green);
+  outline-offset: 2px;
+}
+
+
 .member-hub__badges {
   display: flex;
   flex-wrap: wrap;

@@ -7,12 +7,12 @@ import logoImg from "../assets/Oriana Club Luxury Emblem Transparent.png";
 import "./Navbar.css";
 
 const searchItems = [
-  { title: "Resorts", detail: "Stays and destinations", to: "/resorts", keywords: "rooms villas hotels destinations escapes" },
-  { title: "Experiences", detail: "Wellness, dining and more", to: "/experiences", keywords: "spa wellness dining activities" },
-  { title: "Events", detail: "Celebrations and gatherings", to: "/events", keywords: "wedding celebration gathering" },
-  { title: "Membership Benefits", detail: "Explore the Orianaa membership", to: "/membership-benefits", keywords: "join member points benefits" },
+  { title: "Resorts", detail: "Nature-led stays across the Saptagiri family", to: "/resorts", keywords: "rooms villas destinations hills beaches forests" },
+  { title: "Experiences", detail: "Wellness, vegetarian dining, and active leisure", to: "/experiences", keywords: "naturopathy spa yoga gym pool vegetarian activities" },
+  { title: "Events", detail: "Member celebrations and family gatherings", to: "/events", keywords: "weddings celebrations retreats family gathering" },
+  { title: "Membership Benefits", detail: "Discover OrianaaClub membership", to: "/membership-benefits", keywords: "join member benefits saptagiri" },
   { title: "Members Login", detail: "Access your member account", to: "/login", keywords: "sign in account login" },
-  { title: "Journal", detail: "Stories from the Orianaa world", to: "/blog", keywords: "blog stories journal" },
+  { title: "Journal", detail: "Stories from Saptagiri Resorts and OrianaaClub", to: "/blog", keywords: "blog stories journal" },
 ];
 
 const Navbar = () => {
@@ -142,14 +142,14 @@ const Navbar = () => {
           </Button>
           <nav className="home-nav__links" aria-label="Main navigation">
             <Link className={navLinkClass("home")} to="/">Home</Link>
-            <Link className={navLinkClass("destination")} to={destinationPath}>Destination</Link>
+            <Link className={navLinkClass("destination")} to={destinationPath}>Resorts</Link>
             <Link className={navLinkClass("experience")} to="/experiences">Experiences</Link>
-            <Link className={navLinkClass("event")} to="/events">Event</Link>
+            <Link className={navLinkClass("event")} to="/events">Events</Link>
             <Link className={navLinkClass("blog")} to="/blog">Blog</Link>
             <Link className={navLinkClass("membership")} to="/membership-benefits">Membership</Link>
           </nav>
-          <Link className="home-nav__brand" to="/" aria-label="Orianaa Club home">
-            <img src={logoImg} alt="Orianaa Club Luxury Membership" />
+          <Link className="home-nav__brand" to="/" aria-label="Saptagiri Resorts and OrianaaClub home">
+            <img src={logoImg} alt="OrianaaClub membership" />
           </Link>
           <div className="home-nav__actions">
             <Button
@@ -189,7 +189,7 @@ const Navbar = () => {
           >
             <form className="home-nav__search-form" role="search" onSubmit={handleSearchSubmit}>
               <Search size={18} aria-hidden="true" />
-              <label className="home-nav__visually-hidden" htmlFor="home-nav-search-input">Search Orianaa Club</label>
+              <label className="home-nav__visually-hidden" htmlFor="home-nav-search-input">Search Saptagiri Resorts and OrianaaClub</label>
               <input
                 id="home-nav-search-input"
                 type="search"
@@ -234,9 +234,9 @@ const Navbar = () => {
             aria-label="Mobile navigation"
           >
             <Link className={navLinkClass("home")} to="/" onClick={() => setMenuOpen(false)}>Home</Link>
-            <Link className={navLinkClass("destination")} to={destinationPath} onClick={() => setMenuOpen(false)}>Destination</Link>
+            <Link className={navLinkClass("destination")} to={destinationPath} onClick={() => setMenuOpen(false)}>Resorts</Link>
             <Link className={navLinkClass("experience")} to="/experiences" onClick={() => setMenuOpen(false)}>Experiences</Link>
-            <Link className={navLinkClass("event")} to="/events" onClick={() => setMenuOpen(false)}>Event</Link>
+            <Link className={navLinkClass("event")} to="/events" onClick={() => setMenuOpen(false)}>Events</Link>
             <Link className={navLinkClass("blog")} to="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
             <Link className={navLinkClass("membership")} to="/membership-benefits" onClick={() => setMenuOpen(false)}>Membership</Link>
             {user ? (

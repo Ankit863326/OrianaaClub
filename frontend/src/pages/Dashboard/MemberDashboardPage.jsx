@@ -14,11 +14,12 @@ import {
 import FamilyDashboardTab from './FamilyDashboardTab.jsx';
 import PaymentsReceiptsTab from './PaymentsReceiptsTab.jsx';
 import RenewDashboardTab from './RenewDashboardTab.jsx';
+import ReviewTab from './ReviewTab.jsx';
 import { getIdentityVerification, submitIdentityVerification } from '../../lib/memberApi.js';
 import { isValidIdentityNumber } from '../../lib/identityValidation.js';
 import './MemberDashboard.css';
 
-const tabs = ['Overview', 'Family', 'Documents', 'Bills & Bookings', 'Points History', 'Renew', 'Payments & Receipts'];
+const tabs = ['Overview', 'Family', 'Documents', 'Bills & Bookings', 'Points History', 'Renew', 'Payments & Receipts', 'Review'];
 const rowsPerPage = 10;
 const emptyFilters = { from: '', to: '', status: '' };
 
@@ -496,7 +497,7 @@ export default function MemberDashboardPage() {
       {approved && <div className="member-hub__grid">
         <article className="member-hub__membership">
           <p className="member-hub__eyebrow">Membership overview</p>
-          <h2>{membership.tier || 'Orianaa Club Membership'}</h2>
+          <h2>{membership.tier || 'OrianaaClub Membership'}</h2>
           <p>Welcome, {user?.firstName || 'Member'}</p>
           <div className="member-hub__badges">
             {membership.discountPercent > 0 && <span className="member-hub__badge">{membership.discountPercent}% discount active</span>}
@@ -558,6 +559,7 @@ export default function MemberDashboardPage() {
         {tab === 'Bills & Bookings' && <BillsTab membership={membership} onSessionExpired={handleSessionExpired} />}
         {tab === 'Points History' && <PointsHistoryTab membership={membership} onSessionExpired={handleSessionExpired} />}
         {tab === 'Payments & Receipts' && <PaymentsReceiptsTab onSessionExpired={handleSessionExpired} />}
+        {tab === 'Review' && <ReviewTab onSessionExpired={handleSessionExpired} />}
       </div>
     </div>
   </main>;

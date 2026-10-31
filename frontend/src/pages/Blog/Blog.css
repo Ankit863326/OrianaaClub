@@ -94,10 +94,10 @@
   margin: 0 auto;
   padding: clamp(7rem, 13vh, 10rem) max(4.5vw, calc((100vw - 1340px) / 2 + 2rem)) clamp(3rem, 6vh, 4.5rem);
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 1.5rem;
 }
 
 .b2-hero__left {
@@ -105,6 +105,11 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  text-align: left;
+}
+
+.b2-hero__right {
+  align-self: flex-start;
 }
 
 .b2-hero__main-title {

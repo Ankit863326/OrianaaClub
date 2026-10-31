@@ -1,11 +1,12 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight, Leaf, Mountain, Trees, Waves } from "lucide-react";
 import { AnimatePresence, LazyMotion, m as Motion, useReducedMotion } from "framer-motion";
 import { Button } from "./ui/button";
 // import beachImage from "../assets/beachh.jpg";
 import heroVideo from "../assets/OrianaaClub_promo_video_creation_20261019122757.mp4";
 import LuxuryContactDrawer from "./LuxuryContactDrawer";
-import saptagiriimg from "../assets/swimming pool.jpeg"
+import { contentApi } from "../lib/contentApi.js";
+import saptagiriimg from "../assets/Swimming pool .png";
 import "./HomePage.css";
 
 const destinations = [
@@ -46,29 +47,29 @@ const events = [
   },
 ];
 
-const stories = [
-  {
-    quote:
-      "I have stayed in fine hotels all over the world. Orianaa is the first place that felt like it was waiting for me.",
-    name: "Arjun Mehta",
-    role: "Founder, Mehta Industries",
-    initials: "AM",
-  },
-  {
-    quote:
-      "The points system is honest. One rupee, one point. No fine print, no games. That is rare.",
-    name: "Sarah Chen",
-    role: "Partner, Chen Capital",
-    initials: "SC",
-  },
-  {
-    quote:
-      "My wife and I celebrated our twentieth anniversary at an Orianaa resort. They remembered the wine we drank on our first date.",
-    name: "Vikram Rao",
-    role: "Chairman, Rao Group",
-    initials: "VR",
-  },
-];
+// const stories = [
+//   {
+//     quote:
+//       "I have stayed in fine hotels all over the world. Orianaa is the first place that felt like it was waiting for me.",
+//     name: "Arjun Mehta",
+//     role: "Founder, Mehta Industries",
+//     initials: "AM",
+//   },
+//   {
+//     quote:
+//       "The points system is honest. One rupee, one point. No fine print, no games. That is rare.",
+//     name: "Sarah Chen",
+//     role: "Partner, Chen Capital",
+//     initials: "SC",
+//   },
+//   {
+//     quote:
+//       "My wife and I celebrated our twentieth anniversary at an Orianaa resort. They remembered the wine we drank on our first date.",
+//     name: "Vikram Rao",
+//     role: "Chairman, Rao Group",
+//     initials: "VR",
+//   },
+// ];
 
 const eventCardVariants = {
   enter: (direction) => ({
@@ -95,12 +96,30 @@ export default function HomePage() {
   const [activeEvent, setActiveEvent] = useState(0);
   const [eventDirection, setEventDirection] = useState(1);
   const [contactOpen, setContactOpen] = useState(false);
+  const [memberReviews, setMemberReviews] = useState([]);
+  const [activeReview, setActiveReview] = useState(0);
   const universeRef = useRef(null);
   const universeScrollTriggerRef = useRef(null);
   const shouldReduceMotion = useReducedMotion();
   const event = events[activeEvent];
   const previousEvent = (activeEvent - 1 + events.length) % events.length;
   const nextEvent = (activeEvent + 1) % events.length;
+
+  useEffect(() => {
+    let active = true;
+    contentApi.memberReviews()
+      .then((result) => {
+        if (active) setMemberReviews(Array.isArray(result?.data) ? result.data : []);
+      })
+      .catch(() => {
+        if (active) setMemberReviews([]);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const changeReview = (direction) => {
+    setActiveReview((current) => (current + direction + memberReviews.length) % memberReviews.length);
+  };
 
   const changeEvent = (direction) => {
     setEventDirection(direction);
@@ -231,7 +250,7 @@ export default function HomePage() {
           playsInline
           controls
           preload="metadata"
-          aria-label="Orianaa Club resort video"
+          aria-label="Saptagiri Resorts video"
         >
           <source src={heroVideo} type="video/mp4" />
           Your browser does not support embedded video.
@@ -242,12 +261,12 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
         >
-          <p className="home-eyebrow">A more considered way to get away</p>
+          <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
           {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
           <p className="home-hero__summary">
-            A 25-year Lifestyle Membership bringing together stays, wellness,
-            dining, celebrations and curated experiences. One invitation to a
-            life less ordinary.
+            A members-only community of nature resorts across India. Through
+            OrianaaClub, discover restorative stays, pure vegetarian hospitality,
+            holistic wellness, and meaningful time together.
           </p>
           <div className="home-hero__actions">
             <Button asChild>
@@ -265,12 +284,13 @@ export default function HomePage() {
 
       <section className="home-universe" id="universe" ref={universeRef}>
         <div className="home-universe__copy">
-          <p className="home-eyebrow home-eyebrow--dark">Universe</p>
-          <h2>The Orianaa Universe: One World, Six Connections</h2>
+          <p className="home-eyebrow home-eyebrow--dark">Our vision</p>
+          <h2>Your nature home, wherever you travel</h2>
           <p className="home-body-copy">
-            At the center stands Orianaa. Around it, six experiences move in
-            orbit. Each one feeds the next, creating a life that is greater
-            than the sum of its parts.
+            Saptagiri Resorts envisions a private club of nature sanctuaries
+            across India’s hills, beaches, and forests. OrianaaClub brings
+            members together through familiar comfort, thoughtful hospitality,
+            and a lasting sense of belonging.
           </p>
           <div className="home-inline-actions">
             <Button asChild>
@@ -281,7 +301,7 @@ export default function HomePage() {
             </a>
           </div>
         </div>
-        <div className="home-universe-gallery" aria-label="Orianaa resort collection">
+        <div className="home-universe-gallery" aria-label="Saptagiri Resorts collection">
           <div className="home-universe-gallery__main">
             {destinations.map((destination, index) => (
               <img
@@ -328,11 +348,11 @@ export default function HomePage() {
 
       <section className="home-destinations" id="destinations">
         <div className="home-section-heading">
-          <p className="home-eyebrow home-eyebrow--dark">A place for every pace</p>
-          <h2>Explore Destinations</h2>
+          <p className="home-eyebrow home-eyebrow--dark">Nature, in all its moods</p>
+          <h2>Discover Saptagiri Resorts</h2>
           <p>
-            Find your own kind of extraordinary, from restorative hillsides to
-            the easy rhythm of the coast.
+            We are building a collection of member resorts shaped by their
+            surroundings, from peaceful hillsides to the rhythm of the coast.
           </p>
         </div>
         <div className="home-destination-grid">
@@ -361,8 +381,8 @@ export default function HomePage() {
         </div>
         <div className="home-destination-signature">
           <div className="home-destination-signature__copy">
-            <p className="home-eyebrow home-eyebrow--dark">The Orianaa landscape</p>
-            <h3>Find your own kind of away.</h3>
+            <p className="home-eyebrow home-eyebrow--dark">A growing resort family</p>
+            <h3>Belong. Renew. Return.</h3>
           </div>
           <div className="home-destination-signature__settings" aria-label="Resort settings">
             <span><Waves size={19} strokeWidth={1.4} aria-hidden="true" /> Coast</span>
@@ -468,34 +488,42 @@ export default function HomePage() {
         <div className="home-section-heading">
           <p className="home-eyebrow home-eyebrow--dark">In their own words</p>
           <h2>Stories</h2>
-          <p>Trust is earned in years, not in words.</p>
+          <p>Experiences shared by OrianaaClub members.</p>
         </div>
-        <div className="home-story-grid">
-          {stories.map((story, index) => (
-            <Motion.article
-              className="home-story"
-              key={story.name}
-              initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.25 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : index * 0.1 }}
-            >
-              <div className="home-story__stars" aria-label="5 out of 5 stars">
-                ★★★★★
+        {memberReviews.length ? <div className="home-story-carousel" aria-label="Member reviews">
+          <article className="home-story" aria-live="polite" aria-atomic="true">
+            <div className="home-story__stars" aria-label={`${memberReviews[activeReview].rating} out of 5 stars`}>
+              {'★'.repeat(memberReviews[activeReview].rating)}{'☆'.repeat(5 - memberReviews[activeReview].rating)}
+            </div>
+            <blockquote>“{memberReviews[activeReview].message}”</blockquote>
+            <div className="home-story__author">
+              <span className="home-story__avatar" aria-hidden="true">
+                {String(memberReviews[activeReview].memberName || 'Member').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}
+              </span>
+              <div>
+                <h3>{memberReviews[activeReview].memberName}</h3>
+                <p>OrianaaClub member</p>
               </div>
-              <blockquote>{story.quote}</blockquote>
-              <div className="home-story__author">
-                <span className="home-story__avatar" aria-hidden="true">
-                  {story.initials}
-                </span>
-                <div>
-                  <h3>{story.name}</h3>
-                  <p>{story.role}</p>
-                </div>
-              </div>
-            </Motion.article>
-          ))}
-        </div>
+            </div>
+          </article>
+          {memberReviews.length > 1 && <>
+            <div className="home-story-carousel__controls">
+              <button type="button" onClick={() => changeReview(-1)} aria-label="Previous member review">‹</button>
+              <span>{activeReview + 1} / {memberReviews.length}</span>
+              <button type="button" onClick={() => changeReview(1)} aria-label="Next member review">›</button>
+            </div>
+            <div className="home-story-carousel__indicators" aria-label="Choose a member review">
+              {memberReviews.map((review, index) => <button
+                key={review._id || `${review.memberName}-${index}`}
+                type="button"
+                className={activeReview === index ? 'is-active' : ''}
+                aria-label={`Show review by ${review.memberName}`}
+                aria-current={activeReview === index ? 'true' : undefined}
+                onClick={() => setActiveReview(index)}
+              />)}
+            </div>
+          </>}
+        </div> : <p className="home-stories__empty">Member stories will appear here as reviews are shared.</p>}
       </section>
 
       <section className="home-benefits" id="benefits">
@@ -522,19 +550,20 @@ export default function HomePage() {
           <p className="home-eyebrow home-eyebrow--dark">Membership, reimagined</p>
           <h2>Benefits of Membership</h2>
           <p className="home-body-copy">
-            Orianaa resorts are not buildings. They are places where the land
-            does the talking. You arrive, and the noise of the city falls away.
+            OrianaaClub is the members-only community of Saptagiri Resorts.
+            Each stay is envisioned as a chance to slow down, reconnect with
+            nature, and return to balance.
           </p>
           <div className="home-benefit-points">
             <article>
               <Leaf size={30} strokeWidth={1.5} aria-hidden="true" />
-              <h3>Up to 50% points redemption</h3>
-              <p>25% Exclusive Member Discount on resort stays.</p>
+              <h3>Membership value</h3>
+              <p>Explore the benefits available with each membership plan.</p>
             </article>
             <article>
               <Trees size={30} strokeWidth={1.5} aria-hidden="true" />
-              <h3>Closer to the land</h3>
-              <p>State-of-the-art sports and fitness facilities, an invigorating lifestyle with pristine natural surroundings, and holistic spa and naturopathy centers.</p>
+              <h3>Rooted in nature and wellbeing</h3>
+              <p>Nature-led stays, pure vegetarian hospitality, wellness, and active leisure are at the heart of the Saptagiri Resorts vision.</p>
             </article>
           </div>
           <Button asChild>
@@ -560,9 +589,9 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.25 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : 0.1 }}
         >
-          <p className="home-eyebrow home-eyebrow--dark">A note from Orianaa</p>
-          <h2>Do you have an enquiry?</h2>
-          <p>Join our circle for private invitations and stories from the Orianaa world.</p>
+          <p className="home-eyebrow home-eyebrow--dark">A note from Saptagiri Resorts</p>
+          <h2>How can we help?</h2>
+          <p>Ask us about OrianaaClub membership and the Saptagiri Resorts vision.</p>
           <Button
             type="button"
             className="home-button home-button--green"
