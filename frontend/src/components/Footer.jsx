@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { ArrowRight } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { Link } from "react-router-dom";
+import { apiResourceUrl } from "../config/api.js";
 import logoImg from "../assets/Oriana Club Luxury Emblem Transparent.png";
 import "./Footer.css";
 
@@ -66,6 +67,9 @@ export default function Footer() {
               <Link key={link.to} to={link.to}>{link.label}</Link>
             ))}
             <Link to="/#enquiry">Get in touch</Link>
+            <a href={apiResourceUrl("/terms/v1/membership-terms.pdf")} target="_blank" rel="noopener noreferrer">
+              Terms and Conditions
+            </a>
           </nav>
 
           <div className="site-footer__invitation">
