@@ -1,35 +1,16 @@
 import * as paymentService from '../services/payment.service.js';
 import ApiError from '../utils/ApiError.js';
-import MembershipPlan from '../models/MembershipPlan.js';
-import { getSettings } from '../models/Setting.js';
-import { getFamilyTier } from '../services/family-tier.service.js';
+import { listPublicMembershipPlans } from '../services/public-membership-plans.service.js';
 import { env } from '../config/env.js';
 import { unlink } from 'node:fs/promises';
 import { verificationDocumentPath } from '../utils/verificationDocumentStorage.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 export const listPlans = asyncHandler(async (request, response) => {
-  const [plans, settings] = await Promise.all([
-    MembershipPlan.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean(),
-    getSettings(),
-  ]);
+  const plans = await listPublicMembershipPlans();
   response.json({
     success: true,
-    data: plans.map((plan) => ({
-      ...plan,
-      slug: plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-      title: plan.name,
-      subtitle: `${settings.membershipValidityYears} year membership`,
-      termYears: settings.membershipValidityYears,
-      familyLimits: settings.familyMembership.limits,
-      familyEnabled: getFamilyTier(plan, settings.familyMembership.tiers)?.familyEnabled ?? false,
-      benefitsTitle: plan.name,
-      benefits: [
-        { points: plan.earlyBirdPoints, label: `First ${settings.earlyBirdLimit} members` },
-        { points: plan.defaultPoints, label: 'Standard joining points' },
-        { points: plan.renewalPoints, label: 'Renewal points' },
-      ],
-    })),
+    data: plans,
     message: 'Membership plans loaded.',
   });
 });

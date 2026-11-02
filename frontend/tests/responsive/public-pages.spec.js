@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const viewports = [
+  { name: '320x568-short', width: 320, height: 568 },
   { name: '320x740', width: 320, height: 740 },
   { name: '360x740', width: 360, height: 740 },
   { name: '390x844', width: 390, height: 844 },
@@ -10,6 +11,7 @@ const viewports = [
   { name: '768x1024', width: 768, height: 1024 },
   { name: '1024x768', width: 1024, height: 768 },
   { name: '1280x800', width: 1280, height: 800 },
+  { name: '844x390-landscape', width: 844, height: 390 },
 ];
 
 const pages = [
@@ -568,6 +570,39 @@ for (const viewport of viewports) {
       await backToTop.click();
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(20);
       await saveResponsiveScreenshot(page, 'home', viewport.name, 'back-to-top');
+    });
+
+    test('chatbot fits the viewport and stays opposite the back-to-top arrow', async ({ page }) => {
+      await preparePage(page);
+      await page.goto('/');
+      const launcher = page.getByRole('button', { name: 'Chat with Orianaa Assistant' });
+      await expect(launcher).toBeVisible();
+      await launcher.click();
+
+      const panel = page.getByRole('dialog', { name: 'Orianaa Assistant' });
+      await expect(panel).toBeVisible();
+      const panelBounds = await panel.boundingBox();
+      expect(panelBounds).not.toBeNull();
+      expect(panelBounds.x).toBeGreaterThanOrEqual(0);
+      expect(panelBounds.y).toBeGreaterThanOrEqual(0);
+      expect(panelBounds.x + panelBounds.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(panelBounds.y + panelBounds.height).toBeLessThanOrEqual(viewport.height + 1);
+      await assertResponsiveLayout(page, { mobile: viewport.width <= 767 });
+      await saveResponsiveScreenshot(page, 'home', viewport.name, 'chatbot-open');
+
+      await page.getByRole('button', { name: 'Close chat and clear messages' }).click();
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      const backToTop = page.getByRole('button', { name: 'Back to top' });
+      await expect(backToTop).toBeVisible();
+      const [arrowBounds, launcherBounds] = await Promise.all([
+        backToTop.boundingBox(),
+        launcher.boundingBox(),
+      ]);
+      expect(arrowBounds).not.toBeNull();
+      expect(launcherBounds).not.toBeNull();
+      expect(arrowBounds.x + arrowBounds.width).toBeLessThan(launcherBounds.x);
+      expect(arrowBounds.y + arrowBounds.height).toBeGreaterThan(viewport.height - 80);
+      expect(launcherBounds.y + launcherBounds.height).toBeGreaterThan(viewport.height - 90);
     });
   });
 }

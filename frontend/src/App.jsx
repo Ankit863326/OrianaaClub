@@ -22,6 +22,7 @@ import FamilyVerificationPage from './pages/Dashboard/FamilyVerificationPage.jsx
 import FamilyCheckoutPage from './pages/Dashboard/FamilyCheckoutPage.jsx';
 import NotFound from './pages/NotFound/NotFound.jsx';
 import LuxuryCursor from './components/LuxuryCursor';
+import OrianaaChatbot from './components/OrianaaChatbot.jsx';
 
 function SiteScrollMotion() {
   const location = useLocation();
@@ -134,6 +135,7 @@ function App() {
         </Routes>
         <Footer />
         <BackToTop />
+        <OrianaaChatbot />
       </div>
     </Router>
     </AuthProvider>
