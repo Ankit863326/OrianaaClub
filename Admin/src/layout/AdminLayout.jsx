@@ -12,7 +12,7 @@ const navigation = [
   { title: 'WORKSPACE', links: [['Dashboard', '/', LayoutDashboard], ['Members', '/members', Users], ['Payments', '/payments', CreditCard]] },
   { title: 'MANAGEMENT', links: [['Blog Posts', '/posts', FileText], ['Events', '/events', CalendarDays], ['Enquiries', '/enquiries', Mail], ['Administrators', '/admins', Shield]] },
   { title: 'MEMBERSHIP', links: [['Plans', '/membership/plans', BookOpen], ['Members', '/membership/members', Users], ['Draft Members', '/membership/drafts', Users], ['Points', '/points', Wallet], ['Bills', '/membership/bills', ClipboardList], ['Pending Queue', '/membership/queue', UserRoundCheck], ['Reports', '/membership/reports', Activity], ['Audit Log', '/membership/audit', FileText], ['Settings', '/membership/settings', Settings]] },
-  { title: 'SYSTEM', links: [['Reports', '/reports', Activity], ['Audit Log', '/audit-log', FileText], ['Email Log', '/email-log', Mail]] },
+  { title: 'SYSTEM', links: [['Reports', '/reports', Activity], ['Audit Log', '/audit-log', FileText], ['Email History', '/email-log', Mail]] },
 ];
 const titles = Object.fromEntries(navigation.flatMap((section) => section.links.map(([label, path]) => [path, label])));
 

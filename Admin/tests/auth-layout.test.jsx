@@ -76,6 +76,7 @@ describe('admin navigation layout', () => {
     </Route><Route path="/login" element={<p>Login route</p>} /></Routes></MemoryRouter>);
     expect(await screen.findByText('Workspace')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Members/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /Email History/ }).length).toBeGreaterThan(0);
     expect(await screen.findByText('3')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     expect(screen.getByRole('button', { name: 'Close menu' })).toBeInTheDocument();

@@ -7,6 +7,7 @@ import {
   familyPatchSchema,
   familyParamsSchema,
   manualMemberSchema,
+  memberSearchQuerySchema,
   memberPatchSchema,
   membersQuerySchema,
   userParamsSchema,
@@ -15,6 +16,7 @@ import { pointsHistorySchema, pointsUserParamsSchema } from '../../validators/po
 
 const router = Router();
 
+router.get('/search', validate(memberSearchQuerySchema, 'query'), membersController.search);
 router.get('/export', validate(membersQuerySchema, 'query'), membersController.exportCsv);
 router.get('/', validate(membersQuerySchema, 'query'), membersController.list);
 router.post('/', validate(manualMemberSchema), membersController.create);

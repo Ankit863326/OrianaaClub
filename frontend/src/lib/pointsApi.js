@@ -6,7 +6,8 @@ export async function getPoints(options = {}) {
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
   });
-  const suffix = query.size ? `?${query.toString()}` : '';
+  const serialized = query.toString();
+  const suffix = serialized ? `?${serialized}` : '';
   const result = await apiClient.get(`/member/points${suffix}`);
   return result.data;
 }

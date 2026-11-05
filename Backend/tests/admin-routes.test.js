@@ -15,6 +15,7 @@ import EmailLog from '../src/models/EmailLog.js';
 import Counter from '../src/models/Counter.js';
 import PointsLedger from '../src/models/PointsLedger.js';
 import MembershipPlan from '../src/models/MembershipPlan.js';
+import Event from '../src/models/Event.js';
 
 const app = createApp();
 
@@ -728,6 +729,245 @@ describe('admin points, content, enquiry and reports routes', () => {
       .send({ status: 'cancelled' })).status).toBe(200);
     expect((await adminRequest(admin, 'delete', `/api/admin/events/${eventId}`)).status).toBe(200);
     expect(await AuditLog.countDocuments()).toBe(6);
+  });
+
+  test('searches members and queues selected event emails only for eligible recipients', async () => {
+    const admin = await createAdmin();
+    const optedOut = await createMember({
+      firstName: 'Event',
+      emailOptOut: true,
+      profile: { fullName: 'Event Opted Out' },
+    });
+    const inactive = await createMember({
+      firstName: 'Inactive',
+      status: 'suspended',
+      profile: { fullName: 'Inactive Event Member' },
+    });
+    const alreadySent = await createMember({ firstName: 'Already' });
+    const event = await Event.create({
+      title: 'Member event',
+      slug: 'member-event',
+      description: 'An event for members.',
+      date: '2030-01-01',
+      location: 'Mumbai',
+      status: 'published',
+    });
+    await EmailLog.create({
+      to: alreadySent.user.email,
+      template: 'event',
+      status: 'sent',
+      type: 'selected',
+      eventId: event._id,
+      member: alreadySent.user._id,
+    });
+
+    const search = await adminRequest(admin, 'get', '/api/admin/members/search?q=Opted&page=1');
+    expect(search.status).toBe(200);
+    expect(search.body.data.items).toEqual([
+      expect.objectContaining({
+        _id: String(optedOut.user._id),
+        name: 'Event Opted Out',
+        email: optedOut.user.email,
+        status: 'active',
+      }),
+    ]);
+
+    const response = await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-selected`)
+      .send({
+        memberIds: [
+          String(optedOut.user._id),
+          String(optedOut.user._id),
+          String(inactive.user._id),
+          String(alreadySent.user._id),
+          'not-a-member',
+        ],
+      });
+    expect(response.status).toBe(202);
+    expect(response.body.data).toMatchObject({
+      total: 4,
+      queued: 0,
+      skippedOptOut: 1,
+      skippedInvalid: 2,
+      skippedAlreadySent: 1,
+    });
+    expect(await EmailLog.countDocuments({
+      eventId: event._id,
+      member: optedOut.user._id,
+      status: 'skipped',
+      type: 'selected',
+      skipReason: 'email_opt_out',
+    })).toBe(1);
+    const bulk = await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-all`);
+    expect(bulk.status).toBe(202);
+    expect(bulk.body.data).toMatchObject({
+      total: 2,
+      queued: 0,
+      skippedOptOut: 1,
+      skippedInvalid: 0,
+      skippedAlreadySent: 1,
+    });
+    expect(await EmailLog.countDocuments({
+      eventId: event._id,
+      member: optedOut.user._id,
+      status: 'skipped',
+      type: 'bulk',
+      skipReason: 'email_opt_out',
+    })).toBe(1);
+    expect((await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-selected`)
+      .send({ memberIds: [] })).status).toBe(400);
+  });
+
+  test('queues selected and bulk event emails and sends a test to the administrator', async () => {
+    const admin = await createAdmin();
+    const first = await createMember({
+      firstName: 'First',
+      profile: { fullName: 'First Event Member' },
+    });
+    const second = await createMember({
+      firstName: 'Second',
+      profile: { fullName: 'Second Event Member' },
+    });
+    expect(first.user.emailOptOut).toBe(false);
+    const event = await Event.create({
+      title: 'Queue event',
+      slug: 'queue-event',
+      description: 'Details for the email.',
+      date: '2030-04-05',
+      time: '7 PM',
+      location: 'Mumbai',
+      status: 'published',
+    });
+    const transport = globalThis.__orianaMailTransport.sendMail;
+    transport.mockClear();
+
+    const selected = await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-selected`)
+      .send({ memberIds: [String(first.user._id)] });
+    expect(selected.status).toBe(202);
+    expect(selected.body.data).toMatchObject({ total: 1, queued: 1, skippedOptOut: 0, skippedInvalid: 0 });
+    const selectedLog = await EmailLog.findOne({ eventId: event._id, member: first.user._id }).lean();
+    expect(selectedLog).toMatchObject({
+      to: first.user.email,
+      template: 'event',
+      type: 'selected',
+      status: 'queued',
+    });
+
+    const bulk = await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-all`);
+    expect(bulk.status).toBe(202);
+    expect(bulk.body.data).toMatchObject({ total: 2, queued: 1, skippedOptOut: 0, skippedInvalid: 0 });
+    expect(await EmailLog.exists({
+      eventId: event._id,
+      member: second.user._id,
+      type: 'bulk',
+      status: { $in: ['queued', 'sent'] },
+    })).toBeTruthy();
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(transport).toHaveBeenCalledWith(expect.objectContaining({
+      to: expect.stringMatching(/@example\.invalid$/),
+      subject: expect.stringContaining(event.title),
+      html: expect.stringContaining('Details for the email.'),
+    }));
+
+    const test = await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-test`);
+    expect(test.status).toBe(200);
+    expect(test.body.data).toEqual({ queued: 1 });
+    expect(transport).toHaveBeenCalledWith(expect.objectContaining({
+      to: admin.user.email,
+      subject: expect.stringContaining('preview'),
+    }));
+    expect(await EmailLog.exists({
+      eventId: event._id,
+      to: admin.user.email,
+      type: 'test',
+      status: 'sent',
+    })).toBeTruthy();
+  });
+
+  test('delivers all-member event emails in batches of 20 with a three-second pause', async () => {
+    const admin = await createAdmin();
+    await Promise.all(Array.from({ length: 21 }, (_, index) => createMember({
+      firstName: `Batch${index}`,
+    })));
+    const event = await Event.create({
+      title: 'Batch event',
+      slug: 'batch-event',
+      description: 'Batch delivery details.',
+      date: '2030-05-06',
+      location: 'Mumbai',
+      status: 'published',
+    });
+    const transport = globalThis.__orianaMailTransport.sendMail;
+    const sendTimes = [];
+    transport.mockClear();
+    transport.mockImplementation(async () => {
+      sendTimes.push(Date.now());
+      return { messageId: 'batch-test-message' };
+    });
+
+    try {
+      const response = await adminRequest(admin, 'post', `/api/admin/events/${event._id}/send-all`);
+      expect(response.status).toBe(202);
+      expect(response.body.data).toMatchObject({ total: 21, queued: 21 });
+
+      const deadline = Date.now() + 5000;
+      while (transport.mock.calls.length < 21 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(transport).toHaveBeenCalledTimes(21);
+      expect(sendTimes[20] - sendTimes[19]).toBeGreaterThanOrEqual(2900);
+      const logDeadline = Date.now() + 1000;
+      while (await EmailLog.countDocuments({ eventId: event._id, status: 'sent' }) < 21
+        && Date.now() < logDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(await EmailLog.countDocuments({ eventId: event._id, status: 'sent' })).toBe(21);
+    } finally {
+      transport.mockReset().mockResolvedValue({ messageId: 'test-message-id' });
+    }
+  });
+
+  test('returns not found for event email sends when the event does not exist', async () => {
+    const admin = await createAdmin();
+    const missingEvent = '0123456789abcdef01234567';
+    const selected = await adminRequest(admin, 'post', `/api/admin/events/${missingEvent}/send-selected`)
+      .send({ memberIds: ['0123456789abcdef01234567'] });
+    const bulk = await adminRequest(admin, 'post', `/api/admin/events/${missingEvent}/send-all`);
+    const test = await adminRequest(admin, 'post', `/api/admin/events/${missingEvent}/send-test`);
+    expect(selected.status).toBe(404);
+    expect(bulk.status).toBe(404);
+    expect(test.status).toBe(404);
+  });
+
+  test('paginates member search and rejects invalid search pagination', async () => {
+    const admin = await createAdmin();
+    const first = await createMember({
+      firstName: 'Search',
+      profile: { fullName: 'Search First' },
+    });
+    await createMember({
+      firstName: 'Search',
+      profile: { fullName: 'Search Second' },
+    });
+
+    const firstPage = await adminRequest(admin, 'get', '/api/admin/members/search?q=Search&page=1&limit=1');
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.data).toMatchObject({ page: 1, limit: 1, total: 2, pages: 2 });
+    expect(firstPage.body.data.items).toHaveLength(1);
+    expect(firstPage.body.data.items[0]).toMatchObject({
+      _id: String(first.user._id),
+      name: 'Search First',
+    });
+
+    const secondPage = await adminRequest(admin, 'get', '/api/admin/members/search?q=Search&page=2&limit=1');
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.data).toMatchObject({ page: 2, limit: 1, total: 2, pages: 2 });
+    expect(secondPage.body.data.items[0].name).toBe('Search Second');
+
+    const invalidPage = await adminRequest(admin, 'get', '/api/admin/members/search?page=0');
+    const invalidLimit = await adminRequest(admin, 'get', '/api/admin/members/search?limit=51');
+    expect(invalidPage.status).toBe(400);
+    expect(invalidLimit.status).toBe(400);
   });
 
   test('updates enquiry status and notes, reads logs, and exports reports', async () => {

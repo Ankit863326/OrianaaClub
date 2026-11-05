@@ -1,27 +1,32 @@
+import { jest } from '@jest/globals';
+
 const gsap = {
-  registerPlugin: () => {},
-  context: (callback) => {
+  registerPlugin: jest.fn(),
+  context: jest.fn((callback) => {
     callback?.();
-    return { kill: () => {}, revert: () => {} };
-  },
-  matchMedia: () => ({
-    add: (_query, callback) => callback?.(),
-    revert: () => {},
+    return { kill: jest.fn(), revert: jest.fn() };
   }),
-  timeline: () => {
+  matchMedia: jest.fn(() => ({
+    add: jest.fn((_query, callback) => callback?.()),
+    revert: jest.fn(),
+  })),
+  timeline: jest.fn(() => {
     const timeline = {
-      to: () => timeline,
-      fromTo: () => timeline,
-      from: () => timeline,
+      to: jest.fn(() => timeline),
+      fromTo: jest.fn(() => timeline),
+      from: jest.fn(() => timeline),
+      set: jest.fn(() => timeline),
+      call: jest.fn(() => timeline),
+      kill: jest.fn(),
     };
     return timeline;
-  },
-  to: () => ({}),
-  set: () => ({}),
-  killTweensOf: () => {},
-  from: () => ({}),
-  fromTo: () => ({}),
-  utils: { toArray: () => [] },
+  }),
+  to: jest.fn(() => ({})),
+  set: jest.fn(() => ({})),
+  killTweensOf: jest.fn(),
+  from: jest.fn(() => ({})),
+  fromTo: jest.fn(() => ({})),
+  utils: { toArray: jest.fn(() => []) },
 };
 
 export default gsap;

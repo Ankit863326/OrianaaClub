@@ -14,14 +14,35 @@ const emailLogSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['sent', 'failed'],
+    enum: ['queued', 'sent', 'failed', 'skipped'],
     required: true,
+  },
+  type: {
+    type: String,
+    enum: ['selected', 'bulk', 'test'],
+    default: undefined,
+  },
+  eventId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    default: null,
+  },
+  member: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+  skipReason: {
+    type: String,
+    default: '',
   },
   error: {
     type: String,
     default: '',
   },
 }, { timestamps: true });
+
+emailLogSchema.index({ eventId: 1, member: 1, status: 1 });
 
 const EmailLog = mongoose.models.EmailLog || mongoose.model('EmailLog', emailLogSchema);
 

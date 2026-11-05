@@ -243,7 +243,7 @@ export default function HomePage() {
           transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
         >
           <p className="home-eyebrow">A more considered way to get away</p>
-          {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
+          <h1 id="home-hero-title">The Orianaa Club</h1>
           <p className="home-hero__summary">
             A 25-year Lifestyle Membership bringing together stays, wellness,
             dining, celebrations and curated experiences. One invitation to a

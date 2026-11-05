@@ -290,6 +290,9 @@ const schemaCases = [
   [content.postPatchSchema, { title: 'Updated' }, { status: 'draft' }],
   [content.eventCreateSchema, validEvent, { ...validEvent, capacity: '' }],
   [content.eventPatchSchema, { title: 'Updated' }, { capacity: '3' }],
+  [content.eventSendSelectedSchema, { memberIds: ['0123456789abcdef01234567'] }, { memberIds: ['0123456789abcdef01234567'], force: true }],
+  [content.eventSendAllSchema, {}, { force: true }],
+  [admin.memberSearchQuerySchema, {}, { q: ' Asha ', page: '2', limit: '50' }],
   [content.publicPostsQuerySchema, {}, { page: '1', limit: '100', category: ' Travel ' }],
   [content.adminPostsQuerySchema, {}, { status: 'published' }],
   [content.adminEventsQuerySchema, {}, { status: 'cancelled' }],
@@ -315,6 +318,26 @@ const schemaCases = [
 describe.each(schemaCases.map((testCase, index) => [index, ...testCase]))('schema #%i', (index, schema, validValue, edgeValue) => {
   test('accepts a valid value', () => {
     expect(schema.safeParse(validValue).success).toBe(true);
+  });
+
+  describe('event email request validators', () => {
+    test('requires 1 to 500 selected member IDs and accepts optional force', () => {
+      expect(content.eventSendSelectedSchema.safeParse({ memberIds: [] }).success).toBe(false);
+      expect(content.eventSendSelectedSchema.safeParse({
+        memberIds: Array.from({ length: 501 }, (_, index) => String(index)),
+      }).success).toBe(false);
+      expect(content.eventSendSelectedSchema.safeParse({
+        memberIds: ['0123456789abcdef01234567'],
+        force: true,
+      }).success).toBe(true);
+    });
+
+    test('defaults send-all options and restricts email-log statuses', () => {
+      expect(content.eventSendAllSchema.parse({})).toEqual({ force: false });
+      expect(content.emailLogsQuerySchema.safeParse({ status: 'queued' }).success).toBe(true);
+      expect(content.emailLogsQuerySchema.safeParse({ status: 'skipped' }).success).toBe(true);
+      expect(content.emailLogsQuerySchema.safeParse({ status: 'unknown' }).success).toBe(false);
+    });
   });
 
   test('rejects a value with an invalid type or required field', () => {

@@ -19,6 +19,7 @@ const templates = new Set([
   'family-verification-rejected',
   'family-verification-overdue',
   'nominee-confirmation-code',
+  'event',
 ]);
 let transporter;
 let etherealSenderAddress = '';
@@ -67,20 +68,34 @@ async function renderTemplate(template, data) {
     .replaceAll('{{mobile}}', escapeHtml(data.mobile || ''))
     .replaceAll('{{type}}', escapeHtml(data.type || ''))
     .replaceAll('{{message}}', escapeHtml(data.message || ''))
-    .replaceAll('{{supportEmail}}', supportFooter);
+    .replaceAll('{{supportEmail}}', supportFooter)
+    .replaceAll('{{eventTitle}}', escapeHtml(data.eventTitle || ''))
+    .replaceAll('{{eventDescription}}', escapeHtml(data.eventDescription || ''))
+    .replaceAll('{{eventDate}}', escapeHtml(data.eventDate || ''))
+    .replaceAll('{{eventTime}}', escapeHtml(data.eventTime || ''))
+    .replaceAll('{{eventLocation}}', escapeHtml(data.eventLocation || ''));
 }
 
 async function renderPlainText(template, data) {
-  if (!['activation', 'membership-otp', 'family-verification-code', 'nominee-confirmation-code'].includes(template)) return undefined;
+  if (!['activation', 'membership-otp', 'family-verification-code', 'nominee-confirmation-code', 'event'].includes(template)) return undefined;
   const text = await readFile(new URL(`../templates/emails/${template}.txt`, import.meta.url), 'utf8');
   return text
     .replaceAll('{{firstName}}', data.firstName || 'Member')
     .replaceAll('{{link}}', data.link || '')
     .replaceAll('{{expiry}}', data.expiry || '')
-    .replaceAll('{{code}}', data.code || '');
+    .replaceAll('{{code}}', data.code || '')
+    .replaceAll('{{eventTitle}}', data.eventTitle || '')
+    .replaceAll('{{eventDescription}}', data.eventDescription || '')
+    .replaceAll('{{eventDate}}', data.eventDate || '')
+    .replaceAll('{{eventTime}}', data.eventTime || '')
+    .replaceAll('{{eventLocation}}', data.eventLocation || '');
 }
 
-async function logEmail(fields) {
+async function logEmail(fields, id) {
+  if (id) {
+    await EmailLog.findByIdAndUpdate(id, fields, { runValidators: true });
+    return;
+  }
   await EmailLog.create(fields);
 }
 
@@ -146,7 +161,8 @@ export async function verifyMailTransport() {
   }
 }
 
-export async function sendMail({ to, subject, template, data }) {
+export async function sendMail({ to, subject, template, data, logContext = {} }) {
+  const { emailLogId, ...logFields } = logContext;
   let info;
   try {
     const [html, text] = await Promise.all([
@@ -187,9 +203,9 @@ export async function sendMail({ to, subject, template, data }) {
     const code = redactMailSecret(error?.code);
     const message = redactMailSecret(error?.message || 'No error message was provided.');
     const safeError = [error?.name, code, message].filter(Boolean).join(': ');
-    await logEmail({ to, template, status: 'failed', error: safeError });
+    await logEmail({ to, template, ...logFields, status: 'failed', error: safeError }, emailLogId);
     throw error;
   }
 
-  await logEmail({ to, template, status: 'sent', error: '' });
+  await logEmail({ to, template, ...logFields, status: 'sent', error: '' }, emailLogId);
 }

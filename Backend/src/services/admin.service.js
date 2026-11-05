@@ -28,6 +28,53 @@ function pagination(query) {
   return { page, limit, skip: (page - 1) * limit };
 }
 
+export async function searchMembers(query = {}) {
+  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, Number.parseInt(query.limit, 10) || 20));
+  const search = String(query.q || '').trim();
+  const filter = { role: 'member', deletedAt: null };
+  if (search) {
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const expression = new RegExp(escapedSearch, 'i');
+    const matchingProfiles = await Profile.find({ fullName: expression }).distinct('user');
+    filter.$or = [
+      { firstName: expression },
+      { email: expression },
+      { _id: { $in: matchingProfiles } },
+    ];
+  }
+  const [members, total, eligibleTotal] = await Promise.all([
+    User.find(filter).select('_id firstName email status emailVerified emailOptOut createdAt')
+      .sort({ firstName: 1, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+    User.countDocuments(filter),
+    User.countDocuments({
+      role: 'member',
+      deletedAt: null,
+      status: 'active',
+      emailVerified: true,
+      emailOptOut: { $ne: true },
+    }),
+  ]);
+  const profiles = await Profile.find({ user: { $in: members.map((member) => member._id) } })
+    .select('user fullName').lean();
+  const names = new Map(profiles.map((profile) => [String(profile.user), profile.fullName]));
+  return {
+    items: members.map((member) => ({
+      _id: member._id,
+      name: names.get(String(member._id)) || member.firstName,
+      email: member.email,
+      status: member.status,
+      emailVerified: member.emailVerified,
+      emailOptOut: member.emailOptOut,
+    })),
+    page,
+    limit,
+    total,
+    pages: Math.ceil(total / limit),
+    eligibleTotal,
+  };
+}
+
 export async function listMembers(query) {
   const { page, limit, skip } = pagination(query);
   const conditions = [{ role: 'member', deletedAt: null }];

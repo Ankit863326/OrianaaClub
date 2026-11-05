@@ -9,6 +9,11 @@ export const list = asyncHandler(async (request, response) => {
   response.json({ success: true, data, message: 'Members loaded.' });
 });
 
+export const search = asyncHandler(async (request, response) => {
+  const data = await adminService.searchMembers(request.validated.query);
+  response.json({ success: true, data, message: 'Members loaded.' });
+});
+
 export const details = asyncHandler(async (request, response) => {
   const data = await adminService.getMemberDetails(request.validated.params.userId);
   response.json({ success: true, data, message: 'Member details loaded.' });

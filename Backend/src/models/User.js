@@ -34,6 +34,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  emailOptOut: {
+    type: Boolean,
+    default: false,
+  },
   activationEmailStatus: {
     type: String,
     enum: ['not_sent', 'sent', 'resent', 'failed', 'activated'],

@@ -374,6 +374,66 @@ describe('mail, reCAPTCHA, plans, and audit services', () => {
     }));
   });
 
+  test('renders event details and updates a queued email log on delivery success or failure', async () => {
+    const transport = globalThis.__orianaMailTransport;
+    transport.sendMail.mockReset().mockResolvedValue({ messageId: 'event-message' });
+    const eventId = '0123456789abcdef01234567';
+    const memberId = 'abcdef0123456789abcdef01';
+    const successLog = await EmailLog.create({
+      to: 'member@example.invalid',
+      template: 'event',
+      status: 'queued',
+      type: 'selected',
+      eventId,
+      member: memberId,
+    });
+
+    await sendMail({
+      to: 'member@example.invalid',
+      subject: 'OrianaaClub event: Dinner',
+      template: 'event',
+      data: {
+        eventTitle: 'Dinner',
+        eventDescription: '<Bring a friend>',
+        eventDate: '5 April 2030',
+        eventTime: '7 PM',
+        eventLocation: 'Mumbai',
+      },
+      logContext: { emailLogId: successLog._id, type: 'selected', eventId, member: memberId },
+    });
+    expect(transport.sendMail.mock.calls[0][0].html).toContain('&lt;Bring a friend&gt;');
+    expect(transport.sendMail.mock.calls[0][0].html).toContain('5 April 2030');
+    await expect(EmailLog.findById(successLog._id).lean()).resolves.toMatchObject({
+      status: 'sent',
+      type: 'selected',
+      eventId: expect.objectContaining({ toString: expect.any(Function) }),
+    });
+
+    const failureLog = await EmailLog.create({
+      to: 'member2@example.invalid',
+      template: 'event',
+      status: 'queued',
+      type: 'bulk',
+      eventId,
+      member: memberId,
+    });
+    transport.sendMail.mockRejectedValueOnce(Object.assign(new Error('Event SMTP failed'), { code: 'EFAIL' }));
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(sendMail({
+      to: 'member2@example.invalid',
+      subject: 'OrianaaClub event: Dinner',
+      template: 'event',
+      data: { eventTitle: 'Dinner' },
+      logContext: { emailLogId: failureLog._id, type: 'bulk', eventId, member: memberId },
+    })).rejects.toThrow('Event SMTP failed');
+    expect(await EmailLog.findById(failureLog._id).lean()).toMatchObject({
+      status: 'failed',
+      type: 'bulk',
+      error: expect.stringContaining('EFAIL'),
+    });
+    errorLog.mockRestore();
+  });
+
   test('logs real SMTP failure details without exposing the fake password', async () => {
     const transport = globalThis.__orianaMailTransport;
     transport.sendMail.mockReset().mockRejectedValue(Object.assign(

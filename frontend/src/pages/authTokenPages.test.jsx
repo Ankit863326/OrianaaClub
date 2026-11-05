@@ -96,7 +96,7 @@ describe('password setup and reset pages', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Passwords do not match.');
     fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'Password123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reset Password' }));
-    expect(await screen.findByText('Login destination')).toBeInTheDocument();
+    expect(await screen.findByText('Your password has been reset. You can now log in.')).toBeInTheDocument();
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
       token: 'reset-token',
       password: 'Password123',

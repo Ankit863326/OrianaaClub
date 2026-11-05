@@ -263,6 +263,7 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & Continue' }));
 
     expect(await screen.findByRole('button', { name: 'Select Plan' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Select Plan' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Select Plan' }));
     expect(await screen.findByRole('heading', { name: 'Family details' })).toBeInTheDocument();
     expect(screen.queryByText(/early bird/i)).not.toBeInTheDocument();
@@ -276,17 +277,14 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Sam Updated' }));
     await waitFor(() => expect(screen.queryByText(/Sam Updated/)).not.toBeInTheDocument());
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Spouse' }));
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Jo Member' } });
     fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1992-01-01' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
     expect(await screen.findByText(/Jo Member/)).toBeInTheDocument();
 
-    const continueButton = screen.getByRole('button', { name: 'Continue to review' });
-    await waitFor(() => expect(continueButton).toBeEnabled());
-    await act(async () => {
-      fireEvent.click(continueButton);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue to review' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to review' }));
     expect(await screen.findByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
     expect(screen.getByText('14 Oct 1990')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Family profiles and nominees' }))
@@ -416,7 +414,7 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Adult Child' } });
     fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '2000-01-01' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/needs their own membership/i);
+    expect(await screen.findAllByText('This child is over 18 and needs their own membership.')).not.toHaveLength(0);
     expect(fetch.mock.calls.some(([url, options]) => (
       String(url).endsWith('/member/family') && options?.method === 'POST'
     ))).toBe(false);
@@ -467,7 +465,7 @@ describe('integrated membership application and payment flow', () => {
     expect(request[1].body.has('parentSide')).toBe(false);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Extended family' }));
-    const sideSelector = screen.getByLabelText('Whose parent?');
+    let sideSelector = screen.getByLabelText('Whose parent?');
     expect(sideSelector).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Member Father' } });
     fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1960-01-01' } });
@@ -477,18 +475,21 @@ describe('integrated membership application and payment flow', () => {
     expect(fetch.mock.calls.filter(([url, options]) => (
       String(url).endsWith('/member/family') && options?.method === 'POST'
     ))).toHaveLength(2);
+    sideSelector = screen.getByLabelText('Whose parent?');
     fireEvent.change(sideSelector, { target: { value: 'member' } });
-    fireEvent.click(addFamilyButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
     expect(await screen.findByText('Member Father')).toBeInTheDocument();
     request = fetch.mock.calls.filter(([url, options]) => (
       String(url).endsWith('/member/family') && options?.method === 'POST'
     )).at(-1);
     expect(request[1].body.get('parentSide')).toBe('member');
 
+    sideSelector = screen.getByLabelText('Whose parent?');
     fireEvent.change(sideSelector, { target: { value: 'spouse' } });
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Spouse Mother' } });
+    fireEvent.change(screen.getByLabelText('Relationship'), { target: { value: 'Mother' } });
     fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1962-01-01' } });
-    fireEvent.click(addFamilyButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Add family profile' }));
     expect(await screen.findByText('Spouse Mother')).toBeInTheDocument();
     request = fetch.mock.calls.filter(([url, options]) => (
       String(url).endsWith('/member/family') && options?.method === 'POST'
@@ -508,9 +509,11 @@ describe('integrated membership application and payment flow', () => {
     )).at(-1);
     expect(request[1].body.has('parentSide')).toBe(false);
 
-    const continueButton = screen.getByRole('button', { name: 'Continue to review' });
-    await waitFor(() => expect(continueButton).toBeEnabled());
-    fireEvent.click(continueButton);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue to review' })).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue to review' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(await screen.findByRole('heading', { name: 'Personal Details' })).toBeInTheDocument();
     const review = screen.getByRole('region', { name: 'Family profiles and nominees' });
     expect(within(review).getByText('Riya Spouse')).toBeInTheDocument();
@@ -551,6 +554,7 @@ describe('integrated membership application and payment flow', () => {
     setUpApi('not_submitted');
     const refreshUser = jest.fn();
     const onboardingUser = {
+      _id: userId,
       email: 'member@example.test',
       status: 'pending',
       emailVerified: true,
@@ -577,17 +581,34 @@ describe('integrated membership application and payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save & Continue' }));
 
     expect(await screen.findByRole('button', { name: 'Select Plan' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Select Plan' })).toBeEnabled());
     const identityRequest = fetch.mock.calls.find(([url, options]) => String(url).endsWith('/member/identity-verification')
       && options.method === 'PUT');
     expect(identityRequest).toBeDefined();
     expect(identityRequest[1].body.get('panBack')).toBe(panBackPdf);
     fireEvent.click(screen.getByRole('button', { name: 'Select Plan' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Continue to review' }));
+    await screen.findByRole('button', { name: 'Continue to review' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue to review' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to review' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Read full agreement' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Read full agreement' }));
+    const agreementDialog = await screen.findByRole('dialog', { name: 'Orianaa Leisure Membership Agreement' });
+    const agreementText = agreementDialog.querySelector('.terms-modal__text');
+    await waitFor(() => expect(agreementDialog.querySelector('.terms-agreement-content #s1')).toHaveTextContent('धारा 1'));
+    Object.defineProperty(agreementText, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(agreementText, 'scrollHeight', { configurable: true, value: 500 });
+    agreementText.scrollTop = 450;
+    fireEvent.scroll(agreementText);
+    expect(await screen.findByText('You reached the end. You can confirm now.')).toBeInTheDocument();
+    const acknowledgeAgreement = await screen.findByRole('button', { name: 'I have read this' });
+    await waitFor(() => expect(acknowledgeAgreement).toBeEnabled());
+    fireEvent.click(acknowledgeAgreement);
+    const agreementConsent = screen.getByLabelText(/I have read and agree to the Orianaa Leisure Membership Agreement/);
+    await waitFor(() => expect(agreementConsent).toBeEnabled());
+    fireEvent.click(agreementConsent);
+    await waitFor(() => expect(agreementConsent).toBeChecked());
     await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm & Proceed to Payment' })).toBeEnabled());
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm & Proceed to Payment' }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & Proceed to Payment' }));
     expect(await screen.findByRole('heading', { name: 'Select Payment Method' })).toBeInTheDocument();
     fireEvent.click(await screen.findByLabelText('RTGS'));
     fireEvent.change(screen.getByLabelText('RTGS UTR / reference number'), { target: { value: 'ABCD12345678' } });
@@ -858,7 +879,7 @@ describe('integrated membership application and payment flow', () => {
 
     renderMembership();
 
-    expect(await screen.findByText(/You already have an active membership/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'You’re already a member' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Select Plan' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Your Orianaa Club Membership' })).not.toBeInTheDocument();
   });

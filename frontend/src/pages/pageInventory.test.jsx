@@ -29,12 +29,12 @@ describe('public page inventory', () => {
   test('home page renders key links and the event carousel changes its featured story', async () => {
     const { container } = withRouter(<HomePage />);
     expect(screen.getByRole('heading', { name: 'The Orianaa Club' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Explore Resorts' })).toHaveAttribute('href', '/resorts');
+    expect(screen.getByRole('link', { name: 'Explore Destinations' })).toHaveAttribute('href', '/resorts');
     expect(screen.getByRole('button', { name: 'Next event' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Wedding' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Weddings' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next event' }));
     expect(screen.getByRole('heading', { name: 'A slower kind of escape' })).toBeInTheDocument();
-    expect(container.querySelectorAll('.home-destination')).toHaveLength(4);
+    expect(container.querySelectorAll('.home-destination')).toHaveLength(2);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -51,7 +51,7 @@ describe('public page inventory', () => {
     expect(container.querySelector('.ev2-featured__media img')).toHaveAttribute('src', 'http://localhost:5000/media/event.jpg');
     fireEvent.click(screen.getAllByRole('button', { name: 'Discover' })[0]);
     expect(screen.getAllByRole('heading', { name: 'Autumn Retreat' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Explore Events' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Book This Experience' })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -96,7 +96,7 @@ describe('public page inventory', () => {
     expect(screen.getByRole('heading', { name: 'A Taste of Exceptional Living' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Restore. Rebalance. Renew.' })).toBeInTheDocument();
     expect(container.querySelectorAll('.exp-row')).toHaveLength(6);
-    expect(screen.getAllByRole('link', { name: /Join/ })).toHaveLength(7);
+    expect(screen.getAllByRole('link', { name: /Join/ })).toHaveLength(1);
     expect(fetch).not.toHaveBeenCalled();
   });
 

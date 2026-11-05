@@ -22,6 +22,13 @@ const uploadedImagePath = z.string().regex(
 
 export const slugParamsSchema = z.object({ slug });
 export const contentIdParamsSchema = z.object({ id: objectId });
+export const eventSendSelectedSchema = z.object({
+  memberIds: z.array(z.string().trim().min(1).max(100)).min(1).max(500),
+  force: z.boolean().optional().default(false),
+});
+export const eventSendAllSchema = z.object({
+  force: z.boolean().optional().default(false),
+}).default({});
 
 const postFields = z.object({
   title: z.string().trim().min(2).max(180),
@@ -89,7 +96,7 @@ export const auditQuerySchema = pagination.extend({
   to: optionalDate,
 }).refine(({ from, to }) => !from || !to || from <= to, 'The start date must be before the end date.');
 export const emailLogsQuerySchema = pagination.extend({
-  status: z.enum(['sent', 'failed']).optional(),
+  status: z.enum(['queued', 'sent', 'failed', 'skipped']).optional(),
   template: z.string().trim().max(100).optional(),
   search: z.string().trim().max(254).optional(),
   from: optionalDate,

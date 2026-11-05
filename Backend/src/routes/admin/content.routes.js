@@ -12,6 +12,8 @@ import {
   enquiryStatusSchema,
   eventCreateSchema,
   eventPatchSchema,
+  eventSendAllSchema,
+  eventSendSelectedSchema,
   postCreateSchema,
   postPatchSchema,
 } from '../../validators/content.schema.js';
@@ -33,6 +35,9 @@ function createContentRouter(type) {
 
 const posts = createContentRouter('post');
 const events = createContentRouter('event');
+events.post('/:id/send-selected', validate(contentIdParamsSchema, 'params'), validate(eventSendSelectedSchema), controller.sendSelectedEvent);
+events.post('/:id/send-all', validate(contentIdParamsSchema, 'params'), validate(eventSendAllSchema), controller.sendAllEvent);
+events.post('/:id/send-test', validate(contentIdParamsSchema, 'params'), controller.sendTestEvent);
 const enquiries = Router();
 enquiries.get('/', validate(enquiriesQuerySchema, 'query'), controller.enquiries);
 enquiries.get('/summary', controller.enquiryStatusSummary);

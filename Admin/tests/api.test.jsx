@@ -82,6 +82,7 @@ describe('admin API client', () => {
 
     await adminApi.dashboard();
     await adminApi.member('user/1');
+    await adminApi.memberSearch({ q: 'Asha', page: 2, limit: 20 });
     await adminApi.createMember({ firstName: 'Asha' });
     await adminApi.updateMember('user-1', { firstName: 'Mira' });
     await adminApi.memberAction('user-1', 'suspend');
@@ -101,6 +102,9 @@ describe('admin API client', () => {
     await adminApi.createContent('events', { title: 'Dinner' });
     await adminApi.updateContent('posts', 'post-1', { title: 'Edited' });
     await adminApi.deleteContent('events', 'event-1');
+    await adminApi.sendSelectedEvent('event-1', { memberIds: ['member-1'] });
+    await adminApi.sendAllEvent('event-1');
+    await adminApi.sendTestEvent('event-1');
     await adminApi.admins({ page: 1 });
     await adminApi.createAdmin({ email: 'admin@example.invalid' });
     await adminApi.setAdminStatus('admin-1', 'suspended');
@@ -113,6 +117,10 @@ describe('admin API client', () => {
 
     expect(api.get).toHaveBeenCalledWith('/admin/dashboard');
     expect(api.get).toHaveBeenCalledWith('/admin/members/user%2F1');
+    expect(api.get).toHaveBeenCalledWith('/admin/members/search?q=Asha&page=2&limit=20');
+    expect(api.post).toHaveBeenCalledWith('/admin/events/event-1/send-selected', { memberIds: ['member-1'] });
+    expect(api.post).toHaveBeenCalledWith('/admin/events/event-1/send-all', {});
+    expect(api.post).toHaveBeenCalledWith('/admin/events/event-1/send-test', {});
     expect(api.post).toHaveBeenCalledWith('/admin/points/debit', expect.objectContaining({ type: 'debit' }));
     expect(api.post).toHaveBeenCalledWith('/admin/points/bulk-credit', expect.objectContaining({ membershipIds: ['membership-1'] }));
     expect(api.patch).toHaveBeenCalledWith('/admin/admins/admin-1', { status: 'suspended' });

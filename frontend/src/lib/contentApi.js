@@ -12,5 +12,6 @@ function queryString(values) {
   Object.entries(values).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') query.set(key, value);
   });
-  return query.size ? `?${query.toString()}` : '';
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : '';
 }

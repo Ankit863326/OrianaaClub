@@ -20,6 +20,12 @@ export const membersQuerySchema = paginationSchema.extend({
   order: z.enum(['asc', 'desc']).optional(),
 });
 
+export const memberSearchQuerySchema = z.object({
+  q: z.string().trim().max(100).optional().default(''),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(50).optional(),
+});
+
 export const userParamsSchema = z.object({ userId: objectId });
 export const idParamsSchema = z.object({ id: objectId });
 export const familyParamsSchema = z.object({ userId: objectId, familyId: objectId });

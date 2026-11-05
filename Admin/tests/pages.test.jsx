@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import api from '../src/api/client.js';
 import { adminApi } from '../src/api/admin.js';
+import { membershipApi } from '../src/api/membership.js';
 import { useAuth } from '../src/auth/AuthContext.jsx';
 import DashboardPage from '../src/pages/DashboardPage.jsx';
 import LoginPage from '../src/pages/LoginPage.jsx';
@@ -18,15 +19,23 @@ import OperationsPage from '../src/pages/OperationsPage.jsx';
 jest.mock('../src/api/admin.js', () => ({
   adminApi: {
     dashboard: jest.fn(), members: jest.fn(), plans: jest.fn(), member: jest.fn(), createMember: jest.fn(),
+    memberSearch: jest.fn(),
     updateMember: jest.fn(), memberAction: jest.fn(), deleteMember: jest.fn(), updateFamily: jest.fn(),
     deleteFamily: jest.fn(), memberPoints: jest.fn(), points: jest.fn(), payments: jest.fn(), payment: jest.fn(),
     paymentAction: jest.fn(), content: jest.fn(), createContent: jest.fn(), updateContent: jest.fn(),
-    deleteContent: jest.fn(), admins: jest.fn(), createAdmin: jest.fn(), setAdminStatus: jest.fn(),
+    deleteContent: jest.fn(), sendSelectedEvent: jest.fn(), sendAllEvent: jest.fn(), sendTestEvent: jest.fn(),
+    admins: jest.fn(), createAdmin: jest.fn(), setAdminStatus: jest.fn(),
     updatePlan: jest.fn(), createPlan: jest.fn(),
     enquiries: jest.fn(), setEnquiryStatus: jest.fn(), addEnquiryNote: jest.fn(), audit: jest.fn(),
     emails: jest.fn(), reports: jest.fn(),
   },
   downloadCsv: jest.fn(),
+}));
+
+jest.mock('../src/api/membership.js', () => ({
+  membershipApi: {
+    plans: jest.fn(), lookup: jest.fn(), adjustPoints: jest.fn(), ledger: jest.fn(),
+  },
 }));
 
 const plan = {
@@ -63,8 +72,14 @@ function withRoute(element, route = '/') {
 
 beforeEach(() => {
   Object.values(adminApi).forEach((method) => method.mockReset?.());
+  Object.values(membershipApi).forEach((method) => method.mockReset?.());
+  membershipApi.plans.mockResolvedValue({ items: [] });
+  membershipApi.lookup.mockResolvedValue([]);
+  membershipApi.adjustPoints.mockResolvedValue({ balanceAfter: 105 });
+  membershipApi.ledger.mockResolvedValue({ items: [] });
   adminApi.dashboard.mockResolvedValue(dashboard);
   adminApi.members.mockResolvedValue({ items: [memberRecord], page: 1, pages: 2, total: 21 });
+  adminApi.memberSearch.mockResolvedValue({ items: [], page: 1, pages: 1, total: 0, eligibleTotal: 0 });
   adminApi.plans.mockResolvedValue({ items: [plan], page: 1, pages: 1, total: 1 });
   adminApi.member.mockResolvedValue(memberRecord);
   adminApi.updatePlan.mockResolvedValue({});
@@ -84,6 +99,9 @@ beforeEach(() => {
   adminApi.createContent.mockResolvedValue({});
   adminApi.updateContent.mockResolvedValue({});
   adminApi.deleteContent.mockResolvedValue({});
+  adminApi.sendSelectedEvent.mockResolvedValue({ total: 1, queued: 1, skippedOptOut: 0, skippedInvalid: 0 });
+  adminApi.sendAllEvent.mockResolvedValue({ total: 1, queued: 1, skippedOptOut: 0, skippedInvalid: 0 });
+  adminApi.sendTestEvent.mockResolvedValue({ queued: 1 });
   adminApi.admins.mockResolvedValue({ items: [{ _id: 'admin-2', firstName: 'Ravi', email: 'ravi@example.invalid', status: 'active' }], page: 1, pages: 1, total: 1 });
   adminApi.createAdmin.mockResolvedValue({ activationEmailSent: true });
   adminApi.setAdminStatus.mockResolvedValue({});
@@ -118,7 +136,7 @@ describe('dashboard and member administration', () => {
     await waitFor(() => expect(adminApi.members).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
 
     fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
-    const submit = screen.getByRole('button', { name: 'Create member and send activation' });
+    const submit = screen.getByRole('button', { name: 'Create member' });
     expect(screen.getByLabelText('Email')).toBeRequired();
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Mira' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'mira@example.invalid' } });
@@ -134,7 +152,7 @@ describe('dashboard and member administration', () => {
       profile: expect.objectContaining({ fullName: 'Mira Rao' }),
       planSlug: 'gold',
     })));
-    expect(await screen.findByText(/activation email sent/i)).toBeInTheDocument();
+    expect(await screen.findByText('Member created. Send a password link from the member record when ready.')).toBeInTheDocument();
   });
 
   test('member detail tabs show profile, membership, family, payments and ledger; confirms suspension and deletion', async () => {
@@ -193,8 +211,8 @@ describe('dashboard and member administration', () => {
     render(<MemoryRouter initialEntries={['/members/member-1']}><Routes>
       <Route path="/members/:userId" element={<MemberDetailPage />} />
     </Routes></MemoryRouter>);
-    expect(await screen.findByRole('button', { name: 'Resend activation' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Resend activation' }));
+    expect(await screen.findByRole('button', { name: 'Resend password link' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Resend password link' }));
     await waitFor(() => expect(adminApi.memberAction).toHaveBeenCalledWith('member-1', 'resend-activation'));
   });
 });
@@ -224,29 +242,38 @@ describe('plans, points, and payments', () => {
     expect(reason).toBeRequired();
     fireEvent.change(amount, { target: { value: '1.5' } });
     expect(amount.checkValidity()).toBe(false);
-    fireEvent.change(screen.getByLabelText('Membership ID'), { target: { value: 'membership-1' } });
+    fireEvent.change(screen.getByLabelText('Member ID or phone'), { target: { value: 'membership-1' } });
+    membershipApi.lookup.mockResolvedValueOnce({
+      id: 'membership-1', name: 'Asha Rao', tier: 'Gold', status: 'active', pointsBalance: 100,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find member' }));
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
+    expect(reason).toBeInvalid();
     fireEvent.change(amount, { target: { value: '5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit adjustment' }));
-    expect(adminApi.points).not.toHaveBeenCalled();
+    expect(membershipApi.adjustPoints).not.toHaveBeenCalled();
     fireEvent.change(reason, { target: { value: 'Service recovery' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit adjustment' }));
-    await waitFor(() => expect(adminApi.points).toHaveBeenCalledWith(expect.objectContaining({
-      amount: 5, reason: 'Service recovery', type: 'credit', membershipId: 'membership-1',
-    })));
-    expect(await screen.findByRole('status')).toHaveTextContent('Points credited successfully.');
+    await waitFor(() => expect(membershipApi.adjustPoints).toHaveBeenCalledWith('membership-1', {
+      amount: 5, reason: 'Service recovery', direction: '+',
+    }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Points credited successfully. New balance: 105.');
     fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'bulk' } });
     fireEvent.change(screen.getByLabelText('Plan slug'), { target: { value: 'gold' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit adjustment' }));
     await waitFor(() => expect(adminApi.points).toHaveBeenLastCalledWith(expect.objectContaining({
-      amount: 5, filter: { planSlug: 'gold' },
+      amount: 5, reason: 'Service recovery', filter: { planSlug: 'gold' },
     })));
     fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'debit' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit adjustment' }));
-    await waitFor(() => expect(adminApi.points).toHaveBeenLastCalledWith(expect.objectContaining({ amount: 5, type: 'debit' })));
-    fireEvent.change(screen.getByLabelText('Member user ID'), { target: { value: 'user-1' } });
+    await waitFor(() => expect(membershipApi.adjustPoints).toHaveBeenLastCalledWith('membership-1', {
+      amount: 5, reason: 'Service recovery', direction: '-',
+    }));
+    membershipApi.lookup.mockResolvedValueOnce({ id: 'user-1', name: 'Asha Rao', pointsBalance: 100 });
+    fireEvent.change(screen.getByLabelText('Member ID, phone or name'), { target: { value: 'user-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Load history' }));
-    await waitFor(() => expect(adminApi.memberPoints).toHaveBeenCalledWith('user-1', { page: 1, limit: 30 }));
-    expect(await screen.findByText(/Current balance:/)).toHaveTextContent('100');
+    await waitFor(() => expect(membershipApi.ledger).toHaveBeenCalledWith('user-1', { page: 1, limit: 30 }));
+    expect(screen.getAllByText(/Current balance:/).at(-1)).toHaveTextContent('100');
   });
 
   test('reviews bank transfers and submits an approval confirmation', async () => {
@@ -255,7 +282,7 @@ describe('plans, points, and payments', () => {
     expect(await screen.findByText('Asha')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(await screen.findByText('Payment review')).toBeInTheDocument();
-    expect(screen.getByText(/UTR-1/)).toBeInTheDocument();
+    expect(screen.getByLabelText('UTR / reference number')).toHaveValue('UTR-1');
     fireEvent.click(screen.getByRole('button', { name: 'Approve transfer' }));
     fireEvent.click(screen.getByRole('button', { name: 'approve' }));
     await waitFor(() => expect(adminApi.paymentAction).toHaveBeenCalledWith('payment-1', 'approve', {}));
@@ -332,7 +359,7 @@ describe('all operations routes render API records and visible errors', () => {
     ['enquiries', /Enquiries/, 'Mira'],
     ['admins', /Administrators/, 'Ravi'],
     ['audit', /Audit Log/, 'member.updated'],
-    ['email', /Email Log/, 'activation'],
+    ['email', /Email History/, 'activation'],
     ['reports', /Reports/, 'Members by plan'],
   ];
 
@@ -365,7 +392,7 @@ describe('all operations routes render API records and visible errors', () => {
     withRoute(<OperationsPage type="admins" />);
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Amit' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'amit@example.invalid' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Send activation invitation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send password setup invitation' }));
     await waitFor(() => expect(adminApi.createAdmin).toHaveBeenCalledWith({
       firstName: 'Amit', email: 'amit@example.invalid',
     }));
@@ -378,6 +405,126 @@ describe('all operations routes render API records and visible errors', () => {
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'An evening together' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(adminApi.createContent).toHaveBeenCalledWith('events', expect.any(FormData)));
+  });
+
+  test('selects members and confirms the event preview before sending', async () => {
+    adminApi.content.mockResolvedValueOnce({
+      items: [{
+        _id: 'event-1', title: 'Club dinner', description: 'An evening together.',
+        date: '2030-01-01', time: '7 PM', location: 'Mumbai', status: 'published',
+      }],
+      page: 1, pages: 1, total: 1,
+    });
+    adminApi.memberSearch.mockResolvedValue({
+      items: [{ _id: 'member-1', name: 'Asha Rao', email: 'asha@example.invalid', status: 'active', emailVerified: true }],
+      page: 1, pages: 1, total: 1, eligibleTotal: 1,
+    });
+    withRoute(<OperationsPage type="events" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send Email' }));
+    fireEvent.click(await screen.findByRole('checkbox'));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with 1 recipient' }));
+    expect(screen.getByRole('heading', { name: 'Confirm event email' })).toBeInTheDocument();
+    expect(screen.getByText('An evening together.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and send to 1' }));
+    await waitFor(() => expect(adminApi.sendSelectedEvent).toHaveBeenCalledWith('event-1', { memberIds: ['member-1'] }));
+    expect(await screen.findByRole('heading', { name: 'Email request complete' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Email History' })).toHaveAttribute('href', '/email-log');
+  });
+
+  test('preserves member selections across picker pages and searches, and clears them', async () => {
+    adminApi.content.mockResolvedValueOnce({
+      items: [{
+        _id: 'event-1', title: 'Club dinner', description: 'An evening together.',
+        date: '2030-01-01', location: 'Mumbai', status: 'published',
+      }],
+      page: 1, pages: 1, total: 1,
+    });
+    adminApi.memberSearch.mockImplementation(({ q, page }) => {
+      if (q === 'Mira') {
+        return Promise.resolve({
+          items: [{ _id: 'member-3', name: 'Mira Rao', email: 'mira@example.invalid', status: 'active', emailVerified: true }],
+          page: 1, pages: 1, total: 1, eligibleTotal: 3,
+        });
+      }
+      const member = page === 2
+        ? { _id: 'member-2', name: 'Ravi Rao', email: 'ravi@example.invalid', status: 'active', emailVerified: true }
+        : { _id: 'member-1', name: 'Asha Rao', email: 'asha@example.invalid', status: 'active', emailVerified: true };
+      return Promise.resolve({ items: [member], page, pages: 2, total: 2, eligibleTotal: 3 });
+    });
+    withRoute(<OperationsPage type="events" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send Email' }));
+    fireEvent.click(await screen.findByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Ravi Rao')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search members' }), { target: { value: 'Mira' } });
+    expect(await screen.findByText('Mira Rao')).toBeInTheDocument();
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(screen.getByText('0 selected')).toBeInTheDocument();
+  });
+
+  test('confirms sending to all eligible members and shows skipped results', async () => {
+    adminApi.content.mockResolvedValueOnce({
+      items: [{ _id: 'event-1', title: 'Club dinner', description: 'Details', date: '2030-01-01', location: 'Mumbai' }],
+      page: 1, pages: 1, total: 1,
+    });
+    adminApi.memberSearch.mockResolvedValue({
+      items: [], page: 1, pages: 1, total: 0, eligibleTotal: 4,
+    });
+    adminApi.sendAllEvent.mockResolvedValue({
+      total: 4, queued: 2, skippedOptOut: 1, skippedInvalid: 1,
+    });
+    withRoute(<OperationsPage type="events" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send Email' }));
+    fireEvent.click(screen.getByLabelText('All Members'));
+    expect(await screen.findByText(/This will email/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with 4 recipients' }));
+    expect(screen.getByRole('heading', { name: 'Confirm event email' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and send to 4' }));
+    await waitFor(() => expect(adminApi.sendAllEvent).toHaveBeenCalledWith('event-1'));
+    expect(await screen.findByRole('heading', { name: 'Email request complete' })).toBeInTheDocument();
+    expect(screen.getByText(/Skipped/)).toHaveTextContent('Skipped 2');
+    expect(screen.getByText(/Opted out/)).toHaveTextContent('Opted out 1');
+  });
+
+  test('sends a test email to the administrator and reports request failures', async () => {
+    useAuth.mockReturnValue({
+      user: { id: 'admin-1', firstName: 'Admin', email: 'admin@example.invalid' },
+      logout: jest.fn(),
+    });
+    adminApi.content.mockResolvedValueOnce({
+      items: [{ _id: 'event-1', title: 'Club dinner', description: 'Details', date: '2030-01-01', location: 'Mumbai' }],
+      page: 1, pages: 1, total: 1,
+    });
+    withRoute(<OperationsPage type="events" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send Email' }));
+    fireEvent.click(screen.getByLabelText('Test to Me'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('admin@example.invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with 1 recipient' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and send to 1' }));
+    await waitFor(() => expect(adminApi.sendTestEvent).toHaveBeenCalledWith('event-1'));
+    expect(await screen.findByRole('heading', { name: 'Email request complete' })).toBeInTheDocument();
+
+    cleanup();
+    adminApi.memberSearch.mockResolvedValueOnce({
+      items: [{ _id: 'member-1', name: 'Asha Rao', email: 'asha@example.invalid', status: 'active', emailVerified: true }],
+      page: 1, pages: 1, total: 1, eligibleTotal: 1,
+    });
+    adminApi.content.mockResolvedValueOnce({
+      items: [{ _id: 'event-2', title: 'Club launch', description: 'Details', date: '2030-01-01', location: 'Mumbai' }],
+      page: 1, pages: 1, total: 1,
+    });
+    adminApi.sendSelectedEvent.mockRejectedValueOnce({
+      response: { status: 503, data: { message: 'Email service unavailable' } },
+    });
+    withRoute(<OperationsPage type="events" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send Email' }));
+    fireEvent.click(await screen.findByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with 1 recipient' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and send to 1' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email service unavailable');
   });
 
   test('creates and removes blog content and confirms admin status changes', async () => {

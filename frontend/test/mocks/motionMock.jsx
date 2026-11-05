@@ -33,8 +33,13 @@ function createMotionComponent(tag) {
   });
 }
 
+const motionComponents = new Map();
+
 export const motion = new Proxy({}, {
-  get: (_target, tag) => createMotionComponent(tag),
+  get: (_target, tag) => {
+    if (!motionComponents.has(tag)) motionComponents.set(tag, createMotionComponent(tag));
+    return motionComponents.get(tag);
+  },
 });
 export const m = motion;
 export const AnimatePresence = ({ children }) => children;

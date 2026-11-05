@@ -1,11 +1,13 @@
 // This page handles editorial content, enquiries, admin access, reports, and activity logs.
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { adminApi, downloadCsv } from '../api/admin.js';
 import { errorMessage } from '../api/client.js';
 import { getImageUrl } from '../api/image.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { Badge, Button, DataTable, EmptyState, FormField, LoadingState, PageHeading, Pagination, Panel, Toast, controlClass, formatDate, formatPaise, formatPoints } from '../components/ui.jsx';
 import { slugify } from '../utils/slugify.js';
+import EventEmailDialog from '../components/EventEmailDialog.jsx';
 
 const maxImageSize = 10 * 1024 * 1024;
 const pageTitles = {
@@ -14,7 +16,7 @@ const pageTitles = {
   enquiries: ['Enquiries', 'Review public requests and record follow-up notes.'],
   admins: ['Administrators', 'Invite administrators and manage access.'],
   audit: ['Audit Log', 'Review changes made by administrators.'],
-  email: ['Email Log', 'Review notification delivery outcomes.'],
+  email: ['Email History', 'Review notification delivery outcomes.'],
   reports: ['Reports', 'Review membership, revenue, and points summaries.'],
 };
 const newContent = {
@@ -41,6 +43,7 @@ export default function OperationsPage({ type }) {
   const [imagePreview, setImagePreview] = useState('');
   const [selected, setSelected] = useState(null);
   const [note, setNote] = useState('');
+  const [emailEvent, setEmailEvent] = useState(null);
 
   useEffect(() => () => {
     if (imagePreview.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
@@ -265,7 +268,7 @@ export default function OperationsPage({ type }) {
       {loading ? <LoadingState /> : error ? null : <DataTable columns={[
         { key: 'title', label: 'Title' }, { key: 'status', label: 'Status', render: (item) => <Badge>{item.status}</Badge> },
         { key: 'updatedAt', label: 'Updated', render: (item) => formatDate(item.updatedAt) },
-        { key: 'actions', label: 'Actions', render: (item) => <div className="flex gap-2"><Button variant="secondary" onClick={() => {
+        { key: 'actions', label: 'Actions', render: (item) => <div className="flex flex-wrap gap-2">{type === 'events' && <Button variant="gold" onClick={() => setEmailEvent(item)}>Send Email</Button>}<Button variant="secondary" onClick={() => {
           const edit = { ...item };
           if (type === 'events' && edit.date) edit.date = new Date(edit.date).toISOString().slice(0, 10);
         setEditingId(item._id); setAutoSlug(false); setForm(edit); setImagePreview(getImageUrl(edit.coverImage || edit.image));
@@ -322,7 +325,7 @@ export default function OperationsPage({ type }) {
           <input className={controlClass} placeholder="Action" value={filters.action || ''} onChange={(event) => filterField('action', event.target.value)} />
           <input className={controlClass} placeholder="Entity type" value={filters.entityType || ''} onChange={(event) => filterField('entityType', event.target.value)} />
         </> : <>
-          <select className={controlClass} aria-label="Filter email status" value={filters.status || ''} onChange={(event) => filterField('status', event.target.value)}><option value="">All outcomes</option><option value="sent">Sent</option><option value="failed">Failed</option></select>
+          <select className={controlClass} aria-label="Filter email status" value={filters.status || ''} onChange={(event) => filterField('status', event.target.value)}><option value="">All outcomes</option><option value="queued">Queued</option><option value="sent">Sent</option><option value="failed">Failed</option><option value="skipped">Skipped</option></select>
           <input className={controlClass} placeholder="Email recipient" value={filters.search || ''} onChange={(event) => filterField('search', event.target.value)} />
         </>}
       </div>
@@ -332,7 +335,7 @@ export default function OperationsPage({ type }) {
         { key: 'action', label: 'Action' }, { key: 'entityType', label: 'Entity' }, { key: 'summary', label: 'Summary' },
       ]} rows={rows || []} empty="No audit entries match these filters." /> : <DataTable columns={[
         { key: 'createdAt', label: 'When', render: (item) => formatDate(item.createdAt) },
-        { key: 'to', label: 'Recipient' }, { key: 'template', label: 'Template' },
+        { key: 'to', label: 'Recipient' }, { key: 'template', label: 'Template' }, { key: 'type', label: 'Type' },
         { key: 'status', label: 'Status', render: (item) => <Badge>{item.status}</Badge> }, { key: 'error', label: 'Error' },
       ]} rows={rows || []} empty="No email records match these filters." />}
       {!error && <Pagination info={pageInfo} onPage={setPage} />}
@@ -349,6 +352,12 @@ export default function OperationsPage({ type }) {
         <ReportTable title="Points by month" columns={['Month', 'Issued', 'Spent']} rows={(reportData.pointsByMonth || []).map((item) => [item.month, formatPoints(item.issued), formatPoints(item.spent)])} onExport={() => exportReport('points-by-month')} />
       </div> : <EmptyState>No report data is available yet.</EmptyState>}
     </>}
+    {emailEvent && <EventEmailDialog
+      event={emailEvent}
+      adminEmail={user?.email || ''}
+      onClose={() => setEmailEvent(null)}
+      onSent={() => setNotice('Event email request completed.')}
+    />}
   </section>;
 }
 

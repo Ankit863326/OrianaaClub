@@ -2,6 +2,8 @@
 import Post from '../../models/Post.js';
 import Event from '../../models/Event.js';
 import Enquiry from '../../models/Enquiry.js';
+import ApiError from '../../utils/ApiError.js';
+import * as eventEmailService from '../../services/event-email.service.js';
 import * as contentService from '../../services/content-admin.service.js';
 import { recordRequestAction } from '../../services/audit.service.js';
 import asyncHandler from '../../utils/asyncHandler.js';
@@ -42,6 +44,52 @@ export const remove = (type) => asyncHandler(async (request, response) => {
     summary: `Deleted ${type} "${record.title}".`,
   });
   response.json({ success: true, data: null, message: `${type === 'post' ? 'Post' : 'Event'} deleted.` });
+});
+
+async function findEventForEmail(id) {
+  const event = await Event.findById(id);
+  if (!event) throw new ApiError(404, 'Event was not found.');
+  return event;
+}
+
+export const sendSelectedEvent = asyncHandler(async (request, response) => {
+  const event = await findEventForEmail(request.validated.params.id);
+  const result = await eventEmailService.sendSelectedEvent(
+    event,
+    request.validated.body.memberIds,
+    request.validated.body.force,
+  );
+  await recordRequestAction(request, {
+    action: 'event.email.selected',
+    entityType: 'event',
+    entityId: event._id,
+    summary: `Queued ${result.queued} event emails; skipped ${result.total - result.queued}.`,
+  });
+  response.status(202).json({ success: true, data: result, message: 'Event email batch queued.' });
+});
+
+export const sendAllEvent = asyncHandler(async (request, response) => {
+  const event = await findEventForEmail(request.validated.params.id);
+  const result = await eventEmailService.sendAllEvent(event, request.validated.body.force);
+  await recordRequestAction(request, {
+    action: 'event.email.bulk',
+    entityType: 'event',
+    entityId: event._id,
+    summary: `Queued ${result.queued} event emails; skipped ${result.total - result.queued}.`,
+  });
+  response.status(202).json({ success: true, data: result, message: 'Event email batch queued.' });
+});
+
+export const sendTestEvent = asyncHandler(async (request, response) => {
+  const event = await findEventForEmail(request.validated.params.id);
+  await eventEmailService.sendTestEvent(event, request.user.email, request.user.firstName);
+  await recordRequestAction(request, {
+    action: 'event.email.test',
+    entityType: 'event',
+    entityId: event._id,
+    summary: `Sent event email test to ${request.user.email}.`,
+  });
+  response.json({ success: true, data: { queued: 1 }, message: 'Test email sent.' });
 });
 
 export const enquiries = asyncHandler(async (request, response) => {

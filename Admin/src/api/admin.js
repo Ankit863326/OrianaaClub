@@ -16,6 +16,7 @@ const data = (request) => request.then((response) => response.data.data);
 export const adminApi = {
   dashboard: () => data(api.get('/admin/dashboard')),
   members: (filters = {}) => data(api.get(`/admin/members${query(filters)}`)),
+  memberSearch: (filters = {}) => data(api.get(`/admin/members/search${query(filters)}`)),
   drafts: (filters = {}) => data(api.get(`/admin/drafts${query(filters)}`)),
   resendDraftLink: (id) => data(api.post(`/admin/drafts/${encodeURIComponent(id)}/resend-link`, {})),
   markDraftPaid: (id, body) => data(api.post(`/admin/drafts/${encodeURIComponent(id)}/mark-paid`, body)),
@@ -46,6 +47,9 @@ export const adminApi = {
   createContent: (type, body) => data(api.post(`/admin/${type}`, body)),
   updateContent: (type, id, body) => data(api.patch(`/admin/${type}/${id}`, body)),
   deleteContent: (type, id) => data(api.delete(`/admin/${type}/${id}`)),
+  sendSelectedEvent: (id, body) => data(api.post(`/admin/events/${encodeURIComponent(id)}/send-selected`, body)),
+  sendAllEvent: (id, body = {}) => data(api.post(`/admin/events/${encodeURIComponent(id)}/send-all`, body)),
+  sendTestEvent: (id) => data(api.post(`/admin/events/${encodeURIComponent(id)}/send-test`, {})),
   admins: (filters = {}) => data(api.get(`/admin/admins${query(filters)}`)),
   createAdmin: (body) => data(api.post('/admin/admins', body)),
   setAdminStatus: (id, status) => data(api.patch(`/admin/admins/${id}`, { status })),
