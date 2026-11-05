@@ -11,12 +11,12 @@ const roomCategories = [
     id: "deluxe-room",
     name: "Deluxe Rooms",
     shortName: "Deluxe",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Serene & Sophisticated",
     description:
-      "A beautifully appointed room designed for guests who appreciate refined comfort, calm interiors, and a relaxing stay surrounded by nature.",
+      "A thoughtfully appointed room for members seeking comfort, calm interiors, and a restful stay close to nature.",
     longDescription:
-      "The Deluxe Room combines contemporary design with a warm, welcoming atmosphere. Thoughtful furnishings, comfortable sleeping space, and a scenic setting make it ideal for couples and leisure travellers.",
+      "The Deluxe Room pairs contemporary design with a warm, welcoming atmosphere. Thoughtful furnishings and comfortable sleeping space create a restful setting for couples and leisure travellers.",
     size: "420 sq. ft.",
     guests: "Up to 3 Guests",
     bed: "King Bed",
@@ -41,12 +41,12 @@ const roomCategories = [
     id: "premium-deluxe",
     name: "Premium Deluxe Rooms",
     shortName: "Premium Deluxe",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Bespoke Artistry & Comfort",
     description:
-      "A larger and more sophisticated accommodation offering enhanced comfort, elegant interiors, and beautiful views for a memorable resort experience.",
+      "A spacious room with elegant interiors, added comforts, and scenic views for a memorable resort stay.",
     longDescription:
-      "Designed for guests looking for something beyond a standard stay, the Premium Deluxe Room features generous living space, carefully selected details, and a peaceful ambience that complements the resort experience.",
+      "The Premium Deluxe Room offers generous living space, considered details, and a peaceful atmosphere for a relaxed resort stay.",
     size: "480 sq. ft.",
     guests: "Up to 3 Guests",
     bed: "King Bed",
@@ -72,12 +72,12 @@ const roomCategories = [
     id: "executive-room",
     name: "Executive Rooms",
     shortName: "Executive",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Refined Functionality & Elegance",
     description:
-      "A polished accommodation created for guests who value space, privacy, productivity, and premium resort comfort in equal measure.",
+      "A comfortable room for guests who value space, privacy, and a practical place to work or unwind.",
     longDescription:
-      "The Executive Room brings together sophisticated interiors and practical functionality. It is an excellent choice for business travellers, couples, and guests planning a longer leisure stay.",
+      "The Executive Room brings together considered interiors and practical features. It suits business travellers, couples, and guests planning a longer stay.",
     size: "520 sq. ft.",
     guests: "Up to 3 Guests",
     bed: "King Bed",
@@ -103,12 +103,12 @@ const roomCategories = [
     id: "luxury-suite",
     name: "Luxury Suites",
     shortName: "Luxury Suite",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Expansive Lounge & Sanctuary",
     description:
-      "An expansive suite with separate living character, premium furnishings, and an elevated sense of privacy for an indulgent resort stay.",
+      "An expansive suite with a separate living area, premium furnishings, and added privacy for a restful resort stay.",
     longDescription:
-      "The Luxury Suite is designed for guests who prefer extra space and a more exclusive stay. Its elegant sleeping area and comfortable lounge environment create a refined setting for relaxing, entertaining, or simply unwinding.",
+      "The Luxury Suite offers extra space and privacy. An elegant sleeping area and comfortable lounge create a welcoming setting to relax and spend time together.",
     size: "650 sq. ft.",
     guests: "Up to 4 Guests",
     bed: "King Bed",
@@ -134,12 +134,12 @@ const roomCategories = [
     id: "family-suite",
     name: "Family Suites",
     shortName: "Family Suite",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Generous Room for Reconnecting",
     description:
-      "A spacious family-focused accommodation offering generous room to relax, reconnect, and enjoy quality time together.",
+      "A spacious suite with room for families to relax, reconnect, and enjoy time together.",
     longDescription:
-      "The Family Suite is thoughtfully planned for families and small groups. Its generous layout offers a comfortable balance between shared moments and personal space, making it perfect for extended leisure stays.",
+      "The Family Suite is designed for families and small groups. Its generous layout balances shared spaces with room for privacy, making it well suited to longer leisure stays.",
     size: "780 sq. ft.",
     guests: "Up to 5 Guests",
     bed: "King + Twin Beds",
@@ -165,12 +165,12 @@ const roomCategories = [
     id: "honeymoon-suite",
     name: "Honeymoon Suites",
     shortName: "Honeymoon Suite",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Private Sanctuary for Two",
     description:
-      "A romantic private retreat created for couples celebrating love, anniversaries, honeymoons, and unforgettable moments together.",
+      "A private retreat for couples celebrating an anniversary, honeymoon, or time together.",
     longDescription:
-      "The Honeymoon Suite creates an intimate atmosphere with elegant interiors, comfortable living space, and a romantic setting. It is crafted for couples seeking privacy and a memorable escape.",
+      "The Honeymoon Suite offers an intimate atmosphere, elegant interiors, and comfortable living space for couples seeking privacy and a memorable stay.",
     size: "700 sq. ft.",
     guests: "Up to 2 Guests",
     bed: "Luxury King Bed",
@@ -196,12 +196,12 @@ const roomCategories = [
     id: "pool-villa",
     name: "Pool Villa",
     shortName: "Pool Villa",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Secluded Outdoor Oasis",
     description:
-      "A private villa experience designed around space, tranquillity, and exclusive leisure, complete with your own poolside setting.",
+      "A private villa designed for space, tranquillity, and time together, with a poolside setting.",
     longDescription:
-      "The Pool Villa offers a more secluded resort experience for guests who want privacy and premium comfort. A private pool, spacious interiors, and an intimate outdoor setting make it ideal for romantic and family escapes.",
+      "The Pool Villa offers privacy and generous space. Its pool and outdoor setting make it a welcoming choice for couples and families.",
     size: "1,100 sq. ft.",
     guests: "Up to 4 Guests",
     bed: "King Bed",
@@ -227,12 +227,12 @@ const roomCategories = [
     id: "presidential-room",
     name: "Presidential Rooms",
     shortName: "Presidential",
-    eyebrow: "Saptagiri Resort",
+    eyebrow: "Saptagiri Resorts",
     tagline: "Pinnacle of Resort Living",
     description:
-      "Our most exclusive accommodation, combining generous private space, sophisticated interiors, and an elevated villa experience for exceptional stays.",
+      "A spacious accommodation with refined interiors and a private setting for family stays and special occasions.",
     longDescription:
-      "The Presidential Villa represents the highest level of resort accommodation. Created for special occasions, families, VIP guests, and extended stays, it offers expansive spaces and a private atmosphere designed around effortless luxury.",
+      "The Presidential Room offers generous space and privacy for families, special occasions, and longer stays.",
     size: "1,800 sq. ft.",
     guests: "Up to 6 Guests",
     bed: "Multiple Premium Beds",
@@ -411,7 +411,7 @@ export default function RoomCategories() {
             animate="visible"
             variants={heroVariants}
           >
-            <Sparkles size={13} className="destinations-sparkle" /> The Orianaa Universe
+            <Sparkles size={13} className="destinations-sparkle" /> The Saptagiri Resorts vision
           </Motion.p>
           <Motion.h1
             id="destinations-hero-title"
@@ -450,8 +450,8 @@ export default function RoomCategories() {
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <p className="home-eyebrow home-eyebrow--dark">Resort Collection</p>
-          <h2 className="destinations-stays__title">Find Your Perfect Stay With Us</h2>
+          <p className="home-eyebrow home-eyebrow--dark">Saptagiri Resorts</p>
+          <h2 className="destinations-stays__title">Find a stay that feels like yours</h2>
         </Motion.div>
 
         {/* 3-Column Grid Container */}
@@ -466,9 +466,7 @@ export default function RoomCategories() {
               transition={{ duration: 0.6 }}
             >
               <p className="destinations-intro-text">
-                From elegant rooms for a relaxing weekend to expansive villas for special
-                celebrations, our accommodation collection brings together contemporary comfort
-                and the calm character of a resort stay.
+                Explore rooms and suites designed for comfort, privacy, and time together. Each Saptagiri resort is envisioned around its landscape and the people who gather there.
               </p>
             </Motion.div>
 
@@ -800,17 +798,17 @@ export default function RoomCategories() {
                       >
                         <div className="preferred-card__perk">
                           <Sparkles size={11} className="preferred-card__perk-icon" />
-                          <span>Best Rate Guarantee</span>
+                          <span>Member booking support</span>
                         </div>
                         <span className="preferred-card__perk-dot" />
                         <div className="preferred-card__perk">
                           <Check size={11} className="preferred-card__perk-icon" />
-                          <span>Flexible Cancellation</span>
+                          <span>Clear booking terms</span>
                         </div>
                         <span className="preferred-card__perk-dot" />
                         <div className="preferred-card__perk">
                           <Sparkles size={11} className="preferred-card__perk-icon" />
-                          <span>24×7 Concierge</span>
+                          <span>Caring service</span>
                         </div>
                       </Motion.div>
 
@@ -853,16 +851,16 @@ export default function RoomCategories() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <p className="home-eyebrow">Included with Every Stay</p>
-            <h2>Thoughtfully Prepared Comfort</h2>
+            <p className="home-eyebrow">The Saptagiri approach</p>
+            <h2>Comfort, care, and connection</h2>
           </Motion.div>
 
           <div className="destinations-experience__features">
             {[
-              { num: "01", title: "24×7 Concierge Service", desc: "Dedicated staff catering to your every request day and night." },
-              { num: "02", title: "Scenic Private Balconies", desc: "Uninterrupted views of surrounding natural gardens and serene hills." },
-              { num: "03", title: "Artisanal Fine Dining", desc: "In-room dining curated with organic regional produce." },
-              { num: "04", title: "Holistic Wellness Spa", desc: "Complimentary access to our spa and rejuvenation sanctuary." },
+              { num: "01", title: "Member-first care", desc: "Thoughtful service and a warm welcome for every member of the family." },
+              { num: "02", title: "Nature-led settings", desc: "Resorts envisioned to reflect the character of their hills, beaches, and forests." },
+              { num: "03", title: "Vegetarian hospitality", desc: "Fresh, wholesome, and regional vegetarian food, with organic produce where available." },
+              { num: "04", title: "Wellbeing and leisure", desc: "A vision for restorative wellness and activities shaped by each location." },
             ].map((item, idx) => (
               <Motion.div
                 key={item.num}
@@ -894,16 +892,16 @@ export default function RoomCategories() {
           transition={{ duration: 0.7 }}
         >
           <p className="home-eyebrow">Your Sanctuary Awaits</p>
-          <h2>Reserve Your Stay With Orianaa</h2>
+          <h2>Discover Saptagiri Resorts</h2>
           <p>
-            Connect with our membership circle to unlock exclusive benefits, seasonal retreats, and private invitations.
+            Learn about OrianaaClub membership and the nature-led experiences envisioned across the Saptagiri Resorts family.
           </p>
           <Button
             type="button"
             className="home-button home-button--green destinations-cta__button"
             onClick={handleBookNow}
           >
-            Book Now <ArrowRight size={17} aria-hidden="true" />
+            Enquire Now <ArrowRight size={17} aria-hidden="true" />
           </Button>
         </Motion.div>
       </section>

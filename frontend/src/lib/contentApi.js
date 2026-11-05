@@ -4,6 +4,7 @@ import apiClient from './apiClient.js';
 export const contentApi = {
   posts: (filters = {}) => apiClient.get(`/posts${queryString(filters)}`),
   events: (filters = {}) => apiClient.get(`/events${queryString(filters)}`),
+  memberReviews: () => apiClient.get('/stories/reviews'),
   submitEnquiry: (body) => apiClient.post('/enquiries', body),
 };
 

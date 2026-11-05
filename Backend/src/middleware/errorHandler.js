@@ -11,6 +11,7 @@ function redactErrorDetails(value) {
     env.jwtAccessSecret,
     env.jwtRefreshSecret,
     env.recaptchaSecretKey,
+    env.openAiApiKey,
     env.identityDocumentEncryptionKey,
   ].filter((secret) => typeof secret === 'string' && secret.length > 0);
   for (const secret of secrets) message = message.split(secret).join('[redacted]');

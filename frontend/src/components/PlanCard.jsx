@@ -47,6 +47,7 @@ export default function PlanCard({
   selected = false,
   disabled = false,
   featured,
+  visible = false,
 }) {
   const cardRef = useRef(null);
   const isInView = useInView(cardRef, { once: true, margin: '-60px' });
@@ -59,8 +60,8 @@ export default function PlanCard({
     <motion.article
       ref={cardRef}
       className={`mb-card${isFeatured ? ' mb-card--featured' : ''}${selected ? ' mb-card--selected' : ''}`}
-      initial={{ opacity: 0, y: 40 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+      initial={visible ? false : { opacity: 0, y: 40 }}
+      animate={visible || isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
       transition={{ duration: 0.65, delay: (index % 3) * 0.12, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -8, transition: { duration: 0.3 } }}
     >

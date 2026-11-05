@@ -104,7 +104,7 @@ export default function MembershipBenefits() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
           >
-            Absolute Privacy
+            A nature resort club, made for belonging
           </motion.h1>
 
           <motion.p
@@ -113,7 +113,7 @@ export default function MembershipBenefits() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            Distinctive privileges in an exclusive club offering premium amenities, bespoke recreation, and personalized assistance. Orianaa Club is crafted to endure as your lasting family legacy.
+            OrianaaClub is the members-only community envisioned by Saptagiri Resorts: a growing family of nature sanctuaries where discerning families can find restoration, thoughtful hospitality, and a sense of belonging.
           </motion.p>
 
           <motion.div
@@ -148,7 +148,7 @@ export default function MembershipBenefits() {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.15 }}
           >
-            Find the membership made for you
+            Explore the membership plans and find the one that suits you.
           </motion.p>
 
           {/* Points Cohort Explainer Bar */}
@@ -171,7 +171,7 @@ export default function MembershipBenefits() {
             <div className="mb-points-guide__divider" />
             <div className="mb-points-guide__step">
               <span className="mb-points-guide__tag mb-points-guide__tag--default">Default Points</span>
-              <p>Standard baseline points awarded for all subsequent members.</p>
+              <p>Standard points apply to members who join after the early-bird cohorts.</p>
             </div>
           </motion.div>
         </div>

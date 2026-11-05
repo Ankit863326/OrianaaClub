@@ -37,9 +37,60 @@
   box-shadow: 0 16px 40px rgba(13, 74, 57, 0.1);
 }
 
+/* Unselected cards default styling */
+.mb-card:not(.mb-card--selected) {
+  background: #ffffff;
+  border: 1px solid rgba(13, 74, 57, 0.14);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
+}
+
+.mb-card:not(.mb-card--selected):hover {
+  background: #fdfcf9;
+  border-color: rgba(226, 173, 50, 0.55);
+  box-shadow: 0 14px 40px rgba(13, 74, 57, 0.1);
+}
+
+/* Selected plan card (The Current One) - distinctly prestigious deep emerald with glowing gold */
 .mb-card--selected {
-  border-color: var(--mb-gold, #e2ad32);
-  box-shadow: 0 0 0 2px var(--mb-gold, #e2ad32), 0 12px 32px rgba(13, 74, 57, 0.12);
+  background: linear-gradient(155deg, #0d4a39 0%, #063124 100%) !important;
+  border-color: var(--mb-gold, #e2ad32) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 0 0 2.5px #e2ad32,
+    0 18px 48px rgba(13, 74, 57, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+.mb-card--selected .mb-card__title,
+.mb-card--selected .mb-card__cohort-amount,
+.mb-card--selected .mb-card__price {
+  color: #ffffff !important;
+}
+
+.mb-card--selected .mb-card__subtitle,
+.mb-card--selected .mb-card__redemption-rate {
+  color: var(--mb-gold-light, #f1d99c) !important;
+}
+
+.mb-card--selected .mb-card__cohort-label {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.mb-card--selected .mb-card__btn {
+  background: linear-gradient(135deg, #e2ad32 0%, #b88a22 100%) !important;
+  color: #0b1c14 !important;
+  font-weight: 700 !important;
+  border: 1px solid #f8e5b8 !important;
+  box-shadow: 0 4px 18px rgba(226, 173, 50, 0.4) !important;
+}
+
+.mb-card--selected .mb-card__selected-badge {
+  background: linear-gradient(135deg, #e2ad32 0%, #c9931b 100%);
+  color: #082a20;
+  border: 1px solid #f8e5b8;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  font-weight: 750;
+  letter-spacing: 0.05em;
 }
 
 .gold-wave-watermark {

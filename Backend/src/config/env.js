@@ -68,6 +68,8 @@ const razorpayKeyId = process.env.RAZORPAY_KEY_ID || '';
 const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
 const razorpayWebhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
 const recaptchaSecretKey = process.env.RECAPTCHA_SECRET_KEY || '';
+const openAiApiKey = process.env.OPENAI_API_KEY?.trim() || '';
+const openAiModel = process.env.OPENAI_MODEL?.trim() || 'gpt-6-luna';
 const identityDocumentEncryptionKey = process.env.IDENTITY_DOCUMENT_ENCRYPTION_KEY || '';
 const identityDocumentEncryptionKeyIsValid = /^[0-9a-f]{64}$/i.test(identityDocumentEncryptionKey);
 const adminPassword = process.env.ADMIN_PASSWORD || '';
@@ -344,6 +346,8 @@ export const env = Object.freeze({
   razorpayKeySecret,
   razorpayWebhookSecret,
   recaptchaSecretKey,
+  openAiApiKey,
+  openAiModel,
   identityDocumentEncryptionKey,
   identityDocumentEncryptionKeyIsValid,
   adminNotifyEmail: process.env.ADMIN_NOTIFY_EMAIL || '',

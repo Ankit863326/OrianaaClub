@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion as Motion, useInView } from "framer-motion";
 import "./Experiences.css";
 
@@ -24,6 +24,80 @@ const experiences = [
       "Private Candlelight Dinner",
       "Chef's Special Tasting Menu",
     ],
+    items: [
+      {
+        name: "Fine Dining Restaurant",
+        type: "Gourmet",
+        highlight: "Multi-cuisine gourmet dining with master sommelier service",
+        setting: "Indoor Elegance · Dinner & Lunch",
+      },
+      {
+        name: "Pure Vegetarian Restaurant",
+        type: "Satvik",
+        highlight: "Authentic Satvik & traditional regional preparations",
+        setting: "Dedicated Kitchen · Daily",
+      },
+      {
+        name: "Jain Food Available",
+        type: "Jain Special",
+        highlight: "Strict root-free preparations guided by heritage recipes",
+        setting: "Custom Menus on Request",
+      },
+      {
+        name: "Outdoor Garden Dining",
+        type: "Alfresco",
+        highlight: "Alfresco dining canopy surrounded by manicured flora",
+        setting: "Lush Greenery · Twilight",
+      },
+      {
+        name: "Rooftop Restaurant",
+        type: "Panoramic",
+        highlight: "Elevated horizon views paired with artisanal cocktails",
+        setting: "Panoramic Sky Deck · Sunset",
+      },
+      {
+        name: "Coffee Lounge & Café",
+        type: "Artisanal",
+        highlight: "Single-origin pour-overs, artisanal teas & light bites",
+        setting: "All-Day Casual Lounge",
+      },
+      {
+        name: "Bakery & Patisserie",
+        type: "Fresh Bakes",
+        highlight: "Fresh sourdough, French pastries & bespoke celebration cakes",
+        setting: "Handcrafted Daily · In-house",
+      },
+      {
+        name: "Live Barbecue",
+        type: "Open Grill",
+        highlight: "Smoky charcoal skewers & chef-interactive open grill",
+        setting: "Weekend Sundowners · Alfresco",
+      },
+      {
+        name: "Poolside Dining",
+        type: "Cabana Fare",
+        highlight: "Chilled mocktails, wood-fired bites & cabana service",
+        setting: "Deckside Loungers · All Day",
+      },
+      {
+        name: "Sunday Brunch",
+        type: "Grand Buffet",
+        highlight: "Lavish multi-course buffet with live carving stations",
+        setting: "Family Festive · Sundays",
+      },
+      {
+        name: "Private Candlelight Dinner",
+        type: "Romantic",
+        highlight: "Secluded canopy setup with personal butler & floral decor",
+        setting: "By Prior Reservation",
+      },
+      {
+        name: "Chef's Special Tasting Menu",
+        type: "Degustation",
+        highlight: "7-course seasonal degustation journey curated by Executive Chef",
+        setting: "Exclusive Seating · Sommelier Paired",
+      },
+    ],
     image:
       "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1400&q=85",
   },
@@ -43,6 +117,62 @@ const experiences = [
       "Meditation Garden",
       "Fitness Center",
       "Health Club",
+    ],
+    items: [
+      {
+        name: "Luxury Spa",
+        type: "Rejuvenation",
+        highlight: "Holistic skin, facial and sensory rejuvenation rituals",
+        setting: "Private Treatment Suites · By Appointment",
+      },
+      {
+        name: "Ayurvedic Treatments",
+        type: "Panchakarma",
+        highlight: "Classical Panchakarma & herbal therapies by certified vaidyas",
+        setting: "Authentic Healing Sanctuary",
+      },
+      {
+        name: "Massage Therapy",
+        type: "Therapeutic",
+        highlight: "Deep tissue, Balinese & Swedish targeted muscle relief",
+        setting: "Customized Therapeutic Sessions",
+      },
+      {
+        name: "Steam & Sauna",
+        type: "Cedarwood",
+        highlight: "Detoxifying dry cedarwood sauna & aromatic herbal steam",
+        setting: "Separate Men & Women Suites",
+      },
+      {
+        name: "Jacuzzi",
+        type: "Hydrotherapy",
+        highlight: "Temperature-controlled hydrotherapy whirlpool tubs",
+        setting: "Relaxation Lounge Access",
+      },
+      {
+        name: "Yoga Deck",
+        type: "Sunrise Flow",
+        highlight: "Sunrise guided Hatha & Vinyasa flows overlooking nature",
+        setting: "Open-Air Forest Pavilion · Daily",
+      },
+      {
+        name: "Meditation Garden",
+        type: "Mindfulness",
+        highlight: "Tranquil stone trails with babbling fountains for mindful reflection",
+        setting: "Designated Silent Zone",
+      },
+      {
+        name: "Fitness Center",
+        type: "TechnoGym",
+        highlight: "Advanced cardio, free weights & strength resistance equipment",
+        setting: "Personal Trainers Available",
+      },
+      {
+        name: "Health Club",
+        type: "Vitality",
+        highlight: "Vitality consultations, body analysis & lifestyle coaching",
+        setting: "Member Wellness Desk",
+      },
     ],
     image:
       "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1400&q=85",
@@ -76,6 +206,134 @@ const experiences = [
       "Rain Dance",
       "Bonfire Area",
     ],
+    items: [
+      {
+        name: "Swimming Pool",
+        type: "Olympic Size",
+        highlight: "Olympic-standard temperature regulated swimming pool",
+        setting: "Dedicated Lap Lanes · Member Access",
+      },
+      {
+        name: "Kids Pool",
+        type: "Splash Pool",
+        highlight: "Shallow, temperature-safe splash pool with water jets",
+        setting: "Certified Lifeguard on Duty",
+      },
+      {
+        name: "Indoor Games",
+        type: "Billiards & TT",
+        highlight: "Billiards, table tennis, snooker, foosball & classic boards",
+        setting: "Air-Conditioned Game Lounge",
+      },
+      {
+        name: "Outdoor Sports",
+        type: "Athletics",
+        highlight: "Comprehensive multi-sport grounds with pro coaching staff",
+        setting: "Equipment & Gear Provided",
+      },
+      {
+        name: "Cricket Ground",
+        type: "Turf Pitch",
+        highlight: "Full-boundary turf wicket with pavilion & floodlit setup",
+        setting: "Day & Night Tournament Ready",
+      },
+      {
+        name: "Football Turf",
+        type: "FIFA Grade",
+        highlight: "FIFA-standard artificial grass arena for 7-a-side matches",
+        setting: "Shock-Absorbent Turf Surface",
+      },
+      {
+        name: "Volleyball Court",
+        type: "Sand Beach",
+        highlight: "Fine beach sand court with regulation net and perimeter",
+        setting: "Outdoor Sand Arena",
+      },
+      {
+        name: "Badminton Court",
+        type: "Indoor Wood",
+        highlight: "Four competition wooden-cushioned indoor synthetic courts",
+        setting: "Indoor Climate Controlled",
+      },
+      {
+        name: "Basketball Court",
+        type: "Full Court",
+        highlight: "Full-size multi-layer acrylic court with professional hoops",
+        setting: "Evening Floodlit Play",
+      },
+      {
+        name: "Tennis Court",
+        type: "Hard Court",
+        highlight: "Championship standard hard court with tournament markings",
+        setting: "Private Coaching Available",
+      },
+      {
+        name: "Pickleball Court",
+        type: "Dual Courts",
+        highlight: "Fast-growing paddle sport courts for social & competitive play",
+        setting: "Social Mixers & Tournaments",
+      },
+      {
+        name: "Cycling",
+        type: "Paved Trails",
+        highlight: "Paved club perimeter tracks with premium mountain & hybrid bikes",
+        setting: "Scenic Trail Map & Helmets",
+      },
+      {
+        name: "Nature Trails",
+        type: "Eco Walks",
+        highlight: "Guided flora, bird-watching and biodiversity morning trails",
+        setting: "Resort Eco Sanctuary Walk",
+      },
+      {
+        name: "Adventure Zone",
+        type: "Rope Courses",
+        highlight: "Challenging rope bridges, balance beams & cargo net traverses",
+        setting: "Supervised Safety Harnesses",
+      },
+      {
+        name: "Rock Climbing",
+        type: "40ft Wall",
+        highlight: "40-ft artificial natural-grip climbing wall with belaying ropes",
+        setting: "Multiple Route Grades",
+      },
+      {
+        name: "Zip Line",
+        type: "Canopy Aerial",
+        highlight: "Canopy-high gravity zip wire cruising over resort greenery",
+        setting: "Dual Steel Cable Safety",
+      },
+      {
+        name: "Archery",
+        type: "Target Range",
+        highlight: "Precision recurve & compound target shooting range",
+        setting: "Instructor Led Practice",
+      },
+      {
+        name: "ATV Rides",
+        type: "Dirt Circuit",
+        highlight: "250cc all-terrain quad bikes on engineered off-road dirt trails",
+        setting: "Dedicated Off-Road Circuit",
+      },
+      {
+        name: "Horse Riding",
+        type: "Equestrian",
+        highlight: "Gentle equestrian horses with guided paddock walk & lessons",
+        setting: "Equestrian Arena & Stable",
+      },
+      {
+        name: "Rain Dance",
+        type: "Mist Arena",
+        highlight: "High-pressure overhead mist shower arena with sound beats",
+        setting: "Non-slip Party Floor",
+      },
+      {
+        name: "Bonfire Area",
+        type: "Starlit Pit",
+        highlight: "Sunken stone amphitheatre pit for stargazing & campfire talks",
+        setting: "Evening Acoustic Gatherings",
+      },
+    ],
     image:
       "https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&w=1400&q=85",
   },
@@ -95,6 +353,62 @@ const experiences = [
       "DJ Nights",
       "Open Air Theatre",
       "Weekend Entertainment",
+    ],
+    items: [
+      {
+        name: "Children's Play Area",
+        type: "Child-Safe",
+        highlight: "Ergonomic safe play structures, tunnels, swings and slides",
+        setting: "Impact-Absorbing Rubber Floor",
+      },
+      {
+        name: "Kids Club",
+        type: "Arts & Crafts",
+        highlight: "Supervised pottery, creative painting, origami & storytelling",
+        setting: "Dedicated Youth Coordinators",
+      },
+      {
+        name: "Gaming Zone",
+        type: "PS5 & VR",
+        highlight: "PlayStation 5, Xbox Series X, VR simulation & classic arcades",
+        setting: "High-Tech Gaming Arena",
+      },
+      {
+        name: "Movie Nights",
+        type: "Starlit Cinema",
+        highlight: "Open-air screenings of family classics with gourmet popcorn",
+        setting: "Under the Stars · Weekends",
+      },
+      {
+        name: "Live Music",
+        type: "Unplugged",
+        highlight: "Acoustic indie sessions, jazz trios & unplugged performances",
+        setting: "Lawn Amphitheatre Evenings",
+      },
+      {
+        name: "Cultural Programs",
+        type: "Heritage Acts",
+        highlight: "Heritage folk dances, classical music recitals & art showcases",
+        setting: "Festive & Seasonal Specials",
+      },
+      {
+        name: "DJ Nights",
+        type: "Club Lounge",
+        highlight: "Resident DJs spinning high-energy lounge & dance grooves",
+        setting: "Saturday Night Club Lounge",
+      },
+      {
+        name: "Open Air Theatre",
+        type: "Amphitheatre",
+        highlight: "Stepped amphitheatre hosting plays, drama & musical revues",
+        setting: "Full Acoustic Stage Sound",
+      },
+      {
+        name: "Weekend Entertainment",
+        type: "Carnivals",
+        highlight: "Illusionists, stand-up comedy, street carnivals & puppet acts",
+        setting: "Curated Sunday Family Specials",
+      },
     ],
     image:
       "https://images.unsplash.com/photo-1504150558240-0b4fd8946624?auto=format&fit=crop&w=1400&q=85",
@@ -122,6 +436,98 @@ const experiences = [
       "Photography & Videography",
       "Artist & Celebrity Performances",
     ],
+    items: [
+      {
+        name: "Grand Banquet Hall",
+        type: "1500 Guests",
+        highlight: "Pillarless royal ballroom featuring crystal chandeliers & grand foyer",
+        setting: "Capacity up to 1,500 Guests",
+      },
+      {
+        name: "Premium Wedding Lawn",
+        type: "2500 Guests",
+        highlight: "Expansive manicured lawn with natural sunset & mountain backdrops",
+        setting: "Capacity up to 2,500 Guests",
+      },
+      {
+        name: "Destination Wedding Packages",
+        type: "Turnkey",
+        highlight: "Turnkey multi-day royal celebrations with full guest hospitality",
+        setting: "End-to-End Concierge Curation",
+      },
+      {
+        name: "Reception Packages",
+        type: "Royal Gala",
+        highlight: "Bespoke stage production, thematic lighting & gala silver banquet",
+        setting: "Tailored Luxury Themes",
+      },
+      {
+        name: "Engagement Ceremony",
+        type: "Intimate",
+        highlight: "Romantic indoor & open-sky setups for ring exchange & dinner",
+        setting: "Intimate Courtyard / Ballroom",
+      },
+      {
+        name: "Haldi Ceremony Setup",
+        type: "Floral Theme",
+        highlight: "Vibrant yellow floral decor, traditional urlis & poolside vibes",
+        setting: "Sunny Garden / Poolside Deck",
+      },
+      {
+        name: "Mehendi Setup",
+        type: "Boho Cabana",
+        highlight: "Boho chic cabanas, marigold drapes, swings & festive music",
+        setting: "Outdoor Gazebo Lawns",
+      },
+      {
+        name: "Sangeet Stage",
+        type: "Line-Array LED",
+        highlight: "Concert-grade intelligent lighting, line-array audio & LED wall",
+        setting: "High-Energy Dance Stage",
+      },
+      {
+        name: "Bridal Suite",
+        type: "Luxury Vanity",
+        highlight: "Opulent dressing chambers with vanity mirrors, lounge & salon access",
+        setting: "Private Dedicated Wing",
+      },
+      {
+        name: "Groom Lounge",
+        type: "Executive Bar",
+        highlight: "Sophisticated executive lounge with refreshments & grooming assistance",
+        setting: "Quiet Pre-Event Sanctuary",
+      },
+      {
+        name: "Wedding Planning Assistance",
+        type: "Concierge",
+        highlight: "Dedicated event directorship overseeing timelines, guests & protocol",
+        setting: "Personalized Concierge Team",
+      },
+      {
+        name: "Décor Services",
+        type: "Architectural",
+        highlight: "Master floral artisans & contemporary architectural set design",
+        setting: "Custom Floral & Light Concepts",
+      },
+      {
+        name: "Catering Services",
+        type: "Master Chefs",
+        highlight: "Global cuisine counters, regional thalis & interactive live galleys",
+        setting: "Master Chef Curated Menus",
+      },
+      {
+        name: "Photography & Videography",
+        type: "Drone Shoots",
+        highlight: "Scenic heritage spots, cinematic drone permits & sunset photo decks",
+        setting: "Pre-Wedding & Event Shoots",
+      },
+      {
+        name: "Artist & Celebrity Performances",
+        type: "Concert Stage",
+        highlight: "Green rooms, rider management & concert production coordination",
+        setting: "Live Entertainment Ready",
+      },
+    ],
     image:
       "https://cdn0.weddingwire.in/article/1478/3_2/960/jpg/78741-intimate-weddings-creative-wedding-photography-lead-image.jpeg",
   },
@@ -143,10 +549,141 @@ const experiences = [
       "High-Speed Internet",
       "Audio Visual Equipment",
     ],
+    items: [
+      {
+        name: "Conference Hall",
+        type: "500 Delegates",
+        highlight: "Tiered executive seating, precision acoustics & motorized 4K projection",
+        setting: "Accommodates up to 500 Delegates",
+      },
+      {
+        name: "Board Room",
+        type: "24-Seater",
+        highlight: "Ergonomic leather chairs, telepresence conference hub & private pantry",
+        setting: "24-Seater Executive Suite",
+      },
+      {
+        name: "Meeting Rooms",
+        type: "Breakout Hubs",
+        highlight: "Flexible modular breakout spaces with wireless screen mirroring",
+        setting: "Multiple Configurations",
+      },
+      {
+        name: "Corporate Retreat Packages",
+        type: "All-Inclusive",
+        highlight: "Curated blending of strategic offsites, team dining & spa unwind",
+        setting: "Residential All-Inclusive Offsites",
+      },
+      {
+        name: "Team Building Activities",
+        type: "Facilitated",
+        highlight: "Outbound obstacle courses, cricket tournaments & leadership games",
+        setting: "Led by Certified Facilitators",
+      },
+      {
+        name: "Product Launch Events",
+        type: "Reveal Staging",
+        highlight: "Dramatic reveal ramps, immersive high-lumen video walls & media lounge",
+        setting: "Brand Experience Staging",
+      },
+      {
+        name: "Annual Conferences",
+        type: "Full Production",
+        highlight: "Comprehensive hospitality, delegate registration & breakout sessions",
+        setting: "Full-Day Conference Facility",
+      },
+      {
+        name: "Training Programs",
+        type: "Smart Screens",
+        highlight: "Classroom and cluster layouts with smart digital whiteboards",
+        setting: "Quiet Learning Environment",
+      },
+      {
+        name: "High-Speed Internet",
+        type: "1 Gbps Leased",
+        highlight: "Dedicated 1 Gbps symmetric fiber leased line with guest VLAN",
+        setting: "Uninterrupted Redundant Wi-Fi",
+      },
+      {
+        name: "Audio Visual Equipment",
+        type: "4K Laser Tech",
+        highlight: "Shure digital wireless mics, 4K laser projectors & hybrid video kit",
+        setting: "Dedicated Tech Sound Engineer",
+      },
+    ],
     image:
       "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1400&q=85",
   },
 ];
+
+const experienceCopy = {
+  dining: {
+    category: "Pure Vegetarian Hospitality",
+    heading: "Nourishment with a sense of place",
+    description: "Saptagiri Resorts envisions fresh, wholesome, sattvic, and regional vegetarian cuisine, with organic produce where available.",
+    items: [
+      { name: "Pure vegetarian cuisine", type: "Members first", highlight: "Wholesome vegetarian food prepared with care.", setting: "At Saptagiri Resorts" },
+      { name: "Sattvic choices", type: "Mindful dining", highlight: "Sattvic options as part of a thoughtful dining experience.", setting: "Availability may vary by resort" },
+      { name: "Regional flavours", type: "Local traditions", highlight: "Regional vegetarian dishes shaped by local food traditions.", setting: "Inspired by each location" },
+      { name: "Organic produce", type: "Where available", highlight: "Organic ingredients used where available.", setting: "Seasonal and locally informed" },
+    ],
+  },
+  wellness: {
+    category: "Holistic Wellness",
+    heading: "Restore. Rebalance. Renew.",
+    description: "Our vision for long-term wellbeing brings together naturopathy, spa, yoga, fitness, and time to reconnect with nature.",
+    items: [
+      { name: "Naturopathy", type: "Natural wellbeing", highlight: "Naturopathy as part of a considered approach to long-term wellbeing.", setting: "At selected resorts" },
+      { name: "Spa", type: "Rest and renewal", highlight: "Spa experiences designed to support rest and relaxation.", setting: "At selected resorts" },
+      { name: "Yoga", type: "Mindful movement", highlight: "Space for yoga and mindful movement.", setting: "Shaped by each location" },
+      { name: "Fitness and swimming", type: "Everyday vitality", highlight: "Fitness facilities, a gym, and swimming as part of an active lifestyle.", setting: "Facilities vary by resort" },
+    ],
+  },
+  sports: {
+    category: "Active Leisure",
+    heading: "Move. Play. Explore.",
+    description: "Enjoy nature walks and indoor and outdoor activities for all ages, with experiences shaped by each resort’s setting.",
+    items: [
+      { name: "Nature walks", type: "Explore outdoors", highlight: "Take time to discover the landscape around you.", setting: "Routes vary by location" },
+      { name: "Indoor games", type: "Play together", highlight: "Enjoy relaxed games with family and friends.", setting: "At selected resorts" },
+      { name: "Outdoor games", type: "Fresh-air fun", highlight: "Make room for active play outdoors.", setting: "Activities vary by resort" },
+      { name: "All-age activities", type: "Time together", highlight: "Leisure experiences designed with different ages in mind.", setting: "Shaped by each location" },
+    ],
+  },
+  family: {
+    category: "Members First",
+    heading: "A familiar welcome, wherever you go",
+    description: "OrianaaClub is envisioned around priority reservations, personalised care, and recognition across the Saptagiri Resorts family.",
+    items: [
+      { name: "Priority reservations", type: "Members first", highlight: "Member-first reservation support across the resort community.", setting: "Subject to availability and membership terms" },
+      { name: "Personalised care", type: "Thoughtful service", highlight: "Attentive service shaped around members and their families.", setting: "At every member touchpoint" },
+      { name: "A sense of belonging", type: "Familiar comfort", highlight: "A warm welcome and familiar comforts throughout the Saptagiri family.", setting: "Across the resort community" },
+      { name: "Time together", type: "For every generation", highlight: "Make space for shared moments with family and friends.", setting: "At your own pace" },
+    ],
+  },
+  weddings: {
+    category: "Comfort and Celebrations",
+    heading: "Gather for life’s meaningful moments",
+    description: "Well-appointed rooms, suites, and banquet spaces are envisioned for member weddings, family gatherings, milestone celebrations, and retreats.",
+    items: [
+      { name: "Member weddings", type: "Celebrate together", highlight: "A nature-led setting for member weddings and celebrations.", setting: "Enquire about availability" },
+      { name: "Family gatherings", type: "Togetherness", highlight: "Bring loved ones together in a welcoming resort setting.", setting: "At selected resorts" },
+      { name: "Milestone celebrations", type: "Special occasions", highlight: "Mark life’s important moments with family and friends.", setting: "Enquire about arrangements" },
+      { name: "Member retreats", type: "Rest and renewal", highlight: "Make space for a restorative retreat amid nature.", setting: "Shaped by each location" },
+    ],
+  },
+  corporate: {
+    category: "Retreats and Gatherings",
+    heading: "A change of setting, a chance to reconnect",
+    description: "Saptagiri Resorts envisions peaceful settings for retreats and gatherings, with experiences shaped by the surrounding landscape.",
+    items: [
+      { name: "Nature retreats", type: "Rest and renewal", highlight: "Step away from routine and reconnect with nature.", setting: "Enquire about availability" },
+      { name: "Wellbeing retreats", type: "Mind and body", highlight: "Create time for rest, movement, and wellbeing.", setting: "At selected resorts" },
+      { name: "Family gatherings", type: "Time together", highlight: "A welcoming setting for families to gather.", setting: "Enquire about arrangements" },
+      { name: "Private celebrations", type: "Meaningful moments", highlight: "Celebrate milestones in a peaceful resort setting.", setting: "Shaped by each location" },
+    ],
+  },
+};
 
 /* ─── Animation Variants ─────────────────────────────────── */
 const fadeLeft = {
@@ -174,6 +711,19 @@ function ExperienceRow({ exp, index }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
   const isAlt = index % 2 === 1; // alternate bg only, layout stays image-left
+
+  const items =
+    exp.items ||
+    (exp.tags || []).map((tag) => ({
+      name: tag,
+      type: "Curated",
+      highlight: tag,
+      setting: "Member Access",
+    }));
+
+  const midpoint = Math.ceil(items.length / 2);
+  const table1Items = items.slice(0, midpoint);
+  const table2Items = items.slice(midpoint);
 
   return (
     <div ref={ref} className={`exp-row ${isAlt ? "exp-row--alt" : ""}`}>
@@ -239,41 +789,53 @@ function ExperienceRow({ exp, index }) {
           {exp.description}
         </Motion.p>
 
-        {/* ALL Tags */}
+        {/* ── Two-part offering directory ── */}
         <Motion.div
-          className="exp-row__tags"
-          variants={staggerTags}
-          initial="hidden"
-          animate={inView ? "visible" : "hidden"}
+          className="exp-dual-card"
+          initial={{ opacity: 0, y: 18 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.4 }}
         >
-          {exp.tags.map((tag) => (
-            <Motion.span
-              key={tag}
-              className="exp-row__tag"
-              variants={tagVariant}
-              whileHover={{
-                scale: 1.08,
-                backgroundColor: "#e2ad32",
-                color: "#111310",
-                transition: { duration: 0.22 },
-              }}
-            >
-              {tag}
-            </Motion.span>
-          ))}
+          <div className="exp-dual-card__header">
+            <span className="exp-dual-card__kicker">Curated Directory</span>
+            <span className="exp-dual-card__badge">
+              <span className="exp-dual-card__badge-dot" />
+              {items.length} Offerings
+            </span>
+          </div>
+
+          <div className="exp-dual-card__body">
+            <div className="exp-offering-columns">
+              {[table1Items, table2Items].map((group, groupIndex) => (
+                <div className="exp-offering-column" role="list" key={`offering-part-${groupIndex}`}>
+                  {group.map((item, idx) => {
+                    const itemNumber = groupIndex === 0 ? idx + 1 : midpoint + idx + 1;
+                    return (
+                      <div key={item.name} className="exp-offering-item" role="listitem">
+                        <span className="exp-offering-item__number">{String(itemNumber).padStart(2, "0")}</span>
+                        <span className="exp-offering-item__name" title={item.highlight}>{item.name}</span>
+                        <span className="exp-offering-item__type">{item.type}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
         </Motion.div>
 
         {/* Join button */}
         <Motion.a
           href="/luxury-membership"
           className="exp-row__btn"
+          aria-label="Join Membership"
           initial={{ opacity: 0, y: 14 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.65 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.96 }}
         >
-          Explore <span>→</span>
+          Join Membership <span>→</span>
         </Motion.a>
       </Motion.div>
     </div>
@@ -357,7 +919,7 @@ const Experiences = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.2 }}
           >
-            THE SAPTAGIRI EXPERIENCE
+            THE SAPTAGIRI RESORTS VISION
           </Motion.p>
 
           <Motion.h1
@@ -377,9 +939,9 @@ const Experiences = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.72 }}
           >
-            Discover a world of refined experiences — from exquisite dining and
-            restorative wellness to celebrations, adventures, and meaningful
-            moments together.
+            Discover the Saptagiri Resorts vision: pure vegetarian hospitality,
+            holistic wellness, active leisure, and meaningful time together in
+            nature.
           </Motion.p>
 
           <Motion.a
@@ -426,7 +988,7 @@ const Experiences = () => {
 
         <div className="exp-rows">
           {experiences.map((exp, i) => (
-            <ExperienceRow key={exp.id} exp={exp} index={i} />
+            <ExperienceRow key={exp.id} exp={{ ...exp, ...experienceCopy[exp.id] }} index={i} />
           ))}
         </div>
       </section>
@@ -462,7 +1024,7 @@ const Experiences = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.7, delay: 0.2 }}
             >
-              Join The<br />Orianaa Club
+              Join<br />OrianaaClub
             </Motion.h2>
 
             <Motion.p
@@ -472,8 +1034,8 @@ const Experiences = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.34 }}
             >
-              Join our circle for private invitations and stories from the
-              Orianaa world.
+              Become part of a members-only community shaped by Saptagiri Resorts
+              and a shared appreciation for nature, wellbeing, and togetherness.
             </Motion.p>
 
             <Motion.a

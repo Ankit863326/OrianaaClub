@@ -15,6 +15,7 @@ import billingRoutes from './billing.routes.js';
 import membershipDraftRoutes from './membership-draft.routes.js';
 import termsRoutes from './terms.routes.js';
 import membershipTermsRoutes from './membership-terms.routes.js';
+import chatbotRoutes from './chatbot.routes.js';
 import { health } from '../controllers/health.controller.js';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.use('/payments', paymentRoutes);
 router.use('/membership/draft', membershipDraftRoutes);
 router.use('/terms', termsRoutes);
 router.use('/membership/applications', membershipTermsRoutes);
+router.use('/chatbot', chatbotRoutes);
 router.use('/membership', membershipPurchaseRoutes);
 router.use('/webhooks/razorpay', membershipWebhookRoutes);
 router.use(contentRoutes);

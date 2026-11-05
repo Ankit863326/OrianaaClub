@@ -9,6 +9,14 @@ export async function getMyMembership() {
   return data(await apiClient.get('/me/membership'));
 }
 
+export async function getMyReview() {
+  return data(await apiClient.get('/member/review'));
+}
+
+export async function saveMyReview(review) {
+  return data(await apiClient.put('/member/review', review));
+}
+
 export async function getMyPayments() {
   return data(await apiClient.get('/me/payments'));
 }

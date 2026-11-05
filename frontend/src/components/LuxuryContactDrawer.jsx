@@ -49,10 +49,10 @@ const shimmerMotion = {
 };
 
 const interestAreas = [
-  { value: "membership", label: "Luxury Membership" },
-  { value: "resorts", label: "Resorts & Stays" },
-  { value: "wellness", label: "Wellness & Spa" },
-  { value: "dining", label: "Fine Dining" },
+  { value: "membership", label: "OrianaaClub Membership" },
+  { value: "resorts", label: "Saptagiri Resorts and Stays" },
+  { value: "wellness", label: "Wellness and Spa" },
+  { value: "dining", label: "Pure Vegetarian Dining" },
   { value: "events", label: "Events & Celebrations" },
   { value: "general", label: "General Enquiry" },
 ];
@@ -422,7 +422,7 @@ export default function LuxuryContactDrawer({ open, onOpenChange }) {
                 animate="visible"
                 variants={headerMotion}
               >
-                Orianaa Club
+                Saptagiri Resorts · OrianaaClub
               </Motion.div>
               <Motion.h2
                 id="lux-contact-title"
@@ -440,7 +440,7 @@ export default function LuxuryContactDrawer({ open, onOpenChange }) {
                 animate="visible"
                 variants={headerMotion}
               >
-                A 25-year lifestyle membership bringing together stays, wellness, dining, and curated experiences.
+                A members-only nature resort community focused on wellbeing, pure vegetarian hospitality, and time together.
               </Motion.p>
               <Motion.div
                 className="lux-contact__divider"
@@ -472,7 +472,7 @@ export default function LuxuryContactDrawer({ open, onOpenChange }) {
                 </div>
                 <p className="lux-contact__success-eyebrow">Thank you</p>
                 <h3>Your enquiry is with us.</h3>
-                <p>Our concierge team will reach out shortly with a personal note from the Orianaa family.</p>
+                <p>Our team will be in touch soon about your Saptagiri Resorts and OrianaaClub enquiry.</p>
                 <Button type="button" className="home-button home-button--green lux-contact__success-btn" onClick={runCloseAnimation}>
                   Close
                 </Button>
@@ -725,7 +725,7 @@ export default function LuxuryContactDrawer({ open, onOpenChange }) {
                       </svg>
                     </span>
                     <span className="lux-contact__checkbox-label">
-                      I agree to receive promotional SMS/MMS messages from Orianaa Club.
+                      I agree to receive promotional SMS and MMS messages from OrianaaClub.
                     </span>
                   </label>
                   {fieldErrors.agreePromo ? (
@@ -761,7 +761,7 @@ export default function LuxuryContactDrawer({ open, onOpenChange }) {
                     <ArrowRight size={17} aria-hidden="true" />
                   </Button>
                   <p className="lux-contact__fine-print">
-                    Your information is secure and will only be used by Orianaa Club.
+                    Your information will be used by OrianaaClub to respond to your enquiry.
                   </p>
                 </Motion.div>
               </form>

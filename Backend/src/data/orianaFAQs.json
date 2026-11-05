@@ -1,0 +1,178 @@
+{
+  "categories": [
+    {
+      "id": "membership",
+      "name": "Membership FAQs",
+      "faqs": [
+        {
+          "id": "club-overview",
+          "question": "What is OrianaaClub?",
+          "keywords": {
+            "en": ["what is orianaaclub", "club", "members only", "membership", "saptagiri", "holiday club"],
+            "hi": ["ओरियाना क्लब", "सदस्य", "सदस्यता", "सप्तगिरी", "क्लब क्या है"],
+            "mr": ["ओरियाना क्लब", "सदस्य", "सदस्यत्व", "सप्तगिरी", "क्लब काय आहे"]
+          },
+          "answer": "OrianaaClub is the members-only community of Saptagiri Resorts, bringing together nature-led stays, vegetarian hospitality, wellness and time with family.",
+          "source": "https://orianaaclub.com/"
+        },
+        {
+          "id": "membership-plans-and-benefits",
+          "question": "What membership plans and benefits are available?",
+          "keywords": {
+            "en": ["membership", "memberships", "membership plans", "what are the memberships", "benefits", "advantages", "cost", "price", "pricing", "fees", "discounts", "validity", "renew", "upgrade", "transfer", "gift", "family membership", "holiday membership"],
+            "hi": ["सदस्यता योजना", "मेंबरशिप", "मेम्बरशिप", "मेंबरशिप प्लान", "मेंबरशिप के बारे में", "लाभ", "फायदे", "कीमत", "शुल्क", "छूट", "वैधता", "नवीनीकरण", "परिवार", "उपहार"],
+            "mr": ["सदस्यत्व योजना", "मेंबरशिपबद्दल", "मेंबरशिप विषयी", "फायदे", "लाभ", "किंमत", "शुल्क", "सवलत", "मुदत", "नूतनीकरण", "कुटुंब", "भेट"]
+          },
+          "answer": "OrianaaClub is a members-only holiday community. Current plans, prices, eligibility, benefits and terms should be confirmed with the OrianaaClub team; the website's Membership Benefits page shows the current public information.",
+          "source": "https://orianaaclub.com/membership-benefits"
+        },
+        {
+          "id": "join-membership",
+          "question": "How can I become a member?",
+          "keywords": {
+            "en": ["become a member", "join", "apply", "purchase membership", "sign up", "membership application"],
+            "hi": ["सदस्य कैसे बनें", "सदस्यता लें", "जुड़ें", "आवेदन", "सदस्यता खरीदें"],
+            "mr": ["सदस्य कसे व्हावे", "सदस्यत्व घ्या", "सामील व्हा", "अर्ज", "सदस्यत्व खरेदी"]
+          },
+          "answer": "You can explore membership on the OrianaaClub website using the Join Membership option. Please refer to the Membership Benefits page or contact the team for current eligibility and terms.",
+          "source": "https://orianaaclub.com/luxury-membership"
+        }
+      ]
+    },
+    {
+      "id": "destinations",
+      "name": "Destinations FAQs",
+      "faqs": [
+        {
+          "id": "featured-destinations",
+          "question": "Where are OrianaaClub's featured destinations?",
+          "keywords": {
+            "en": ["where", "location", "located", "destinations", "resorts", "places", "Pune", "Yewalewadi", "Yewalwadi", "Nashik", "Igatpuri", "Maharashtra"],
+            "hi": ["कहाँ", "कहां", "स्थान", "जगह", "गंतव्य", "रिसॉर्ट", "पुणे", "येवलेवाडी", "नाशिक", "इगतपुरी", "महाराष्ट्र"],
+            "mr": ["कोठे", "कुठे", "ठिकाण", "जागा", "गंतव्य", "रिसॉर्ट", "पुणे", "येवलेवाडी", "नाशिक", "इगतपुरी", "महाराष्ट्र"]
+          },
+          "answer": "The only current Saptagiri Resort locations listed by OrianaaClub are Yewalewadi, Pune, Maharashtra, and Igatpuri, Nashik, Maharashtra. For availability or property-specific information, call OrianaaClub at 087945 15151.",
+          "source": "https://orianaaclub.com/"
+        },
+        {
+          "id": "nature-and-wellness-destinations",
+          "question": "What kinds of destination experiences does OrianaaClub describe?",
+          "keywords": {
+            "en": ["nature", "wellness", "family", "experience", "destinations", "activities", "nature based", "children", "kids"],
+            "hi": ["प्रकृति", "वेलनेस", "कल्याण", "परिवार", "अनुभव", "गतिविधियां", "बच्चे", "बच्चों"],
+            "mr": ["निसर्ग", "वेलनेस", "आरोग्य", "कुटुंब", "अनुभव", "उपक्रम", "मुले", "मुलांसाठी"]
+          },
+          "answer": "OrianaaClub describes its stays and experiences as nature-led, wellness-oriented and suited to time with family. Specific activities and destination details should be confirmed with the OrianaaClub team.",
+          "source": "https://orianaaclub.com/"
+        }
+      ]
+    },
+    {
+      "id": "stay-accommodation",
+      "name": "Stay & Accommodation FAQs",
+      "faqs": [
+        {
+          "id": "featured-stay-types",
+          "question": "What types of stays are shown on the OrianaaClub website?",
+          "keywords": {
+            "en": ["stay", "accommodation", "room", "suite", "residence", "studio", "one bed", "one bedroom", "two bedroom", "room types"],
+            "hi": ["ठहरने", "आवास", "कमरा", "सुइट", "रेजिडेंस", "स्टूडियो", "एक बेडरूम", "दो बेडरूम"],
+            "mr": ["राहण्याची", "निवास", "खोली", "सुइट", "रेसिडेन्स", "स्टुडिओ", "एक बेडरूम", "दोन बेडरूम"]
+          },
+          "answer": "The public OrianaaClub homepage highlights a Studio Suite, One-Bed Suite and Two Bedroom Residence. Room details can vary by property, so please confirm specific layouts and amenities with the team.",
+          "source": "https://orianaaclub.com/"
+        },
+        {
+          "id": "studio-suite",
+          "question": "What is included with the Studio Suite?",
+          "keywords": {
+            "en": ["studio suite", "studio", "400 sq ft", "400 square feet", "guests", "adults", "balcony", "occupancy", "how many"],
+            "hi": ["स्टूडियो सुइट", "स्टूडियो", "400 वर्ग फुट", "मेहमान", "वयस्क", "बालकनी", "कितने लोग"],
+            "mr": ["स्टुडिओ सुइट", "स्टुडिओ", "400 चौरस फूट", "पाहुणे", "प्रौढ", "बाल्कनी", "किती लोक"]
+          },
+          "answer": "The homepage describes the Studio Suite as 400 sq. ft., with capacity for up to 3 adults and a scenic balcony. Please confirm property-specific details with the OrianaaClub team.",
+          "source": "https://orianaaclub.com/"
+        },
+        {
+          "id": "property-room-details",
+          "question": "Can you confirm room amenities, occupancy or extra-bed details?",
+          "keywords": {
+            "en": ["amenities", "facilities", "occupancy", "guest limit", "extra bed", "balcony", "room details", "non member", "non-members"],
+            "hi": ["सुविधाएं", "सुविधाएँ", "कितने मेहमान", "अतिरिक्त बिस्तर", "बालकनी", "कमरे की जानकारी", "गैर सदस्य"],
+            "mr": ["सुविधा", "किती पाहुणे", "अतिरिक्त बेड", "बाल्कनी", "खोलीची माहिती", "सदस्य नसलेले"]
+          },
+          "answer": "Room amenities, guest limits and other accommodation details are property-specific. The OrianaaClub team can confirm the latest details for the stay you have in mind.",
+          "source": "https://orianaaclub.com/"
+        }
+      ]
+    },
+    {
+      "id": "facilities-wellness",
+      "name": "Resort Facilities & Wellness FAQs",
+      "faqs": [
+        {
+          "id": "facilities-and-programmes",
+          "question": "What resort facilities, wellness programmes or activity details are available?",
+          "keywords": {
+            "en": ["facilities", "pool", "swimming", "gym", "spa", "naturopathy", "sports", "activities", "children", "kids", "hours", "operating hours", "wellness programme", "wellness program"],
+            "hi": ["सुविधाएं", "सुविधाएँ", "पूल", "तैराकी", "जिम", "स्पा", "प्राकृतिक चिकित्सा", "खेल", "गतिविधियां", "बच्चे", "समय", "वेलनेस कार्यक्रम"],
+            "mr": ["सुविधा", "पूल", "जलतरण", "जिम", "स्पा", "निसर्गोपचार", "खेळ", "उपक्रम", "मुले", "वेळ", "वेलनेस कार्यक्रम"]
+          },
+          "answer": "OrianaaClub presents nature and wellness as part of its experience. Specific facilities, treatments, activities and operating hours are not confirmed in the public information used here; please check with the OrianaaClub team.",
+          "source": "https://orianaaclub.com/"
+        }
+      ]
+    },
+    {
+      "id": "dining",
+      "name": "Dining FAQs",
+      "faqs": [
+        {
+          "id": "dining-and-dietary-needs",
+          "question": "What dining and dietary options are available?",
+          "keywords": {
+            "en": ["dining", "food", "vegetarian", "restaurant", "meal", "dietary", "diet", "customized meal", "in room dining", "in-room dining", "menu"],
+            "hi": ["भोजन", "खाना", "शाकाहारी", "रेस्तरां", "रेस्टोरेंट", "आहार", "मेनू", "खास भोजन", "कमरे में भोजन"],
+            "mr": ["जेवण", "खाणे", "शाकाहारी", "रेस्टॉरंट", "आहार", "मेनू", "विशेष भोजन", "खोलीत जेवण"]
+          },
+          "answer": "OrianaaClub's website describes its hospitality as vegetarian. Restaurant, menu and special dietary details can vary by property, so please confirm them with the team.",
+          "source": "https://orianaaclub.com/"
+        }
+      ]
+    },
+    {
+      "id": "events-celebrations",
+      "name": "Events & Celebrations FAQs",
+      "faqs": [
+        {
+          "id": "celebrations",
+          "question": "What celebrations and event details does OrianaaClub publish?",
+          "keywords": {
+            "en": ["event", "events", "wedding", "birthday", "celebration", "milestone", "corporate", "private party", "venue", "decorations", "quotation", "catering", "retreat"],
+            "hi": ["कार्यक्रम", "शादी", "विवाह", "जन्मदिन", "समारोह", "उत्सव", "कॉर्पोरेट", "निजी पार्टी", "स्थल", "सजावट", "कोटेशन", "कैटरिंग", "रिट्रीट"],
+            "mr": ["कार्यक्रम", "लग्न", "वाढदिवस", "समारंभ", "उत्सव", "कॉर्पोरेट", "खाजगी पार्टी", "स्थळ", "सजावट", "अंदाजपत्रक", "केटरिंग", "रिट्रीट"]
+          },
+          "answer": "The website describes weddings, milestone celebrations and retreats in nature-shaped settings. Specific venues, arrangements, catering and event terms should be confirmed with the OrianaaClub team.",
+          "source": "https://orianaaclub.com/events"
+        }
+      ]
+    },
+    {
+      "id": "general-contact",
+      "name": "General & Contact FAQs",
+      "faqs": [
+        {
+          "id": "enquiry-and-support",
+          "question": "How can I contact the OrianaaClub team or submit an enquiry?",
+          "keywords": {
+            "en": ["contact", "support", "customer service", "phone", "telephone", "email", "hours", "head office", "enquiry", "inquiry", "feedback", "complaint", "get in touch"],
+            "hi": ["संपर्क", "सहायता", "ग्राहक सेवा", "फोन", "ईमेल", "समय", "मुख्य कार्यालय", "पूछताछ", "प्रतिक्रिया", "शिकायत"],
+            "mr": ["संपर्क", "मदत", "ग्राहक सेवा", "फोन", "ईमेल", "वेळ", "मुख्य कार्यालय", "चौकशी", "अभिप्राय", "तक्रार"]
+          },
+          "answer": "You can call OrianaaClub at 087945 15151 or submit an enquiry through the Get in Touch form on the website: https://orianaaclub.com/#enquiry.",
+          "source": "https://orianaaclub.com/#enquiry"
+        }
+      ]
+    }
+  ]
+}
