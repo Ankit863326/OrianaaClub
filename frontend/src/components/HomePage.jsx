@@ -236,378 +236,372 @@ export default function HomePage() {
 
   return (
     <LazyMotion features={loadMotionFeatures}>
-    <main className="home-page">
-      <section
-        className="home-hero"
-        style={{ backgroundImage: `url()` }}
-        aria-labelledby="home-hero-title"
-      >
-        <video
-          className="home-hero__video"
-          autoPlay={!shouldReduceMotion}
-          muted
-          loop
-          playsInline
-          controls
-          preload="metadata"
-          aria-label="Saptagiri Resorts video"
+      <main className="home-page">
+        <section
+          className="home-hero"
+          style={{ backgroundImage: `url()` }}
+          aria-labelledby="home-hero-title"
         >
-          <source src={heroVideo} type="video/mp4" />
-          Your browser does not support embedded video.
-        </video>
-        <Motion.div
-          className="home-hero__content"
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
-        >
-          <p className="home-eyebrow">A more considered way to get away</p>
-          <h1 id="home-hero-title">The Orianaa Club</h1>
-          <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
-          {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
-{/* ======= */}
-          <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
-          <h1 id="home-hero-title">The Orianaa Club</h1>
-{/* >>>>>>> c571a8e (Fix identity document lookup, relink on finalizeDraft, missing-file UI) */}
-          <p className="home-hero__summary">
-            A members-only community of nature resorts across India. Through
-            OrianaaClub, discover restorative stays, pure vegetarian hospitality,
-            holistic wellness, and meaningful time together.
-          </p>
-          <div className="home-hero__actions">
-            <Button asChild>
-              <a className="home-button home-button--gold" href="/luxury-membership">About Membership</a>
-            </Button>
-            <Button asChild variant="outline">
-              <a className="home-button home-button--outline" href="#universe">Explore</a>
-            </Button>
-          </div>
-        </Motion.div>
-        <a className="home-hero__scroll" href="#universe" aria-label="Scroll to explore">
-          <span />
-        </a>
-      </section>
+          <video
+            className="home-hero__video"
+            autoPlay={!shouldReduceMotion}
+            muted
+            loop
+            playsInline
+            controls
+            preload="metadata"
+            aria-label="Saptagiri Resorts video"
+          >
+            <source src={heroVideo} type="video/mp4" />
+            Your browser does not support embedded video.
+          </video>
+          <Motion.div
+            className="home-hero__content"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
+          >
+            <p className="home-eyebrow">A more considered way to get away</p>
+            <h1 id="home-hero-title">The Orianaa Club</h1>
+            <p className="home-hero__summary">
+              A members-only community of nature resorts across India. Through
+              OrianaaClub, discover restorative stays, pure vegetarian hospitality,
+              holistic wellness, and meaningful time together.
+            </p>
+            <div className="home-hero__actions">
+              <Button asChild>
+                <a className="home-button home-button--gold" href="/luxury-membership">About Membership</a>
+              </Button>
+              <Button asChild variant="outline">
+                <a className="home-button home-button--outline" href="#universe">Explore</a>
+              </Button>
+            </div>
+          </Motion.div>
+          <a className="home-hero__scroll" href="#universe" aria-label="Scroll to explore">
+            <span />
+          </a>
+        </section>
 
-      <section className="home-universe" id="universe" ref={universeRef}>
-        <div className="home-universe__copy">
-          <p className="home-eyebrow home-eyebrow--dark">Universe</p>
-          <h2>The Orianaa Universe: One World, Six Connections</h2>
-          <p className="home-body-copy">
-            At the center stands Orianaa. Around it, six experiences move in
-            orbit. Each one feeds the next, creating a life that is greater
-            than the sum of its parts.
-          </p>
-          <div className="home-inline-actions">
-            <Button asChild>
-              <a className="home-button home-button--green" href="/resorts">Explore Destinations</a>
-            </Button>
-            <a className="home-text-link" href="/membership-benefits">
-              About Membership <ArrowRight size={16} aria-hidden="true" />
+        <section className="home-universe" id="universe" ref={universeRef}>
+          <div className="home-universe__copy">
+            <p className="home-eyebrow home-eyebrow--dark">Universe</p>
+            <h2>The Orianaa Universe: One World, Six Connections</h2>
+            <p className="home-body-copy">
+              At the center stands Orianaa. Around it, six experiences move in
+              orbit. Each one feeds the next, creating a life that is greater
+              than the sum of its parts.
+            </p>
+            <div className="home-inline-actions">
+              <Button asChild>
+                <a className="home-button home-button--green" href="/resorts">Explore Destinations</a>
+              </Button>
+              <a className="home-text-link" href="/membership-benefits">
+                About Membership <ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+          <div className="home-universe-gallery" aria-label="Orianaa resort collection">
+            <div className="home-universe-gallery__main">
+              {destinations.map((destination, index) => (
+                <img
+                  className="home-universe-gallery__main-image"
+                  key={destination.place || index}
+                  src={destination.image}
+                  alt={`${destination.name} - ${destination.place}`}
+                  data-universe-image
+                />
+              ))}
+              {destinations.map((destination, index) => (
+                <div
+                  className="home-universe-gallery__caption"
+                  key={`caption-${destination.place || index}`}
+                  data-universe-caption
+                >
+                  <p className="home-eyebrow">{destination.place}</p>
+                  <h3>{destination.headline || "Room to find your own away"}</h3>
+                </div>
+              ))}
+            </div>
+            <div className="home-universe-gallery__thumbs" aria-label="Destinations in the collection">
+              {destinations.map((destination, index) => (
+                <figure
+                  className="home-universe-gallery__thumb"
+                  key={destination.place || index}
+                  data-universe-thumb
+                  onClick={() => handleThumbClick(index)}
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  aria-label={`View ${destination.name} at ${destination.place}`}
+                >
+                  <img src={destination.image} alt={destination.place} />
+                  <figcaption title={destination.place}>
+                    {destination.place.split(",")[0]} - {destination.name}
+                  </figcaption>
+                  <span className="home-universe-gallery__indicator" />
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-destinations" id="destinations">
+          <div className="home-section-heading">
+            <p className="home-eyebrow home-eyebrow--dark">Nature, in all its moods</p>
+            <h2>Discover Saptagiri Resorts</h2>
+            <p>
+              We are building a collection of member resorts shaped by their
+              surroundings, from peaceful hillsides to the rhythm of the coast.
+            </p>
+          </div>
+          <div className="home-destination-grid">
+            {destinations.map((destination, index) => (
+              <Motion.a
+                className="home-destination"
+                href="/resorts"
+                key={destination.place || index}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : index * 0.08 }}
+              >
+                <div className="home-destination__image">
+                  <img src={destination.image} alt={destination.name} />
+                  <span className="home-destination__arrow" aria-hidden="true">
+                    <ArrowRight size={19} />
+                  </span>
+                </div>
+                <div className="home-destination__caption">
+                  <h3>{destination.name}</h3>
+                  <p>{destination.place}</p>
+                </div>
+              </Motion.a>
+            ))}
+          </div>
+          <div className="home-destination-signature">
+            <div className="home-destination-signature__copy">
+              <p className="home-eyebrow home-eyebrow--dark">A growing resort family</p>
+              <h3>Belong. Renew. Return.</h3>
+            </div>
+            <div className="home-destination-signature__settings" aria-label="Resort settings">
+              <span><Waves size={19} strokeWidth={1.4} aria-hidden="true" /> Coast</span>
+              <span><Mountain size={19} strokeWidth={1.4} aria-hidden="true" /> Hills</span>
+              <span><Trees size={19} strokeWidth={1.4} aria-hidden="true" /> Forest</span>
+            </div>
+            <a className="home-destination-signature__link" href="/resorts">
+              Explore every stay <ArrowRight size={16} aria-hidden="true" />
             </a>
           </div>
-        </div>
-        <div className="home-universe-gallery" aria-label="Orianaa resort collection">
-          <div className="home-universe-gallery__main">
-            {destinations.map((destination, index) => (
-              <img
-                className="home-universe-gallery__main-image"
-                key={destination.place || index}
-                src={destination.image}
-                alt={`${destination.name} - ${destination.place}`}
-                data-universe-image
+        </section>
+
+        <section className="home-events" id="events">
+          <div className="home-event-stage">
+            <div
+              className="home-event-peek home-event-peek--left"
+              style={{ backgroundImage: `url(${events[previousEvent].image})` }}
+              aria-hidden="true"
+            />
+            <div
+              className="home-event-peek home-event-peek--right"
+              style={{ backgroundImage: `url(${events[nextEvent].image})` }}
+              aria-hidden="true"
+            />
+            <AnimatePresence initial={false} custom={eventDirection}>
+              <Motion.article
+                className="home-event-card"
+                key={activeEvent}
+                custom={eventDirection}
+                variants={eventCardVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: shouldReduceMotion ? 0 : 0.68, ease: [0.16, 1, 0.3, 1] }}
+                drag={shouldReduceMotion ? false : "x"}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.08}
+                onDragEnd={(_, info) => {
+                  if (info.offset.x < -80) changeEvent(1);
+                  if (info.offset.x > 80) changeEvent(-1);
+                }}
+                style={{ backgroundImage: `url(${event.image})` }}
+              >
+                <div className="home-event-card__content">
+                  <p>{event.type}</p>
+                  <h2>{event.title}</h2>
+                  <p className="home-event-card__description">
+                    The most meaningful moments deserve a setting that feels like
+                    it was made just for you.
+                  </p>
+                  <div className="home-event-card__actions">
+                    <Button asChild>
+                      <a className="home-button home-button--green" href="/events">Explore Events</a>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <a className="home-button home-button--outline" href="/membership-benefits">About Membership</a>
+                    </Button>
+                  </div>
+                </div>
+              </Motion.article>
+            </AnimatePresence>
+            <Button
+              variant="carousel"
+              size="icon"
+              className="home-event-control home-event-control--previous"
+              type="button"
+              onClick={() => changeEvent(-1)}
+              aria-label="Previous event"
+            >
+              <ChevronLeft size={22} />
+            </Button>
+            <Button
+              variant="carousel"
+              size="icon"
+              className="home-event-control home-event-control--next"
+              type="button"
+              onClick={() => changeEvent(1)}
+              aria-label="Next event"
+            >
+              <ChevronRight size={22} />
+            </Button>
+          </div>
+          <div className="home-event-pagination" aria-label="Choose an event">
+            {events.map((carouselEvent, index) => (
+              <Button
+                key={carouselEvent.title}
+                variant="indicator"
+                size="indicator"
+                className={`home-event-pagination__dot${activeEvent === index ? " is-active" : ""}`}
+                type="button"
+                aria-label={`Show ${carouselEvent.title}`}
+                aria-current={activeEvent === index ? "true" : undefined}
+                onClick={() => {
+                  setEventDirection(index > activeEvent ? 1 : -1);
+                  setActiveEvent(index);
+                }}
               />
             ))}
-            {destinations.map((destination, index) => (
-              <div
-                className="home-universe-gallery__caption"
-                key={`caption-${destination.place || index}`}
-                data-universe-caption
-              >
-                <p className="home-eyebrow">{destination.place}</p>
-                <h3>{destination.headline || "Room to find your own away"}</h3>
-              </div>
-            ))}
           </div>
-          <div className="home-universe-gallery__thumbs" aria-label="Destinations in the collection">
-            {destinations.map((destination, index) => (
-              <figure
-                className="home-universe-gallery__thumb"
-                key={destination.place || index}
-                data-universe-thumb
-                onClick={() => handleThumbClick(index)}
-                role="button"
-                tabIndex={0}
-                style={{ cursor: "pointer" }}
-                aria-label={`View ${destination.name} at ${destination.place}`}
-              >
-                <img src={destination.image} alt={destination.place} />
-                <figcaption title={destination.place}>
-                  {destination.place.split(",")[0]} - {destination.name}
-                </figcaption>
-                <span className="home-universe-gallery__indicator" />
-              </figure>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="home-destinations" id="destinations">
-        <div className="home-section-heading">
-          <p className="home-eyebrow home-eyebrow--dark">Nature, in all its moods</p>
-          <h2>Discover Saptagiri Resorts</h2>
-          <p>
-            We are building a collection of member resorts shaped by their
-            surroundings, from peaceful hillsides to the rhythm of the coast.
-          </p>
-        </div>
-        <div className="home-destination-grid">
-          {destinations.map((destination, index) => (
-            <Motion.a
-              className="home-destination"
-              href="/resorts"
-              key={destination.place || index}
-              initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : index * 0.08 }}
-            >
-              <div className="home-destination__image">
-                <img src={destination.image} alt={destination.name} />
-                <span className="home-destination__arrow" aria-hidden="true">
-                  <ArrowRight size={19} />
+        <section className="home-stories" id="stories">
+          <div className="home-section-heading">
+            <p className="home-eyebrow home-eyebrow--dark">In their own words</p>
+            <h2>Stories</h2>
+            <p>Experiences shared by OrianaaClub members.</p>
+          </div>
+          {memberReviews.length ? <div className="home-story-carousel" aria-label="Member reviews">
+            <article className="home-story" aria-live="polite" aria-atomic="true">
+              <div className="home-story__stars" aria-label={`${memberReviews[activeReview].rating} out of 5 stars`}>
+                {'★'.repeat(memberReviews[activeReview].rating)}{'☆'.repeat(5 - memberReviews[activeReview].rating)}
+              </div>
+              <blockquote>“{memberReviews[activeReview].message}”</blockquote>
+              <div className="home-story__author">
+                <span className="home-story__avatar" aria-hidden="true">
+                  {String(memberReviews[activeReview].memberName || 'Member').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}
                 </span>
+                <div>
+                  <h3>{memberReviews[activeReview].memberName}</h3>
+                  <p>OrianaaClub member</p>
+                </div>
               </div>
-              <div className="home-destination__caption">
-                <h3>{destination.name}</h3>
-                <p>{destination.place}</p>
+            </article>
+            {memberReviews.length > 1 && <>
+              <div className="home-story-carousel__controls">
+                <button type="button" onClick={() => changeReview(-1)} aria-label="Previous member review">‹</button>
+                <span>{activeReview + 1} / {memberReviews.length}</span>
+                <button type="button" onClick={() => changeReview(1)} aria-label="Next member review">›</button>
               </div>
-            </Motion.a>
-          ))}
-        </div>
-        <div className="home-destination-signature">
-          <div className="home-destination-signature__copy">
-            <p className="home-eyebrow home-eyebrow--dark">A growing resort family</p>
-            <h3>Belong. Renew. Return.</h3>
-          </div>
-          <div className="home-destination-signature__settings" aria-label="Resort settings">
-            <span><Waves size={19} strokeWidth={1.4} aria-hidden="true" /> Coast</span>
-            <span><Mountain size={19} strokeWidth={1.4} aria-hidden="true" /> Hills</span>
-            <span><Trees size={19} strokeWidth={1.4} aria-hidden="true" /> Forest</span>
-          </div>
-          <a className="home-destination-signature__link" href="/resorts">
-            Explore every stay <ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </div>
-      </section>
+              <div className="home-story-carousel__indicators" aria-label="Choose a member review">
+                {memberReviews.map((review, index) => <button
+                  key={review._id || `${review.memberName}-${index}`}
+                  type="button"
+                  className={activeReview === index ? 'is-active' : ''}
+                  aria-label={`Show review by ${review.memberName}`}
+                  aria-current={activeReview === index ? 'true' : undefined}
+                  onClick={() => setActiveReview(index)}
+                />)}
+              </div>
+            </>}
+          </div> : <p className="home-stories__empty">Member stories will appear here as reviews are shared.</p>}
+        </section>
 
-      <section className="home-events" id="events">
-        <div className="home-event-stage">
-          <div
-            className="home-event-peek home-event-peek--left"
-            style={{ backgroundImage: `url(${events[previousEvent].image})` }}
-            aria-hidden="true"
-          />
-          <div
-            className="home-event-peek home-event-peek--right"
-            style={{ backgroundImage: `url(${events[nextEvent].image})` }}
-            aria-hidden="true"
-          />
-          <AnimatePresence initial={false} custom={eventDirection}>
-            <Motion.article
-              className="home-event-card"
-              key={activeEvent}
-              custom={eventDirection}
-              variants={eventCardVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: shouldReduceMotion ? 0 : 0.68, ease: [0.16, 1, 0.3, 1] }}
-              drag={shouldReduceMotion ? false : "x"}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.08}
-              onDragEnd={(_, info) => {
-                if (info.offset.x < -80) changeEvent(1);
-                if (info.offset.x > 80) changeEvent(-1);
-              }}
-              style={{ backgroundImage: `url(${event.image})` }}
-            >
-            <div className="home-event-card__content">
-              <p>{event.type}</p>
-              <h2>{event.title}</h2>
-              <p className="home-event-card__description">
-                The most meaningful moments deserve a setting that feels like
-                it was made just for you.
-              </p>
-              <div className="home-event-card__actions">
-                <Button asChild>
-                  <a className="home-button home-button--green" href="/events">Explore Events</a>
-                </Button>
-                <Button asChild variant="outline">
-                  <a className="home-button home-button--outline" href="/membership-benefits">About Membership</a>
-                </Button>
-              </div>
-            </div>
-            </Motion.article>
-          </AnimatePresence>
-          <Button
-            variant="carousel"
-            size="icon"
-            className="home-event-control home-event-control--previous"
-            type="button"
-            onClick={() => changeEvent(-1)}
-            aria-label="Previous event"
+        <section className="home-benefits" id="benefits">
+          <Motion.div
+            className="home-benefits__image"
+            initial={shouldReduceMotion ? false : { opacity: 0, x: -22 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.55 }}
           >
-            <ChevronLeft size={22} />
-          </Button>
-          <Button
-            variant="carousel"
-            size="icon"
-            className="home-event-control home-event-control--next"
-            type="button"
-            onClick={() => changeEvent(1)}
-            aria-label="Next event"
-          >
-            <ChevronRight size={22} />
-          </Button>
-        </div>
-        <div className="home-event-pagination" aria-label="Choose an event">
-          {events.map((carouselEvent, index) => (
-            <Button
-              key={carouselEvent.title}
-              variant="indicator"
-              size="indicator"
-              className={`home-event-pagination__dot${activeEvent === index ? " is-active" : ""}`}
-              type="button"
-              aria-label={`Show ${carouselEvent.title}`}
-              aria-current={activeEvent === index ? "true" : undefined}
-              onClick={() => {
-                setEventDirection(index > activeEvent ? 1 : -1);
-                setActiveEvent(index);
-              }}
+            <img
+              src="https://i.pinimg.com/1200x/ea/3a/02/ea3a023dfe2b94a9137b569ca4478e4a.jpg"
+              alt="A family spending a quiet afternoon together"
             />
-          ))}
-        </div>
-      </section>
-
-      <section className="home-stories" id="stories">
-        <div className="home-section-heading">
-          <p className="home-eyebrow home-eyebrow--dark">In their own words</p>
-          <h2>Stories</h2>
-          <p>Experiences shared by OrianaaClub members.</p>
-        </div>
-        {memberReviews.length ? <div className="home-story-carousel" aria-label="Member reviews">
-          <article className="home-story" aria-live="polite" aria-atomic="true">
-            <div className="home-story__stars" aria-label={`${memberReviews[activeReview].rating} out of 5 stars`}>
-              {'★'.repeat(memberReviews[activeReview].rating)}{'☆'.repeat(5 - memberReviews[activeReview].rating)}
-            </div>
-            <blockquote>“{memberReviews[activeReview].message}”</blockquote>
-            <div className="home-story__author">
-              <span className="home-story__avatar" aria-hidden="true">
-                {String(memberReviews[activeReview].memberName || 'Member').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}
-              </span>
-              <div>
-                <h3>{memberReviews[activeReview].memberName}</h3>
-                <p>OrianaaClub member</p>
-              </div>
-            </div>
-          </article>
-          {memberReviews.length > 1 && <>
-            <div className="home-story-carousel__controls">
-              <button type="button" onClick={() => changeReview(-1)} aria-label="Previous member review">‹</button>
-              <span>{activeReview + 1} / {memberReviews.length}</span>
-              <button type="button" onClick={() => changeReview(1)} aria-label="Next member review">›</button>
-            </div>
-            <div className="home-story-carousel__indicators" aria-label="Choose a member review">
-              {memberReviews.map((review, index) => <button
-                key={review._id || `${review.memberName}-${index}`}
-                type="button"
-                className={activeReview === index ? 'is-active' : ''}
-                aria-label={`Show review by ${review.memberName}`}
-                aria-current={activeReview === index ? 'true' : undefined}
-                onClick={() => setActiveReview(index)}
-              />)}
-            </div>
-          </>}
-        </div> : <p className="home-stories__empty">Member stories will appear here as reviews are shared.</p>}
-      </section>
-
-      <section className="home-benefits" id="benefits">
-        <Motion.div
-          className="home-benefits__image"
-          initial={shouldReduceMotion ? false : { opacity: 0, x: -22 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.55 }}
-        >
-          <img
-            src="https://i.pinimg.com/1200x/ea/3a/02/ea3a023dfe2b94a9137b569ca4478e4a.jpg"
-            alt="A family spending a quiet afternoon together"
-          />
-          <span className="home-benefits__image-note">Make time mean more</span>
-        </Motion.div>
-        <Motion.div
-          className="home-benefits__copy"
-          initial={shouldReduceMotion ? false : { opacity: 0, x: 22 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.55, delay: shouldReduceMotion ? 0 : 0.1 }}
-        >
-          <p className="home-eyebrow home-eyebrow--dark">Membership, reimagined</p>
-          <h2>Benefits of Membership</h2>
-          <p className="home-body-copy">
-            OrianaaClub is the members-only community of Saptagiri Resorts.
-            Each stay is envisioned as a chance to slow down, reconnect with
-            nature, and return to balance.
-          </p>
-          <div className="home-benefit-points">
-            <article>
-              <Leaf size={30} strokeWidth={1.5} aria-hidden="true" />
-              <h3>Membership value</h3>
-              <p>Explore the benefits available with each membership plan.</p>
-            </article>
-            <article>
-              <Trees size={30} strokeWidth={1.5} aria-hidden="true" />
-              <h3>Rooted in nature and wellbeing</h3>
-              <p>Nature-led stays, pure vegetarian hospitality, wellness, and active leisure are at the heart of the Saptagiri Resorts vision.</p>
-            </article>
-          </div>
-          <Button asChild>
-            <a className="home-button home-button--green" href="/luxury-membership">Join Membership</a>
-          </Button>
-        </Motion.div>
-      </section>
-
-      <section className="home-enquiry" id="enquiry">
-        <Motion.div
-          className="home-enquiry__image"
-          role="img"
-          aria-label="A calm, thoughtfully designed guest room"
-          initial={shouldReduceMotion ? false : { opacity: 0, scale: 1.03 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.6 }}
-        />
-        <Motion.div
-          className="home-enquiry__copy"
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : 0.1 }}
-        >
-          <p className="home-eyebrow home-eyebrow--dark">A note from Saptagiri Resorts</p>
-          <h2>How can we help?</h2>
-          <p>Ask us about OrianaaClub membership and the Saptagiri Resorts vision.</p>
-          <Button
-            type="button"
-            className="home-button home-button--green"
-            onClick={() => setContactOpen(true)}
+            <span className="home-benefits__image-note">Make time mean more</span>
+          </Motion.div>
+          <Motion.div
+            className="home-benefits__copy"
+            initial={shouldReduceMotion ? false : { opacity: 0, x: 22 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.55, delay: shouldReduceMotion ? 0 : 0.1 }}
           >
-            Get in touch <ArrowRight size={17} aria-hidden="true" />
-          </Button>
-        </Motion.div>
-      </section>
-      <LuxuryContactDrawer open={contactOpen} onOpenChange={setContactOpen} />
-    </main>
+            <p className="home-eyebrow home-eyebrow--dark">Membership, reimagined</p>
+            <h2>Benefits of Membership</h2>
+            <p className="home-body-copy">
+              OrianaaClub is the members-only community of Saptagiri Resorts.
+              Each stay is envisioned as a chance to slow down, reconnect with
+              nature, and return to balance.
+            </p>
+            <div className="home-benefit-points">
+              <article>
+                <Leaf size={30} strokeWidth={1.5} aria-hidden="true" />
+                <h3>Membership value</h3>
+                <p>Explore the benefits available with each membership plan.</p>
+              </article>
+              <article>
+                <Trees size={30} strokeWidth={1.5} aria-hidden="true" />
+                <h3>Rooted in nature and wellbeing</h3>
+                <p>Nature-led stays, pure vegetarian hospitality, wellness, and active leisure are at the heart of the Saptagiri Resorts vision.</p>
+              </article>
+            </div>
+            <Button asChild>
+              <a className="home-button home-button--green" href="/luxury-membership">Join Membership</a>
+            </Button>
+          </Motion.div>
+        </section>
+
+        <section className="home-enquiry" id="enquiry">
+          <Motion.div
+            className="home-enquiry__image"
+            role="img"
+            aria-label="A calm, thoughtfully designed guest room"
+            initial={shouldReduceMotion ? false : { opacity: 0, scale: 1.03 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.6 }}
+          />
+          <Motion.div
+            className="home-enquiry__copy"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : 0.1 }}
+          >
+            <p className="home-eyebrow home-eyebrow--dark">A note from Saptagiri Resorts</p>
+            <h2>How can we help?</h2>
+            <p>Ask us about OrianaaClub membership and the Saptagiri Resorts vision.</p>
+            <Button
+              type="button"
+              className="home-button home-button--green"
+              onClick={() => setContactOpen(true)}
+            >
+              Get in touch <ArrowRight size={17} aria-hidden="true" />
+            </Button>
+          </Motion.div>
+        </section>
+        <LuxuryContactDrawer open={contactOpen} onOpenChange={setContactOpen} />
+      </main>
     </LazyMotion>
   );
 }
