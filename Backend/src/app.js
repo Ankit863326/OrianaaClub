@@ -74,12 +74,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'X-Admin-Request', 'X-Api-Key', 'X-Api-Signature'],
 }));
 app.get('/health', health);
-app.use('/terms', express.static(termsDirectory, {
+app.use('/terms', (request, response, next) => {
+  response.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  });
+  next();
+}, express.static(termsDirectory, {
   dotfiles: 'deny',
   index: false,
   fallthrough: false,
-  immutable: true,
-  maxAge: '1y',
 }));
 app.use('/media', express.static(publicMediaDirectory, {
   dotfiles: 'deny',

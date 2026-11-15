@@ -67,7 +67,7 @@ export default function Footer() {
               <Link key={link.to} to={link.to}>{link.label}</Link>
             ))}
             <Link to="/#enquiry">Get in touch</Link>
-            <a href={apiResourceUrl("/terms/v1/membership-terms.pdf")} target="_blank" rel="noopener noreferrer">
+            <a href={`${apiResourceUrl("/terms/v1/membership-terms.pdf")}?v=2`} target="_blank" rel="noopener noreferrer">
               Terms and Conditions
             </a>
           </nav>

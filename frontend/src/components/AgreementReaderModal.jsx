@@ -274,7 +274,7 @@ export default function AgreementReaderModal({
                   setAttempt((count) => count + 1);
                 }}>Retry</button>
                 {activeLanguage?.pdfUrl && (
-                  <a href={apiResourceUrl(activeLanguage.pdfUrl)} target="_blank" rel="noreferrer" download>
+                  <a href={`${apiResourceUrl(activeLanguage.pdfUrl)}?v=2`} target="_blank" rel="noreferrer" download>
                     Download PDF instead
                   </a>
                 )}

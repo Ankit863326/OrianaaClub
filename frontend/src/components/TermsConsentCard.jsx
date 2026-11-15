@@ -196,7 +196,7 @@ export default function TermsConsentCard({
             {selectedLanguage?.pdfUrl && (
               <a
                 className="terms-consent-card__download"
-                href={apiResourceUrl(selectedLanguage.pdfUrl)}
+                href={`${apiResourceUrl(selectedLanguage.pdfUrl)}?v=2`}
                 target="_blank"
                 rel="noreferrer"
                 download
