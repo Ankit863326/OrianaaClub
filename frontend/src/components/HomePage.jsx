@@ -261,15 +261,14 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
         >
-<<<<<<< HEAD
           <p className="home-eyebrow">A more considered way to get away</p>
           <h1 id="home-hero-title">The Orianaa Club</h1>
           <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
           {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
-=======
+{/* ======= */}
           <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
           <h1 id="home-hero-title">The Orianaa Club</h1>
->>>>>>> c571a8e (Fix identity document lookup, relink on finalizeDraft, missing-file UI)
+{/* >>>>>>> c571a8e (Fix identity document lookup, relink on finalizeDraft, missing-file UI) */}
           <p className="home-hero__summary">
             A members-only community of nature resorts across India. Through
             OrianaaClub, discover restorative stays, pure vegetarian hospitality,
