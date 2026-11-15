@@ -10,8 +10,10 @@ const templates = new Set([
   'reset',
   'payment-success',
   'payment-rejected',
+  'plan-upgraded',
   'enquiry-notification',
   'membership-approved',
+  'welcome-kit-delivered',
   'approval-overdue',
   'family-verification-code',
   'family-verification-submitted',
@@ -55,10 +57,15 @@ async function renderTemplate(template, data) {
     .replaceAll('{{code}}', escapeHtml(data.code || ''))
     .replaceAll('{{planName}}', escapeHtml(data.planName || ''))
     .replaceAll('{{memberId}}', escapeHtml(data.memberId || ''))
+    .replaceAll('{{kitHtml}}', data.kitHtml || '')
+    .replaceAll('{{deliveredDate}}', escapeHtml(data.deliveredDate || ''))
     .replaceAll('{{invoiceNumber}}', escapeHtml(data.invoiceNumber || ''))
     .replaceAll('{{baseAmount}}', escapeHtml(data.baseAmount || ''))
     .replaceAll('{{gstAmount}}', escapeHtml(data.gstAmount || ''))
     .replaceAll('{{totalAmount}}', escapeHtml(data.totalAmount || ''))
+    .replaceAll('{{amountPaid}}', escapeHtml(data.amountPaid || ''))
+    .replaceAll('{{pointsAdded}}', escapeHtml(data.pointsAdded ?? ''))
+    .replaceAll('{{newBalance}}', escapeHtml(data.newBalance ?? ''))
     .replaceAll('{{approvalDueAt}}', escapeHtml(data.approvalDueAt || ''))
     .replaceAll('{{reason}}', escapeHtml(data.reason || ''))
     .replaceAll('{{notice}}', escapeHtml(data.notice || ''))

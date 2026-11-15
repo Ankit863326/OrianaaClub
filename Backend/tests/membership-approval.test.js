@@ -7,6 +7,7 @@ import Membership from '../src/models/Membership.js';
 import Payment from '../src/models/Payment.js';
 import PointsLedger from '../src/models/PointsLedger.js';
 import Setting, { invalidateSettingsCache } from '../src/models/Setting.js';
+import WelcomeKit from '../src/models/WelcomeKit.js';
 import {
   approveMembership,
   confirmNomineeEmail,
@@ -181,6 +182,25 @@ describe('membership approval workflow', () => {
     expect(Object.keys(pointsHistory.items[0]).sort()).toEqual(['amountBasis', 'date', 'points', 'status']);
     expect(pointsHistory.items[0]).not.toHaveProperty('expiresAt');
     expect(await AuditLog.countDocuments({ entityId: String(member.membership._id), action: 'membership.approve' })).toBe(1);
+  });
+
+  test('primary approval creates a hashed welcome kit and includes its code in the approval email', async () => {
+    const member = await createPaidMembership();
+    const admin = await createAdmin();
+    globalThis.__orianaMailTransport.sendMail.mockClear();
+
+    const result = await approveMembership(member.membership._id, admin.user._id);
+    const kit = await WelcomeKit.findOne({ membership: member.membership._id }).select('+codeHash');
+    const [email] = globalThis.__orianaMailTransport.sendMail.mock.calls.map(([message]) => message);
+
+    expect(kit).toBeTruthy();
+    expect(kit.codeHash).toMatch(/^[a-f\d]{64}$/);
+    expect(kit).not.toHaveProperty('code');
+    expect(result).not.toHaveProperty('code');
+    expect(globalThis.__orianaMailTransport.sendMail).toHaveBeenCalledTimes(1);
+    expect(email.html).toContain('Orianaa Club will deliver your welcome kit within 5 working days');
+    expect(email.html).toMatch(/Your 6-digit delivery code: <strong>\d{6}<\/strong>/);
+    expect(email.html).toContain('Give this code to our delivery executive only after you have received the kit.');
   });
 
   test('keeps points hidden from the member dashboard until approval', async () => {

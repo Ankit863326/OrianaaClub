@@ -13,12 +13,13 @@ import {
   formatDate,
 } from '../../components/ui.jsx';
 import { downloadPaymentReceipt, membershipApi } from '../../api/membership.js';
-import { formatINR } from '../formatters.js';
+import { formatINR, formatPts } from '../formatters.js';
 
 const methods = ['bank_transfer', 'cheque', 'rtgs'];
 const blankPayment = { method: 'bank_transfer', amount: '', reference: '', paymentDate: '', note: '' };
 
 function paymentAmount(payment) {
+  if (payment.purpose === 'upgrade') return Number(payment.totalAmount || 0) / 100;
   return Number(payment.amount ?? Number(payment.totalAmount || 0) / 100);
 }
 
@@ -142,14 +143,19 @@ export default function PaymentsTab() {
       {membership?.status !== 'pending_payment' && <p className="mb-4 text-sm text-slate-500">Offline payments can be recorded while the membership is awaiting payment.</p>}
       {payments.length
         ? <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1150px] border-collapse text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>{['Date', 'Plan', 'Amount', 'Method', 'Status', 'Reference', ''].map((label) => <th key={label || 'action'} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+              <tr>{['Date', 'Type', 'Old plan', 'New plan', 'Base difference', 'GST', 'Points', 'Total', 'Method', 'Status', 'Reference', ''].map((label) => <th key={label || 'action'} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {payments.map((payment) => <tr key={payment._id}>
                 <td className="px-4 py-3.5 text-slate-700">{formatDate(payment.paymentDate || payment.createdAt)}</td>
+                <td className="px-4 py-3.5 text-slate-700">{payment.purpose === 'upgrade' ? 'Upgrade' : 'Membership'}</td>
+                <td className="px-4 py-3.5 text-slate-700">{payment.oldPlan?.name || payment.oldPlan?.title || '—'}</td>
                 <td className="px-4 py-3.5 text-slate-700">{payment.plan?.name || payment.plan?.title || membership.plan?.name || membership.plan?.title || '—'}</td>
+                <td className="px-4 py-3.5 text-slate-700">{payment.purpose === 'upgrade' ? formatINR(payment.baseDifference / 100) : '—'}</td>
+                <td className="px-4 py-3.5 text-slate-700">{payment.purpose === 'upgrade' ? formatINR(payment.gstAmount / 100) : '—'}</td>
+                <td className="px-4 py-3.5 text-slate-700">{payment.purpose === 'upgrade' ? formatPts(payment.upgradePoints) : '—'}</td>
                 <td className="px-4 py-3.5 text-slate-700">{formatINR(paymentAmount(payment))}</td>
                 <td className="px-4 py-3.5 text-slate-700">{payment.method === 'rtgs' ? 'RTGS' : String(payment.method || '').replaceAll('_', ' ') || '—'}</td>
                 <td className="px-4 py-3.5">{paymentStatus(payment.status)}</td>

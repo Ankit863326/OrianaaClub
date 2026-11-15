@@ -261,10 +261,15 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
         >
+<<<<<<< HEAD
           <p className="home-eyebrow">A more considered way to get away</p>
           <h1 id="home-hero-title">The Orianaa Club</h1>
           <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
           {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
+=======
+          <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
+          <h1 id="home-hero-title">The Orianaa Club</h1>
+>>>>>>> c571a8e (Fix identity document lookup, relink on finalizeDraft, missing-file UI)
           <p className="home-hero__summary">
             A members-only community of nature resorts across India. Through
             OrianaaClub, discover restorative stays, pure vegetarian hospitality,
@@ -286,13 +291,12 @@ export default function HomePage() {
 
       <section className="home-universe" id="universe" ref={universeRef}>
         <div className="home-universe__copy">
-          <p className="home-eyebrow home-eyebrow--dark">Our vision</p>
-          <h2>Your nature home, wherever you travel</h2>
+          <p className="home-eyebrow home-eyebrow--dark">Universe</p>
+          <h2>The Orianaa Universe: One World, Six Connections</h2>
           <p className="home-body-copy">
-            Saptagiri Resorts envisions a private club of nature sanctuaries
-            across India’s hills, beaches, and forests. OrianaaClub brings
-            members together through familiar comfort, thoughtful hospitality,
-            and a lasting sense of belonging.
+            At the center stands Orianaa. Around it, six experiences move in
+            orbit. Each one feeds the next, creating a life that is greater
+            than the sum of its parts.
           </p>
           <div className="home-inline-actions">
             <Button asChild>
@@ -303,7 +307,7 @@ export default function HomePage() {
             </a>
           </div>
         </div>
-        <div className="home-universe-gallery" aria-label="Saptagiri Resorts collection">
+        <div className="home-universe-gallery" aria-label="Orianaa resort collection">
           <div className="home-universe-gallery__main">
             {destinations.map((destination, index) => (
               <img

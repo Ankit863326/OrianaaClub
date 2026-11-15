@@ -423,8 +423,12 @@ async function hydratePaymentReferences(payments, { includeVerificationDocs = fa
   const planIds = [...new Set(payments
     .filter((payment) => mongoose.isValidObjectId(payment.plan))
     .map((payment) => `${payment.planModel || 'Plan'}:${payment.plan}`))];
-  const legacyPlanIds = planIds.filter((value) => value.startsWith('Plan:')).map((value) => value.slice(5));
-  const membershipPlanIds = planIds.filter((value) => value.startsWith('MembershipPlan:')).map((value) => value.slice(15));
+  const oldPlanIds = [...new Set(payments
+    .filter((payment) => mongoose.isValidObjectId(payment.oldPlan))
+    .map((payment) => `${payment.oldPlanModel || 'Plan'}:${payment.oldPlan}`))];
+  const allPlanIds = [...new Set([...planIds, ...oldPlanIds])];
+  const legacyPlanIds = allPlanIds.filter((value) => value.startsWith('Plan:')).map((value) => value.slice(5));
+  const membershipPlanIds = allPlanIds.filter((value) => value.startsWith('MembershipPlan:')).map((value) => value.slice(15));
   const [users, profiles, memberships, legacyPlans, membershipPlans] = await Promise.all([
     userIds.length ? User.find({ _id: { $in: userIds } }).select('firstName email').lean() : [],
     userIds.length ? Profile.find({ user: { $in: userIds } }).select('user fullName').lean() : [],
@@ -445,13 +449,16 @@ async function hydratePaymentReferences(payments, { includeVerificationDocs = fa
     const profile = profileByUser.get(String(payment.user)) || null;
     const membership = membershipById.get(String(payment.membership)) || null;
     const plan = planByModelAndId.get(`${payment.planModel || 'Plan'}:${payment.plan}`) || null;
+    const oldPlan = payment.oldPlan
+      ? planByModelAndId.get(`${payment.oldPlanModel || 'Plan'}:${payment.oldPlan}`) || null
+      : null;
     const brokenReferences = [
       !user && 'user',
       user && !profile && 'profile',
       !membership && 'membership',
       !plan && 'plan',
     ].filter(Boolean);
-    return { ...payment, user, profile, membership, plan, brokenReferences };
+    return { ...payment, user, profile, membership, plan, oldPlan, brokenReferences };
   });
 }
 

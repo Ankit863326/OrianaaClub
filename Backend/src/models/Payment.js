@@ -16,6 +16,14 @@ const paymentSchema = new mongoose.Schema({
   discountPct: { type: Number, enum: [0, 50, 75], default: 0 },
   plan: { type: mongoose.Schema.Types.ObjectId, refPath: 'planModel', required: true },
   planModel: { type: String, enum: ['Plan', 'MembershipPlan'], default: 'Plan' },
+  purpose: { type: String, enum: ['membership', 'renewal', 'upgrade'], default: 'membership', index: true },
+  targetPlan: { type: mongoose.Schema.Types.ObjectId, refPath: 'targetPlanModel', default: null },
+  targetPlanModel: { type: String, enum: ['Plan', 'MembershipPlan'], default: null },
+  oldPlan: { type: mongoose.Schema.Types.ObjectId, refPath: 'oldPlanModel', default: null },
+  oldPlanModel: { type: String, enum: ['Plan', 'MembershipPlan'], default: null },
+  baseDifference: { type: Number, min: 0, validate: (value) => value === undefined || Number.isSafeInteger(value) },
+  upgradePoints: { type: Number, min: 0, validate: (value) => value === undefined || Number.isSafeInteger(value) },
+  earlyBirdApplied: { type: Boolean, default: false },
   amount: { type: Number, min: 0, validate: (value) => value === undefined || Number.isSafeInteger(value) },
   method: {
     type: String,
@@ -80,6 +88,14 @@ paymentSchema.index(
       familyMember: { $type: 'objectId' },
       status: { $in: ['pending', 'created', 'confirmed', 'paid'] },
     },
+  },
+);
+paymentSchema.index(
+  { membership: 1, purpose: 1 },
+  {
+    unique: true,
+    name: 'membership_pending_upgrade_unique',
+    partialFilterExpression: { purpose: 'upgrade', status: 'pending' },
   },
 );
 

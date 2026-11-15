@@ -27,6 +27,7 @@ import Verification from '../models/Verification.js';
 import { calculateMemberPrice } from './pricing.service.js';
 import { allocateMemberId } from './member-id.service.js';
 import { approveMembership } from './membership-approval.service.js';
+import { applyMembershipUpgrade } from './membership-upgrade.service.js';
 
 const activeMembershipBlockedMessage = 'You already have an active membership. Renewal or upgrade opens when your points are fully used or expired.';
 const renewableMembershipMessage = 'Your points are fully used (or expired). You can renew or upgrade your plan.';
@@ -356,7 +357,12 @@ export async function finalizePayment(paymentId, options = {}) {
       }
       if (!invoiceNumber) invoiceNumber = await allocateInvoiceNumber(session, payment._id);
       const now = new Date();
-      if (!['pending_approval', 'active'].includes(membership.status)) {
+      if (payment.purpose === 'upgrade') {
+        if (membership.status !== 'active') {
+          throw new ApiError(409, 'Only an active membership can be upgraded.');
+        }
+        await applyMembershipUpgrade(session, payment, membership, options.adminId, now);
+      } else if (!['pending_approval', 'active'].includes(membership.status)) {
         const settings = await getSettings({ forceRefresh: true });
         let familyMember = null;
         if (membership.familyMember) {
@@ -680,7 +686,7 @@ export async function listMemberPayments(userId) {
   const payments = await Payment.find({ user: userId })
     .sort({ createdAt: -1 })
     .limit(100)
-    .select('membership plan planModel amount method status baseAmount gstRate gstEnabled gstLabel gstAmount totalAmount currency razorpayOrderId razorpayPaymentId reference transferDate invoiceNumber receiptNumber confirmedAt createdAt updatedAt verifiedAt refunds note')
+    .select('membership plan planModel purpose targetPlan targetPlanModel oldPlan oldPlanModel baseDifference upgradePoints earlyBirdApplied amount method status baseAmount gstRate gstEnabled gstLabel gstAmount totalAmount currency razorpayOrderId razorpayPaymentId reference transferDate invoiceNumber receiptNumber confirmedAt createdAt updatedAt verifiedAt refunds note')
     .populate('plan', 'name title slug')
     .lean();
   return payments.map((payment) => ({
@@ -1292,20 +1298,35 @@ async function sendOfflinePaymentConfirmation(payment, membership, adminId) {
     const PlanModel = payment.planModel === 'MembershipPlan' ? MembershipPlan : Plan;
     const plan = await PlanModel.findById(payment.plan).select('title name').lean();
     emailAttempted = true;
-    await sendMail({
-      to: user.email,
-      subject: 'Your Orianaa Club membership payment receipt',
-      template: 'payment-success',
-      data: {
-        firstName: user.firstName,
-        planName: plan?.title || plan?.name || 'Orianaa Club',
-        memberId: membership.memberId || membership.memberNo || '',
-        invoiceNumber: payment.invoiceNumber,
-        baseAmount: (payment.baseAmount / 100).toFixed(2),
-        gstAmount: (payment.gstAmount / 100).toFixed(2),
-        totalAmount: (payment.totalAmount / 100).toFixed(2),
-      },
-    });
+    if (payment.purpose === 'upgrade') {
+      await sendMail({
+        to: user.email,
+        subject: 'Your Orianaa Club membership plan has been upgraded',
+        template: 'plan-upgraded',
+        data: {
+          firstName: user.firstName,
+          planName: plan?.title || plan?.name || 'Orianaa Club',
+          amountPaid: (payment.totalAmount / 100).toFixed(2),
+          pointsAdded: payment.upgradePoints,
+          newBalance: membership.pointsBalance,
+        },
+      });
+    } else {
+      await sendMail({
+        to: user.email,
+        subject: 'Your Orianaa Club membership payment receipt',
+        template: 'payment-success',
+        data: {
+          firstName: user.firstName,
+          planName: plan?.title || plan?.name || 'Orianaa Club',
+          memberId: membership.memberId || membership.memberNo || '',
+          invoiceNumber: payment.invoiceNumber,
+          baseAmount: (payment.baseAmount / 100).toFixed(2),
+          gstAmount: (payment.gstAmount / 100).toFixed(2),
+          totalAmount: (payment.totalAmount / 100).toFixed(2),
+        },
+      });
+    }
   } catch (error) {
     const code = String(error?.code || error?.name || 'unknown').slice(0, 100);
     console.error(`[payment] Confirmation email failed for payment=${payment._id} code=${code}`);
@@ -1313,7 +1334,7 @@ async function sendOfflinePaymentConfirmation(payment, membership, adminId) {
       try {
         await EmailLog.create({
           to: user?.email || 'unknown@invalid.local',
-          template: 'payment-success',
+          template: payment.purpose === 'upgrade' ? 'plan-upgraded' : 'payment-success',
           status: 'failed',
           error: `Receipt email could not be attempted (code=${code}).`,
         });
@@ -1326,11 +1347,17 @@ async function sendOfflinePaymentConfirmation(payment, membership, adminId) {
         actorType: 'admin',
         actorId: adminId,
         admin: adminId,
-        action: 'membership.payment.confirmation_email.failed',
+        action: payment.purpose === 'upgrade'
+          ? 'membership.upgrade.confirmation_email.failed'
+          : 'membership.payment.confirmation_email.failed',
         entityType: 'payment',
         entityId: String(payment._id),
-        summary: 'The payment was confirmed, but the receipt email could not be sent.',
-        after: { emailTemplate: 'payment-success', emailStatus: 'failed', errorCode: code },
+        summary: 'The payment was confirmed, but the confirmation email could not be sent.',
+        after: {
+          emailTemplate: payment.purpose === 'upgrade' ? 'plan-upgraded' : 'payment-success',
+          emailStatus: 'failed',
+          errorCode: code,
+        },
       });
     } catch (logError) {
       console.error(`[payment] Could not write confirmation-email audit log for payment=${payment._id}: ${logError?.name || 'Error'}`);

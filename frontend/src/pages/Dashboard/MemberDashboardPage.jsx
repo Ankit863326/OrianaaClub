@@ -369,9 +369,10 @@ function PointsHistoryTab({ membership, onSessionExpired }) {
       ? <>
         <div className="member-hub__table-wrap">
           <table className="member-hub__table">
-            <thead><tr>{['Date', 'Amount basis', 'Points', 'Status'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
+            <thead><tr>{['Date', 'Activity', 'Amount basis', 'Points', 'Status'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
             <tbody>{data.items.map((entry, index) => <tr key={`${entry.date}-${entry.type}-${index}`}>
               <td>{formatDate(entry.date, true)}</td>
+              <td>{entry.type === 'upgrade' ? 'Plan upgrade' : entry.type === 'credit_renewal' ? 'Renewal' : 'Membership points'}</td>
               <td>{entry.amountBasis === null || entry.amountBasis === undefined ? '—' : formatINR(entry.amountBasis)}</td>
               <td>{entry.points < 0 ? '−' : '+'}{formatPts(Math.abs(entry.points))}</td>
               <td>{String(entry.status || 'active').replaceAll('_', ' ')}</td>
@@ -382,6 +383,7 @@ function PointsHistoryTab({ membership, onSessionExpired }) {
           {data.items.map((entry, index) => <article className="member-hub__bill-card" key={`${entry.date}-${entry.type}-card-${index}`}>
             <strong>{formatDate(entry.date, true)}</strong>
             <dl>
+              <div><dt>Activity</dt><dd>{entry.type === 'upgrade' ? 'Plan upgrade' : entry.type === 'credit_renewal' ? 'Renewal' : 'Membership points'}</dd></div>
               <div><dt>Amount basis</dt><dd>{entry.amountBasis === null || entry.amountBasis === undefined ? '—' : formatINR(entry.amountBasis)}</dd></div>
               <div><dt>Points</dt><dd>{entry.points < 0 ? '−' : '+'}{formatPts(Math.abs(entry.points))}</dd></div>
               <div><dt>Status</dt><dd>{String(entry.status || 'active').replaceAll('_', ' ')}</dd></div>

@@ -4,7 +4,7 @@ const pointLedgerSchema = new mongoose.Schema({
   membership: { type: mongoose.Schema.Types.ObjectId, ref: 'Membership', required: true },
   type: {
     type: String,
-    enum: ['credit_joining', 'credit_renewal', 'debit_redeem', 'refund', 'expire', 'admin_adjust'],
+    enum: ['credit_joining', 'credit_renewal', 'upgrade', 'debit_redeem', 'refund', 'expire', 'admin_adjust'],
     required: true,
   },
   amount: { type: Number, required: true, min: 1, validate: Number.isSafeInteger },

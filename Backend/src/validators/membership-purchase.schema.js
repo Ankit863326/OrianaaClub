@@ -35,6 +35,11 @@ export const membershipRenewalSchema = z.object({
   companyDetails,
 });
 
+export const membershipUpgradeSchema = z.object({
+  targetPlanId: objectId,
+}).strict();
+export const membershipUpgradeQuoteQuerySchema = z.object({}).strict();
+
 export const membershipPaymentVerificationSchema = z.object({
   razorpay_order_id: z.string().trim().min(1).max(100),
   razorpay_payment_id: z.string().trim().min(1).max(100),

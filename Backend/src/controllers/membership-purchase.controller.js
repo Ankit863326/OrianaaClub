@@ -5,6 +5,8 @@ import { env } from '../config/env.js';
 import { unlink } from 'node:fs/promises';
 import { verificationDocumentPath } from '../utils/verificationDocumentStorage.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { createMembershipUpgrade, quoteMembershipUpgrade } from '../services/membership-upgrade.service.js';
+import { getSettings } from '../models/Setting.js';
 
 export const listPlans = asyncHandler(async (request, response) => {
   const plans = await listPublicMembershipPlans();
@@ -58,6 +60,16 @@ export const renew = asyncHandler(async (request, response) => {
     data,
     message: 'Renewal and pending payment created.',
   });
+});
+
+export const upgradeQuote = asyncHandler(async (request, response) => {
+  const data = await quoteMembershipUpgrade(request.user._id);
+  response.json({ success: true, data, message: 'Membership upgrade quote loaded.' });
+});
+
+export const createUpgrade = asyncHandler(async (request, response) => {
+  const data = await createMembershipUpgrade(request.user._id, request.validated.body.targetPlanId);
+  response.status(201).json({ success: true, data, message: 'Upgrade payment created.' });
 });
 
 export const verifyRazorpay = asyncHandler(async (request, response) => {

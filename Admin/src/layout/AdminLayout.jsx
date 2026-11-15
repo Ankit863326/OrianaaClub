@@ -1,7 +1,7 @@
 // This layout provides shared navigation, the mobile drawer, and admin logout.
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, BookOpen, CalendarDays, CreditCard, FileText, LayoutDashboard, LogOut, Mail, Menu, Shield, Users, Wallet, X, ClipboardList, Settings, UserRoundCheck, Star } from 'lucide-react';
+import { Activity, BookOpen, CalendarDays, CreditCard, FileText, LayoutDashboard, LogOut, Mail, Menu, Shield, Users, Wallet, X, ClipboardList, Settings, UserRoundCheck, Star, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { errorMessage } from '../api/client.js';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -11,7 +11,7 @@ import { Button, Toast } from '../components/ui.jsx';
 const navigation = [
   { title: 'WORKSPACE', links: [['Dashboard', '/', LayoutDashboard], ['Members', '/members', Users], ['Payments', '/payments', CreditCard]] },
   { title: 'MANAGEMENT', links: [['Blog Posts', '/posts', FileText], ['Events', '/events', CalendarDays], ['Reviews', '/reviews', Star], ['Enquiries', '/enquiries', Mail], ['Administrators', '/admins', Shield]] },
-  { title: 'MEMBERSHIP', links: [['Plans', '/membership/plans', BookOpen], ['Members', '/membership/members', Users], ['Draft Members', '/membership/drafts', Users], ['Points', '/points', Wallet], ['Bills', '/membership/bills', ClipboardList], ['Pending Queue', '/membership/queue', UserRoundCheck], ['Reports', '/membership/reports', Activity], ['Audit Log', '/membership/audit', FileText], ['Settings', '/membership/settings', Settings]] },
+  { title: 'MEMBERSHIP', links: [['Plans', '/membership/plans', BookOpen], ['Members', '/membership/members', Users], ['Draft Members', '/membership/drafts', Users], ['Points', '/points', Wallet], ['Bills', '/membership/bills', ClipboardList], ['Pending Queue', '/membership/queue', UserRoundCheck], ['Welcome Kits', '/membership/welcome-kits', Package], ['Reports', '/membership/reports', Activity], ['Audit Log', '/membership/audit', FileText], ['Settings', '/membership/settings', Settings]] },
   { title: 'SYSTEM', links: [['Reports', '/reports', Activity], ['Audit Log', '/audit-log', FileText], ['Email History', '/email-log', Mail]] },
 ];
 const titles = Object.fromEntries(navigation.flatMap((section) => section.links.map(([label, path]) => [path, label])));

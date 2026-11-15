@@ -131,7 +131,13 @@ export default function PaymentsPage() {
   const columns = [
     { key: 'createdAt', label: 'Date', render: (row) => formatDate(row.createdAt) },
     { key: 'user', label: 'Member', render: (row) => row.user?.firstName || '—' },
-    { key: 'plan', label: 'Plan', render: (row) => row.plan?.title || row.plan?.name || '—' },
+    { key: 'oldPlan', label: 'Old plan', render: (row) => row.purpose === 'upgrade'
+      ? row.oldPlan?.title || row.oldPlan?.name || '—'
+      : '—' },
+    { key: 'plan', label: 'New plan', render: (row) => row.plan?.title || row.plan?.name || '—' },
+    { key: 'purpose', label: 'Type', render: (row) => row.purpose === 'upgrade'
+      ? <span className="font-semibold text-forest">Upgrade</span>
+      : 'Membership' },
     { key: 'method', label: 'Method', render: (row) => paymentMethodLabel(row.method) },
     { key: 'references', label: 'Reference status', render: (row) => row.brokenReferences?.length
       ? <span className="text-sm text-red-700" title={`Missing ${row.brokenReferences.join(', ')} reference`}>
@@ -139,6 +145,13 @@ export default function PaymentsPage() {
       </span>
       : '—' },
     { key: 'status', label: 'Status' },
+    { key: 'baseDifference', label: 'Base difference', render: (row) => row.purpose === 'upgrade'
+      ? formatPaise(row.baseDifference)
+      : '—' },
+    { key: 'gstAmount', label: 'GST', render: (row) => formatPaise(row.gstAmount) },
+    { key: 'upgradePoints', label: 'Points', render: (row) => row.purpose === 'upgrade'
+      ? Number(row.upgradePoints || 0).toLocaleString('en-IN')
+      : '—' },
     { key: 'totalAmount', label: 'Total', render: (row) => formatPaise(row.totalAmount) },
     { key: 'details', label: '', render: (row) => <Button variant="secondary" onClick={() => openDetails(row)}>Review</Button> },
   ];
@@ -156,7 +169,13 @@ export default function PaymentsPage() {
     {selected && <div className="fixed inset-0 z-40 bg-midnight/40" onClick={() => setSelected(null)} role="presentation"><aside className="absolute inset-y-0 right-0 w-full max-w-xl overflow-y-auto bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()} aria-label="Payment details">
       <button className="float-right text-sm font-semibold text-forest" onClick={() => setSelected(null)}>Close ×</button>
       <p className="mb-1 text-xs font-bold uppercase tracking-widest text-gold">Payment review</p><h2 className="font-display text-2xl">{selected.user?.firstName || 'Member'} · {selected.plan?.title || selected.plan?.name}</h2>
-      <p className="my-2 text-sm text-slate-500">{selected.status} · {paymentMethodLabel(selected.method)}</p>
+      <p className="my-2 text-sm text-slate-500">{selected.purpose === 'upgrade' ? 'Upgrade · ' : ''}{selected.status} · {paymentMethodLabel(selected.method)}</p>
+      {selected.purpose === 'upgrade' && <Panel className="my-4 grid gap-2 text-sm">
+        <p>Upgrade: {selected.oldPlan?.title || selected.oldPlan?.name || '—'} → {selected.plan?.title || selected.plan?.name || '—'}</p>
+        <p>Base difference <strong>{formatPaise(selected.baseDifference)}</strong></p>
+        <p>GST ({selected.gstRate ?? 0}%) <strong>{formatPaise(selected.gstAmount)}</strong></p>
+        <p>Points to be added <strong>{Number(selected.upgradePoints || 0).toLocaleString('en-IN')}</strong></p>
+      </Panel>}
       {selected.brokenReferences?.length > 0 && <p className="my-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
         Some linked records are unavailable: {selected.brokenReferences.join(', ')}. Payment details remain available for review.
       </p>}

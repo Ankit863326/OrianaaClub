@@ -37,6 +37,18 @@ export async function startMembershipRenewal(planId, paymentMethod) {
   return getData(await apiClient.post('/membership/renew', { planId, paymentMethod }));
 }
 
+export async function getMembershipUpgradeQuote() {
+  return getData(await apiClient.get('/membership/upgrade/quote'));
+}
+
+export async function createMembershipUpgrade(targetPlanId) {
+  return getData(await apiClient.post('/membership/upgrade', { targetPlanId }));
+}
+
+export async function getMembershipBankDetails() {
+  return getData(await apiClient.get('/membership/bank-details'));
+}
+
 export async function createRenewalOrder(paymentId) {
   return getData(await apiClient.post('/membership/razorpay/order', { paymentId }));
 }

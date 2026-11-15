@@ -3,12 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import useAuth from '../../context/useAuth.js';
 import { getMyMembership } from './memberDashboardApi.js';
 import {
+  createMembershipUpgrade,
   createRenewalOrder,
+  getMembershipBankDetails,
+  getMembershipUpgradeQuote,
   getActiveMembershipPlans,
   loadRazorpayCheckout,
   startMembershipRenewal,
   verifyRenewalPayment,
 } from './memberDashboardActionsApi.js';
+import PlanCard from '../../components/PlanCard.jsx';
+import { mapPlanToCard } from '../../lib/planCardData.js';
 
 const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
 const formatINR = (value) => `₹${numberFormat.format(Number(value) || 0)}`;
@@ -42,6 +47,10 @@ export default function RenewDashboardTab() {
   const [message, setMessage] = useState('');
   const [pendingPaymentId, setPendingPaymentId] = useState('');
   const [pendingPlanId, setPendingPlanId] = useState('');
+  const [upgradeQuote, setUpgradeQuote] = useState(null);
+  const [selectedUpgradePlanId, setSelectedUpgradePlanId] = useState('');
+  const [upgradeError, setUpgradeError] = useState('');
+  const [bankDetails, setBankDetails] = useState(null);
 
   const handleSessionExpired = useCallback(async () => {
     try {
@@ -57,6 +66,28 @@ export default function RenewDashboardTab() {
     try {
       const current = await getMyMembership();
       setMembership(current || null);
+      if (current) {
+        try {
+          const quote = await getMembershipUpgradeQuote();
+          setUpgradeQuote(quote);
+          setUpgradeError('');
+          setSelectedUpgradePlanId((previous) => (
+            quote.plans?.some((plan) => String(plan._id) === String(previous) && plan.isUpgradeAllowed)
+              ? previous
+              : String(quote.plans?.find((plan) => plan.isUpgradeAllowed)?._id || '')
+          ));
+          if (quote.pendingUpgrade) {
+            setBankDetails(await getMembershipBankDetails());
+          } else {
+            setBankDetails(null);
+          }
+        } catch (failure) {
+          setUpgradeError(failure.message || 'Could not load upgrade options.');
+        }
+      } else {
+        setUpgradeQuote(null);
+        setBankDetails(null);
+      }
       if (current?.canRenew) {
         const [activePlans, renewablePlans] = await Promise.all([
           getActiveMembershipPlans(),
@@ -205,6 +236,26 @@ export default function RenewDashboardTab() {
     }
   }
 
+  async function onCreateUpgrade() {
+    if (!upgradeQuote?.eligibility || !selectedUpgradePlanId || upgradeQuote.pendingUpgrade) return;
+    setProcessing(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await createMembershipUpgrade(selectedUpgradePlanId);
+      setMessage(`Upgrade payment for ${result.planName} is pending admin confirmation.`);
+      await load();
+    } catch (failure) {
+      if (failure.status === 401) {
+        await handleSessionExpired();
+        return;
+      }
+      setError(failure.message || 'Could not create the upgrade payment.');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   if (loading) return <section className="member-hub__panel" aria-labelledby="renew-dashboard-title">
     <h2 id="renew-dashboard-title">Renew</h2>
     <p className="member-hub__loading" role="status">Loading your renewal options…</p>
@@ -214,6 +265,98 @@ export default function RenewDashboardTab() {
     <h2 id="renew-dashboard-title">Renew</h2>
     {error && <div className="member-hub__error" role="alert">{error}</div>}
     {message && <div className="member-hub__warning" role="status">{message}</div>}
+    {upgradeError && <div className="member-hub__error" role="alert">{upgradeError}</div>}
+    {upgradeQuote && <>
+      <div className="member-upgrade-summary" aria-label="Upgrade summary">
+        <div><span>Current plan</span><strong>{upgradeQuote.currentPlan.name} · {formatINR(upgradeQuote.currentPlan.price)}</strong></div>
+        <div><span>Points remaining</span><strong>{formatPts(upgradeQuote.pointsBalance)}</strong></div>
+        <div><span>Member type</span><strong>{upgradeQuote.earlyBird ? 'Early bird x2' : 'Standard x1.6'}</strong></div>
+        <div><span>Upgrade available</span><strong>{upgradeQuote.eligibility
+          ? `Yes since ${new Date(upgradeQuote.eligibleFrom).toLocaleDateString('en-IN')}`
+          : `Not yet, from ${upgradeQuote.eligibleFrom ? new Date(upgradeQuote.eligibleFrom).toLocaleDateString('en-IN') : 'after membership activation'}`}</strong></div>
+      </div>
+      {!upgradeQuote.eligibility && <div className="member-hub__warning" role="status">
+        {upgradeQuote.eligibleFrom
+          ? `You can upgrade from ${new Date(upgradeQuote.eligibleFrom).toLocaleDateString('en-IN')}, provided your membership is active and has not expired.`
+          : 'Upgrade is available only to an active primary member with an unexpired membership.'}
+      </div>}
+      {upgradeQuote.excludedTier && <div className="member-hub__warning" role="status">Your current membership tier is not eligible for upgrades.</div>}
+      {upgradeQuote.pendingUpgrade
+        ? <div className="member-upgrade-pending" role="status">
+          <h3>Upgrade payment pending</h3>
+          <p>Plan: <strong>{upgradeQuote.pendingUpgrade.planName}</strong></p>
+          <p>Amount including GST: <strong>{formatINR(upgradeQuote.pendingUpgrade.totalPayable)}</strong></p>
+          <p>Points to be added after confirmation: <strong>{formatPts(upgradeQuote.pendingUpgrade.upgradePoints)}</strong></p>
+          <h4>Bank transfer details</h4>
+          {bankDetails
+            ? <dl>
+              <div><dt>Account name</dt><dd>{bankDetails.accountName || '—'}</dd></div>
+              <div><dt>Bank</dt><dd>{bankDetails.bank || '—'}</dd></div>
+              <div><dt>Account number</dt><dd>{bankDetails.accountNumber || '—'}</dd></div>
+              <div><dt>IFSC</dt><dd>{bankDetails.ifsc || '—'}</dd></div>
+              <div><dt>Branch</dt><dd>{bankDetails.branch || '—'}</dd></div>
+            </dl>
+            : <p>Bank transfer details are currently unavailable. Please contact the club.</p>}
+          <p className="member-hub__subtle">Your plan and points update after the admin confirms your transfer.</p>
+        </div>
+        : <div className="member-upgrade-section">
+          <h3>Upgrade your plan</h3>
+          <div className="member-upgrade-grid">
+            {upgradeQuote.plans.map((plan, index) => {
+              const isSelected = String(selectedUpgradePlanId) === String(plan._id);
+              const cardPlan = mapPlanToCard({
+                ...plan,
+                title: plan.title || plan.name,
+                benefitsTitle: plan.name,
+                subtitle: plan.subtitle || '25 year membership',
+                price: plan.price,
+              });
+              return <PlanCard
+                key={`${plan.planModel || 'MembershipPlan'}-${plan._id}`}
+                plan={cardPlan}
+                index={index}
+                visible
+                current={plan.isCurrent}
+                selected={isSelected}
+                upgradeSelected={isSelected}
+                disabled={!plan.isCurrent && (!plan.isUpgradeAllowed || Boolean(upgradeQuote.pendingUpgrade))}
+                buttonLabel={plan.baseDifference > 0 ? 'Select' : 'Not available'}
+                onSelect={() => setSelectedUpgradePlanId(String(plan._id))}
+                details={plan.baseDifference > 0 ? <div className="member-upgrade-card-details">
+                  <p>Pay Rs {numberFormat.format(plan.baseDifference)} + GST</p>
+                  <p>You get +{formatPts(plan.upgradePoints)}</p>
+                </div> : null}
+              />;
+            })}
+          </div>
+          {(() => {
+            const selectedPlan = upgradeQuote.plans.find((plan) => String(plan._id) === String(selectedUpgradePlanId));
+            if (!selectedPlan?.isUpgradeAllowed) return null;
+            return <>
+              <div className="member-upgrade-breakdown">
+                <section>
+                  <h4>You pay</h4>
+                  <p>Price difference <strong>{formatINR(selectedPlan.baseDifference)}</strong></p>
+                  <p>GST ({upgradeQuote.gst.rate}%) <strong>{formatINR(selectedPlan.gstAmount)}</strong></p>
+                  <p>Total to pay <strong>{formatINR(selectedPlan.totalPayable)}</strong></p>
+                </section>
+                <section>
+                  <h4>Points (base amount only)</h4>
+                  <p>{formatINR(selectedPlan.baseDifference)} x {upgradeQuote.multiplier} = <strong>{formatPts(selectedPlan.upgradePoints)}</strong></p>
+                  <p>Current balance <strong>{formatPts(upgradeQuote.pointsBalance)}</strong></p>
+                  <p>New balance <strong>{formatPts(selectedPlan.newBalance)}</strong></p>
+                </section>
+              </div>
+              <button
+                className="member-hub__retry"
+                type="button"
+                disabled={processing || !upgradeQuote.eligibility || Boolean(upgradeQuote.pendingUpgrade)}
+                onClick={onCreateUpgrade}
+              >{processing ? 'Creating upgrade payment…' : `Upgrade to ${selectedPlan.name}`}</button>
+            </>;
+          })()}
+        </div>}
+    </>}
     {!membership
       ? <div className="member-hub__empty">
         <p>No existing membership was found for renewal.</p>

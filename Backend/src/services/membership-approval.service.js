@@ -17,6 +17,7 @@ import { allocateMemberId } from './member-id.service.js';
 import { getMembershipMemberCode } from '../utils/memberCode.js';
 import { creditPoints } from './points-ledger.service.js';
 import { sendMail } from './mail.service.js';
+import { createWelcomeKit } from './welcome-kit.service.js';
 
 function nomineeRole(member) {
   return String(member.nomineeRole || '').trim().toUpperCase();
@@ -81,7 +82,7 @@ async function getTierAndName(membership, session) {
   return { tier, planName: plan.title || plan.name || 'Orianaa Club' };
 }
 
-async function emailDetails(member, planName) {
+async function emailDetails(member, planName, kitCode = '') {
   const userId = member.user || member.linkedUser;
   const user = userId && typeof userId === 'object'
     ? userId
@@ -100,15 +101,18 @@ async function emailDetails(member, planName) {
       firstName,
       planName,
       memberId: getMembershipMemberCode(member) || '',
+      kitHtml: kitCode
+        ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0;background:#f4f7f3;border:1px solid #dfe7df;"><tr><td style="padding:18px;"><p style="margin:0 0 10px;font-weight:bold;">Welcome kit</p><p style="margin:0 0 10px;">Orianaa Club will deliver your welcome kit within 5 working days.</p><p style="margin:0 0 10px;">Your 6-digit delivery code: <strong>${kitCode}</strong></p><p style="margin:0;">Give this code to our delivery executive only after you have received the kit.</p></td></tr></table>`
+        : '',
     },
   };
 }
 
-async function sendApprovalEmails(approved, planName) {
+async function sendApprovalEmails(approved, planName, kitCode = '') {
   const failures = [];
-  for (const member of approved) {
+  for (const [index, member] of approved.entries()) {
     try {
-      const mail = await emailDetails(member, planName);
+      const mail = await emailDetails(member, planName, index === 0 ? kitCode : '');
       if (!mail.to) throw new Error('No email address is available for the approved member.');
       await sendMail(mail);
     } catch (error) {
@@ -491,7 +495,16 @@ export async function approveMembership(membershipId, adminId, now = new Date())
   const nomineeWithEmail = nomineeIds.length
     ? await FamilyMember.find({ _id: { $in: nomineeIds } }).lean()
     : [];
-  const emailFailures = await sendApprovalEmails([primaryWithUser, ...nomineeWithEmail], planName);
+  let kitCode = '';
+  try {
+    const welcomeKit = await createWelcomeKit(membershipResult, now);
+    kitCode = welcomeKit?.code || '';
+  } catch (error) {
+    console.error(
+      `[membership-approval] Welcome kit creation failed for membership ${membershipResult._id}: ${error?.name || 'Error'}:${error?.code || 'unknown'}`,
+    );
+  }
+  const emailFailures = await sendApprovalEmails([primaryWithUser, ...nomineeWithEmail], planName, kitCode);
   return {
     membership: primaryWithUser,
     nominees: nomineeWithEmail,

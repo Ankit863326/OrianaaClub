@@ -53,7 +53,10 @@ export async function getMembershipLedger(membershipId, { page = 1, limit = 20, 
   const skip = (page - 1) * limit;
   const take = skip + limit;
   const pointFilter = { membership: membershipId, ...(type ? { type } : {}) };
-  const awardFilter = { memberId: membershipId };
+  const awardFilter = {
+    memberId: membershipId,
+    source: type ? 'membership_approval' : { $ne: 'upgrade' },
+  };
   const [pointTotal, awardTotal, pointEntries, awardEntries] = await Promise.all([
     PointLedger.countDocuments(pointFilter),
     includeAwards ? PointsLedger.countDocuments(awardFilter) : 0,
@@ -64,12 +67,14 @@ export async function getMembershipLedger(membershipId, { page = 1, limit = 20, 
   ]);
   const normalizedAwards = awardEntries.map((entry) => ({
     ...entry,
-    type: awardType,
+    type: entry.source === 'upgrade' ? 'upgrade' : awardType,
     amount: entry.points,
     direction: '+',
     balanceAfter: null,
-    note: `Membership approval award · ${entry.phase || 'standard'} rate, sequence ${entry.approvalSeq ?? 'unknown'}.`,
-    source: 'approval_award',
+    note: entry.source === 'upgrade'
+      ? 'Membership plan upgrade points'
+      : `Membership approval award · ${entry.phase || 'standard'} rate, sequence ${entry.approvalSeq ?? 'unknown'}.`,
+    source: entry.source === 'upgrade' ? 'upgrade' : 'approval_award',
     createdAt: entry.creditedAt || entry.createdAt || null,
   }));
   const items = [...pointEntries, ...normalizedAwards]
@@ -652,8 +657,8 @@ export async function getMembershipDetails(membershipId) {
       : null,
     FamilyMember.find({ membership: membership._id }).sort({ createdAt: 1 }).lean(),
     Payment.find({ membership: membership._id })
-      .select('amount baseAmount gstRate gstEnabled gstLabel gstAmount totalAmount method status reference note createdAt confirmedBy plan planModel')
-      .sort({ createdAt: -1 }).lean(),
+      .select('amount baseAmount baseDifference gstRate gstEnabled gstLabel gstAmount totalAmount upgradePoints earlyBirdApplied purpose targetPlan targetPlanModel oldPlan oldPlanModel method status reference note createdAt confirmedBy plan planModel')
+      .sort({ createdAt: -1 }).populate('plan', 'name title').populate('oldPlan', 'name title').lean(),
     mongoose.isValidObjectId(membership.nominee)
       ? FamilyMember.findOne({ _id: membership.nominee, membership: membership._id, status: 'active' })
         .select('name fullName relation relationship type').lean()
@@ -776,7 +781,7 @@ export async function getMembershipReports() {
   const now = new Date();
   const [issued, redeemed, expiring30, expiring90, paymentMethods, refunds, settings, earlyBirdUsed] = await Promise.all([
     PointLedger.aggregate([
-      { $match: { type: { $in: ['credit_joining', 'credit_renewal', 'refund', 'admin_adjust'] }, direction: '+' } },
+      { $match: { type: { $in: ['credit_joining', 'credit_renewal', 'upgrade', 'refund', 'admin_adjust'] }, direction: '+' } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
     PointLedger.aggregate([
@@ -856,7 +861,7 @@ export async function getMembershipOperationsReport(query = {}) {
     PointLedger.aggregate([
       { $match: {
         ...reportDateFilter(query.from, query.to),
-        type: { $in: ['credit_joining', 'credit_renewal', 'debit_redeem', 'expire', 'admin_adjust'] },
+        type: { $in: ['credit_joining', 'credit_renewal', 'upgrade', 'debit_redeem', 'expire', 'admin_adjust'] },
       } },
       { $group: { _id: { type: '$type', direction: '$direction' }, total: { $sum: '$amount' } } },
     ]),
@@ -899,7 +904,7 @@ export async function getMembershipOperationsReport(query = {}) {
 
   return {
     points: {
-      issued: ['credit_joining', 'credit_renewal', 'admin_adjust']
+      issued: ['credit_joining', 'credit_renewal', 'upgrade', 'admin_adjust']
         .reduce((sum, type) => sum + totalFor(type, '+'), 0),
       redeemed: totalFor('debit_redeem', '-'),
       expired: totalFor('expire', '-'),

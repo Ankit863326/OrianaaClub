@@ -83,13 +83,10 @@ export async function getMyMembership(userId) {
   const now = new Date();
   const status = membershipStatus(membership, now);
   const pointsExpired = !membership.pointsExpireAt || membership.pointsExpireAt <= now;
-  const [ledgerBalance, hasPointsLedger] = await Promise.all([
-    getBalance(membership._id),
-    PointsLedger.exists({ memberId: membership._id }),
-  ]);
-  const pointsBalance = hasPointsLedger
-    ? ledgerBalance
-    : Number.isSafeInteger(membership.pointsBalance) ? membership.pointsBalance : 0;
+  const hasPointsLedger = await PointsLedger.exists({ memberId: membership._id });
+  const pointsBalance = Number.isSafeInteger(membership.pointsBalance)
+    ? membership.pointsBalance
+    : (hasPointsLedger ? await getBalance(membership._id) : 0);
   const canRenew = ['active', 'expired'].includes(status) && (pointsBalance === 0 || pointsExpired);
   const [nominee, plans, familyProfiles] = await Promise.all([
     membership.nominee
@@ -272,7 +269,13 @@ export async function getMyPointsHistory(userId, query) {
   const membership = await latestMemberMembership(userId);
   const { page, limit, skip } = pagination(query);
   const filter = { membership: membership._id };
-  if (query.type) filter.type = query.type;
+  if (query.type === 'upgrade') {
+    filter.type = { $in: [] };
+  } else if (query.type) {
+    filter.type = query.type;
+  } else {
+    filter.type = { $ne: 'upgrade' };
+  }
   const createdAt = dateRange(query.from, query.to);
   if (createdAt) filter.createdAt = createdAt;
   const [legacyItems, legacyTotal, safeLedger] = await Promise.all([
@@ -284,9 +287,13 @@ export async function getMyPointsHistory(userId, query) {
     PointLedger.countDocuments(filter),
     getMemberSafeLedger(membership._id),
   ]);
-  const newItems = query.type && query.type !== 'credit_joining'
-    ? []
-    : safeLedger
+  const newItems = safeLedger
+      .filter((entry) => {
+        if (!query.type) return true;
+        if (query.type === 'upgrade') return entry.source === 'upgrade';
+        return entry.source !== 'upgrade'
+          && (query.type === 'credit_joining' || query.type === 'credit_renewal');
+      })
       .filter((entry) => !createdAt || (
         entry.creditedAt >= createdAt.$gte || !createdAt.$gte
       ) && (
@@ -297,6 +304,7 @@ export async function getMyPointsHistory(userId, query) {
         amountBasis: entry.pointsBasis,
         date: entry.creditedAt,
         status: entry.status,
+        ...(entry.source === 'upgrade' ? { type: 'upgrade' } : {}),
       }));
   const items = [
     ...legacyItems.map((item) => ({

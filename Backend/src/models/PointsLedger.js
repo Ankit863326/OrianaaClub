@@ -7,12 +7,18 @@ const pointsLedgerSchema = new mongoose.Schema({
   phase: { type: String, enum: ['early_bird', 'default'], required: true },
   approvalSeq: { type: Number, required: true, min: 1, validate: Number.isSafeInteger },
   points: { type: Number, required: true, min: 0, validate: Number.isSafeInteger },
+  source: { type: String, enum: ['membership_approval', 'upgrade'], default: 'membership_approval' },
+  payment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', default: null },
   creditedAt: { type: Date, required: true, default: Date.now, immutable: true },
   expiresAt: { type: Date, required: true },
   status: { type: String, enum: ['active', 'expired'], default: 'active', index: true },
 }, { timestamps: true });
 
 pointsLedgerSchema.index({ memberId: 1, creditedAt: -1 });
+pointsLedgerSchema.index(
+  { payment: 1 },
+  { unique: true, partialFilterExpression: { payment: { $type: 'objectId' } } },
+);
 const PointsLedger = mongoose.models.PointsLedger
   || mongoose.model('PointsLedger', pointsLedgerSchema);
 

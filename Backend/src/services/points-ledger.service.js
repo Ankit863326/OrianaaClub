@@ -30,7 +30,11 @@ function roundedProduct(amount, multiplier) {
   return points;
 }
 
-export async function creditPoints(session, member, approvalSeq) {
+export function calculatePoints(amount, multiplier) {
+  return roundedProduct(amount, multiplier);
+}
+
+export async function creditPoints(session, member, approvalSeq, options = {}) {
   requireTransactionSession(session);
   if (!member?._id) throw new TypeError('A persisted member is required to credit points.');
   if (isNominee(member)) return null;
@@ -40,11 +44,11 @@ export async function creditPoints(session, member, approvalSeq) {
 
   const settings = await getSettings({ forceRefresh: true });
   const config = settings.familyMembership || DEFAULT_FAMILY_MEMBERSHIP_CONFIG;
-  const pointsBasis = config.pointsOnBase ? member.baseAmount : member.totalPaid;
-  const phase = approvalSeq <= config.earlyBirdLimit ? 'early_bird' : 'default';
-  const multiplier = phase === 'early_bird'
+  const pointsBasis = options.pointsBasis ?? (config.pointsOnBase ? member.baseAmount : member.totalPaid);
+  const phase = options.phase || (approvalSeq <= config.earlyBirdLimit ? 'early_bird' : 'default');
+  const multiplier = options.multiplier ?? (phase === 'early_bird'
     ? config.multipliers.earlyBird
-    : config.multipliers.default;
+    : config.multipliers.default);
   const points = roundedProduct(pointsBasis, multiplier);
   const creditedAt = new Date();
   const expiresAt = new Date(creditedAt);
@@ -57,6 +61,8 @@ export async function creditPoints(session, member, approvalSeq) {
     phase,
     approvalSeq,
     points,
+    source: options.source || 'membership_approval',
+    payment: options.paymentId || null,
     creditedAt,
     expiresAt,
     status: 'active',
@@ -81,6 +87,7 @@ export function toMemberSafeLedgerEntry(entry) {
   const value = typeof entry?.toObject === 'function' ? entry.toObject() : { ...entry };
   const memberSafeEntry = { ...value };
   delete memberSafeEntry.expiresAt;
+  delete memberSafeEntry.payment;
   return memberSafeEntry;
 }
 

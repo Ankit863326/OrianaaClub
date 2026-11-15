@@ -82,10 +82,11 @@ export default function PaymentsReceiptsTab({ onSessionExpired }) {
         const confirmed = payment.status === 'confirmed';
         return <article className="member-hub-receipt" key={payment._id}>
           <div className="member-hub-receipt__heading">
-            <h3>{payment.plan?.name || payment.plan?.title || 'Membership payment'}</h3>
+            <h3>{payment.purpose === 'upgrade' ? `Upgrade · ${payment.plan?.name || payment.plan?.title || 'Membership plan'}` : payment.plan?.name || payment.plan?.title || 'Membership payment'}</h3>
             <span className={`member-hub-receipt__status ${status.className}`}>{status.label}</span>
           </div>
           <dl>
+            {payment.purpose === 'upgrade' && <div><dt>Old plan</dt><dd>{payment.oldPlan?.name || payment.oldPlan?.title || '—'}</dd></div>}
             <div><dt>Date</dt><dd>{formatDate(payment.confirmedAt || payment.createdAt)}</dd></div>
             <div><dt>Plan fee</dt><dd>{formatINR(payment.baseAmount ?? Number(payment.amount || 0) * 100)}</dd></div>
             <div>

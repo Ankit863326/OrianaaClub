@@ -27,6 +27,7 @@ describe('public page inventory', () => {
   beforeEach(() => fetch.mockReset());
 
   test('home page renders key links and the event carousel changes its featured story', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ data: [] }));
     const { container } = withRouter(<HomePage />);
     expect(screen.getByRole('heading', { name: 'The Orianaa Club' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Explore Destinations' })).toHaveAttribute('href', '/resorts');
@@ -35,7 +36,8 @@ describe('public page inventory', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next event' }));
     expect(screen.getByRole('heading', { name: 'A slower kind of escape' })).toBeInTheDocument();
     expect(container.querySelectorAll('.home-destination')).toHaveLength(2);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(await screen.findByText('Member stories will appear here as reviews are shared.')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/stories/reviews'), expect.any(Object));
   });
 
   test('events page loads API event details and lets a visitor choose an event', async () => {

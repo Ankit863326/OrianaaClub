@@ -24,6 +24,7 @@ const MembershipReportsPage = lazy(() => import('./membership/MembershipReportsP
 const NewMembershipPlansPage = lazy(() => import('./membership/PlansPage.jsx'));
 const MembershipComingNextPage = lazy(() => import('./membership/ComingNextPage.jsx'));
 const DraftMembersPage = lazy(() => import('./pages/DraftMembersPage.jsx'));
+const WelcomeKitPage = lazy(() => import('./pages/WelcomeKitPage.jsx'));
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="membership/family-verifications/:familyId" element={<FamilyVerificationReviewPage />} />
         <Route path="membership/bills" element={<MembershipBillsPage />} />
         <Route path="membership/queue" element={<MembershipPendingQueuePage />} />
+        <Route path="membership/welcome-kits" element={<WelcomeKitPage />} />
         <Route path="membership/settings" element={<MembershipComingNextPage title="Settings" />} />
         <Route path="membership/reports" element={<MembershipReportsPage />} />
         <Route path="membership/audit" element={<MembershipComingNextPage title="Audit Log" />} />

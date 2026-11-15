@@ -9,6 +9,8 @@ import {
   membershipPaymentOrderSchema,
   membershipPurchaseSchema,
   membershipRenewalSchema,
+  membershipUpgradeSchema,
+  membershipUpgradeQuoteQuerySchema,
 } from '../validators/membership-purchase.schema.js';
 import { passwordLinkSchema } from '../validators/auth.schema.js';
 import * as draftController from '../controllers/membership-draft.controller.js';
@@ -30,6 +32,8 @@ router.use(memberAccessAuth);
 router.get('/bank-details', membershipPurchaseController.bankDetails);
 router.post('/purchase', paymentLimiter, validate(membershipPurchaseSchema), membershipPurchaseController.purchase);
 router.post('/renew', paymentLimiter, validate(membershipRenewalSchema), membershipPurchaseController.renew);
+router.get('/upgrade/quote', validate(membershipUpgradeQuoteQuerySchema, 'query'), membershipPurchaseController.upgradeQuote);
+router.post('/upgrade', paymentLimiter, validate(membershipUpgradeSchema), membershipPurchaseController.createUpgrade);
 router.post('/razorpay/order', paymentLimiter, validate(membershipPaymentOrderSchema), membershipPurchaseController.createRazorpayOrder);
 router.post('/razorpay/verify', paymentLimiter, validate(membershipPaymentVerificationSchema), membershipPurchaseController.verifyRazorpay);
 router.post('/verification-document', verificationDocumentUpload, membershipPurchaseController.uploadVerificationDocument);

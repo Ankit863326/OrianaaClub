@@ -46,6 +46,9 @@ export default function PlanCard({
   to,
   selected = false,
   disabled = false,
+  current = false,
+  upgradeSelected = false,
+  details,
   featured,
   visible = false,
 }) {
@@ -53,13 +56,13 @@ export default function PlanCard({
   const isInView = useInView(cardRef, { once: true, margin: '-60px' });
   const isFeatured = featured ?? Boolean(plan.isFeatured);
   const buttonClassName = `mb-card__btn ${isFeatured ? 'mb-card__btn--white' : 'mb-card__btn--green'}`;
-  const label = selected ? 'Selected' : buttonLabel;
+  const label = selected ? 'Selected' : current ? 'Your current plan' : buttonLabel;
   const cohorts = Array.isArray(plan.cohorts) ? plan.cohorts : [];
 
   return (
     <motion.article
       ref={cardRef}
-      className={`mb-card${isFeatured ? ' mb-card--featured' : ''}${selected ? ' mb-card--selected' : ''}`}
+      className={`mb-card${isFeatured ? ' mb-card--featured' : ''}${selected ? ' mb-card--selected' : ''}${current ? ' mb-card--current' : ''}${upgradeSelected ? ' mb-card--upgrade-selected' : ''}${disabled && !current ? ' mb-card--unavailable' : ''}`}
       initial={visible ? false : { opacity: 0, y: 40 }}
       animate={visible || isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
       transition={{ duration: 0.65, delay: (index % 3) * 0.12, ease: [0.22, 1, 0.36, 1] }}
@@ -67,7 +70,7 @@ export default function PlanCard({
     >
       <GoldWaveWatermark isDark={isFeatured} />
 
-      {selected && <span className="mb-card__selected-badge">Selected</span>}
+      {(selected || current) && <span className="mb-card__selected-badge">{selected ? 'Selected' : 'Your current plan'}</span>}
       <div className="mb-card__header">
         <h3 className="mb-card__title">{plan.title}</h3>
         <p className="mb-card__subtitle">{plan.subtitle}</p>
@@ -86,6 +89,8 @@ export default function PlanCard({
         ))}
       </div>}
 
+      {details}
+
       <div className="mb-card__footer">
         <div className="mb-card__price">{plan.priceLabel}</div>
         {to ? (
@@ -95,7 +100,7 @@ export default function PlanCard({
             className={buttonClassName}
             type="button"
             onClick={onSelect}
-            disabled={disabled}
+            disabled={disabled || current}
             aria-pressed={selected}
           >
             {label}

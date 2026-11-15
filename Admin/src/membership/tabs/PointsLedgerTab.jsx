@@ -19,6 +19,7 @@ const rowsPerPage = 20;
 const ledgerTypes = [
   ['credit_joining', 'Joining points'],
   ['credit_renewal', 'Renewal points'],
+  ['upgrade', 'Plan upgrade points'],
   ['debit_redeem', 'Redemption'],
   ['refund', 'Refund'],
   ['expire', 'Expiry'],

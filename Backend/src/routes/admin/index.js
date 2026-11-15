@@ -17,6 +17,7 @@ import billingAdminRoutes from './billing.routes.js';
 import membershipConsoleRoutes from './membership-console.routes.js';
 import draftsRoutes from './drafts.routes.js';
 import memberReviewsRoutes from './member-reviews.routes.js';
+import welcomeKitRoutes from './welcome-kit.routes.js';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/plans', plansRoutes);
 router.use('/payments', paymentsRoutes);
 router.use('/memberships', membershipsRoutes);
+router.use('/welcome-kits', welcomeKitRoutes);
 router.use('/reviews', memberReviewsRoutes);
 router.use('/', billingAdminRoutes);
 router.use('/', familyRoutes);

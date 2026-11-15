@@ -171,6 +171,7 @@ export const memberLedgerQuerySchema = pagination.extend({
   type: z.enum([
     'credit_joining',
     'credit_renewal',
+    'upgrade',
     'debit_redeem',
     'refund',
     'expire',
