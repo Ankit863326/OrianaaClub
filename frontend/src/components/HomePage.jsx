@@ -261,13 +261,10 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
         >
-<<<<<<< HEAD
           <p className="home-eyebrow">A more considered way to get away</p>
           <h1 id="home-hero-title">The Orianaa Club</h1>
-=======
           <p className="home-eyebrow">Saptagiri Resorts · The OrianaaClub vision</p>
           {/* <h1 id="home-hero-title">The Orianaa Club</h1> */}
->>>>>>> 71ffd047fe49a3b65ad8d69f467764ef5250bc25
           <p className="home-hero__summary">
             A members-only community of nature resorts across India. Through
             OrianaaClub, discover restorative stays, pure vegetarian hospitality,
