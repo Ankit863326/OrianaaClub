@@ -3,7 +3,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Leaf, Mountain, Trees, Waves } f
 import { AnimatePresence, LazyMotion, m as Motion, useReducedMotion } from "framer-motion";
 import { Button } from "./ui/button";
 // import beachImage from "../assets/beachh.jpg";
-import heroVideo from "../assets/OrianaaClub_promo_video_creation_20261019122757.mp4";
+import heroVideo from "../assets/Saptagiri Video.mp4";
 import LuxuryContactDrawer from "./LuxuryContactDrawer";
 import { contentApi } from "../lib/contentApi.js";
 import saptagiriimg from "../assets/Swimming pool .png";
