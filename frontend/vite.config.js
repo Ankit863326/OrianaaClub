@@ -42,7 +42,23 @@ export default defineConfig(({ command, mode }) => {
         '/terms': { target: backendTarget, changeOrigin: true },
       },
     },
-    build: { sourcemap: false },
+    build: {
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/gsap')) return 'gsap';
+            if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) return 'motion';
+            if (id.includes('node_modules/react-dom')) return 'react-dom';
+            if (id.includes('node_modules/react-router-dom') || id.includes('node_modules/react-router')) return 'router';
+            if (id.includes('node_modules/lucide-react')) return 'lucide';
+            if (id.includes('node_modules/')) return 'vendor';
+          },
+        },
+      },
+      chunkSizeWarningLimit: 600,
+      assetsInlineLimit: 4096,
+    },
     resolve: {
       alias: {
         '@': path.resolve(frontendDirectory, './src'),

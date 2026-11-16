@@ -1,28 +1,29 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import BackToTop from './components/BackToTop';
 import Footer from './components/Footer';
-import HomePage from './components/HomePage';
-import LoginPage from './pages/LoginPage/LoginPage';
-import MembershipAll from './pages/LuxuryMembershipStepOne/MembershipAll';
-import MembershipBenefits from "./pages/MembershipBenefits";
-import RoomCategories from './pages/RoomCategories/RoomCategories';
-import Experiences from "./pages/Experiences/Experiences";
-import Events from "./pages/Events/Events";
-import Blog from "./pages/Blog/Blog";
-import logoImg from './assets/Oriana Club Luxury Emblem.png';
 import { AuthProvider } from './context/AuthContext.jsx';
 import useAuth from './context/useAuth.js';
-import Activate from './pages/Activate/Activate.jsx';
-import ForgotPassword from './pages/ForgotPassword/ForgotPassword.jsx';
-import ResetPassword from './pages/ResetPassword/ResetPassword.jsx';
-import Dashboard from './pages/Dashboard/MemberDashboardPage.jsx';
-import FamilyVerificationPage from './pages/Dashboard/FamilyVerificationPage.jsx';
-import FamilyCheckoutPage from './pages/Dashboard/FamilyCheckoutPage.jsx';
-import NotFound from './pages/NotFound/NotFound.jsx';
+const logoImg = '/images/optimized/Oriana Club Luxury Emblem.webp';
 import LuxuryCursor from './components/LuxuryCursor';
 import OrianaaChatbot from './components/OrianaaChatbot.jsx';
+
+const HomePage = lazy(() => import('./components/HomePage'));
+const LoginPage = lazy(() => import('./pages/LoginPage/LoginPage'));
+const MembershipAll = lazy(() => import('./pages/LuxuryMembershipStepOne/MembershipAll'));
+const MembershipBenefits = lazy(() => import('./pages/MembershipBenefits'));
+const RoomCategories = lazy(() => import('./pages/RoomCategories/RoomCategories'));
+const Experiences = lazy(() => import('./pages/Experiences/Experiences'));
+const Events = lazy(() => import('./pages/Events/Events'));
+const Blog = lazy(() => import('./pages/Blog/Blog'));
+const Activate = lazy(() => import('./pages/Activate/Activate'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword/ResetPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard/MemberDashboardPage'));
+const FamilyVerificationPage = lazy(() => import('./pages/Dashboard/FamilyVerificationPage'));
+const FamilyCheckoutPage = lazy(() => import('./pages/Dashboard/FamilyCheckoutPage'));
+const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
 
 function SiteScrollMotion() {
   const location = useLocation();
@@ -110,6 +111,7 @@ function App() {
             </div>
           </div>
         )}
+        <Suspense fallback={<main aria-live="polite" style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'#e2ad32'}}>Loading…</main>}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/resorts" element={<RoomCategories />} />
@@ -133,6 +135,7 @@ function App() {
           <Route path="/luxury-membership-step-3" element={<Navigate to="/luxury-membership?step=3" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
         <Footer />
         <BackToTop />
         <OrianaaChatbot />

@@ -3,10 +3,11 @@ import { ArrowRight, ChevronLeft, ChevronRight, Leaf, Mountain, Trees, Waves } f
 import { AnimatePresence, LazyMotion, m as Motion, useReducedMotion } from "framer-motion";
 import { Button } from "./ui/button";
 // import beachImage from "../assets/beachh.jpg";
-import heroVideo from "../assets/Saptagiri Video.mp4";
+const heroVideo = '/videos/saptagiri-hero.mp4';
 import LuxuryContactDrawer from "./LuxuryContactDrawer";
 import { contentApi } from "../lib/contentApi.js";
-import saptagiriimg from "../assets/Swimming pool .png";
+// import saptagiriimg from "../assets/Swimming pool .png";
+const saptagiriimg = '/images/optimized/Swimming pool .webp';
 import "./HomePage.css";
 
 const destinations = [
@@ -249,7 +250,8 @@ export default function HomePage() {
             loop
             playsInline
             controls
-            preload="metadata"
+            preload="none"
+            poster="/videos/hero-poster.jpg"
             aria-label="Saptagiri Resorts video"
           >
             <source src={heroVideo} type="video/mp4" />
@@ -303,13 +305,17 @@ export default function HomePage() {
           <div className="home-universe-gallery" aria-label="Orianaa resort collection">
             <div className="home-universe-gallery__main">
               {destinations.map((destination, index) => (
-                <img
-                  className="home-universe-gallery__main-image"
-                  key={destination.place || index}
-                  src={destination.image}
-                  alt={`${destination.name} - ${destination.place}`}
-                  data-universe-image
-                />
+                  <img
+                    className="home-universe-gallery__main-image"
+                    key={destination.place || index}
+                    src={destination.image}
+                    alt={`${destination.name} - ${destination.place}`}
+                    width="800"
+                    height="600"
+                    loading="lazy"
+                    decoding="async"
+                    data-universe-image
+                  />
               ))}
               {destinations.map((destination, index) => (
                 <div
@@ -334,7 +340,7 @@ export default function HomePage() {
                   style={{ cursor: "pointer" }}
                   aria-label={`View ${destination.name} at ${destination.place}`}
                 >
-                  <img src={destination.image} alt={destination.place} />
+                  <img src={destination.image} alt={destination.place} width="200" height="150" loading="lazy" decoding="async" />
                   <figcaption title={destination.place}>
                     {destination.place.split(",")[0]} - {destination.name}
                   </figcaption>
@@ -366,7 +372,7 @@ export default function HomePage() {
                 transition={{ duration: shouldReduceMotion ? 0 : 0.5, delay: shouldReduceMotion ? 0 : index * 0.08 }}
               >
                 <div className="home-destination__image">
-                  <img src={destination.image} alt={destination.name} />
+                  <img src={destination.image} alt={destination.name} width="600" height="400" loading="lazy" decoding="async" />
                   <span className="home-destination__arrow" aria-hidden="true">
                     <ArrowRight size={19} />
                   </span>
@@ -536,6 +542,8 @@ export default function HomePage() {
             <img
               src="https://i.pinimg.com/1200x/ea/3a/02/ea3a023dfe2b94a9137b569ca4478e4a.jpg"
               alt="A family spending a quiet afternoon together"
+              loading="lazy"
+              decoding="async"
             />
             <span className="home-benefits__image-note">Make time mean more</span>
           </Motion.div>

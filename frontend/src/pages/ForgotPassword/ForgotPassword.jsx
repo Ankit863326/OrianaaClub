@@ -1,7 +1,7 @@
 // Phase 1: Request a password reset without revealing whether an account exists.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import loginBg from '../../assets/Member login clean.png';
+const loginBg = '/images/optimized/Member login clean.webp';
 import apiClient from '../../lib/apiClient.js';
 import '../LoginPage/LoginPage.css';
 import './ForgotPassword.css';

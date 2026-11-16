@@ -1,7 +1,7 @@
 // Verify a password setup link and let a new member choose their password.
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import loginBg from '../../assets/Member login clean.png';
+const loginBg = '/images/optimized/Member login clean.webp';
 import apiClient from '../../lib/apiClient.js';
 import useAuth from '../../context/useAuth.js';
 import '../LoginPage/LoginPage.css';

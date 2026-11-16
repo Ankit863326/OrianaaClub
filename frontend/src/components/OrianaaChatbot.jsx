@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronUp, Mic, MicOff, Minus, Send, X } from 'lucide-react';
 import { sendChatbotMessage } from '../lib/chatbotApi.js';
 import { detectChatLanguage, getBrowserChatLanguage } from '../lib/chatbotLanguage.js';
-import brandMark from '../assets/oriana-brand-mark.png';
+const brandMark = '/images/optimized/oriana-brand-mark.webp';
 import './OrianaaChatbot.css';
 
 const COPY = Object.freeze({

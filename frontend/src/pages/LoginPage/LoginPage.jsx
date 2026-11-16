@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion as Motion, AnimatePresence } from "framer-motion";
-import loginBg from "../../assets/Member login clean.png";
+const loginBg = '/images/optimized/Member login clean.webp';
 import useAuth from "../../context/useAuth.js";
 import { getMember } from "../../lib/memberApi.js";
 import "./LoginPage.css";

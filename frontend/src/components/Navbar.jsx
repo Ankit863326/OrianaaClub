@@ -3,7 +3,7 @@ import { ArrowRight, Menu, Search, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import useAuth from "../context/useAuth.js";
-import logoImg from "../assets/Oriana Club Luxury Emblem Transparent.png";
+const logoImg = '/images/optimized/Oriana Club Luxury Emblem Transparent.webp';
 import "./Navbar.css";
 
 const searchItems = [

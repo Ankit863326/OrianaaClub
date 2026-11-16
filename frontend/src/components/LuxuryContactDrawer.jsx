@@ -8,7 +8,7 @@ import { Label } from "./ui/label";
 import ReCAPTCHA from "react-google-recaptcha";
 import { lockPageScroll, unlockPageScroll } from "../lib/scrollLock";
 import { contentApi } from "../lib/contentApi.js";
-import resortBg from "../assets/club-bg.jpg";
+const resortBg = '/images/optimized/club-bg.webp';
 import "./LuxuryContactDrawer.css";
 
 const fieldMotion = {

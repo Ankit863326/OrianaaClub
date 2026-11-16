@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import loginBg from '../../assets/Member login clean.png';
+const loginBg = '/images/optimized/Member login clean.webp';
 import apiClient from '../../lib/apiClient.js';
 import '../LoginPage/LoginPage.css';
 import './ResetPassword.css';

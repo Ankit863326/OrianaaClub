@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import { apiResourceUrl } from "../config/api.js";
-import logoImg from "../assets/Oriana Club Luxury Emblem Transparent.png";
+const logoImg = '/images/optimized/Oriana Club Luxury Emblem Transparent.webp';
 import "./Footer.css";
 
 const exploreLinks = [
