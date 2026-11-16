@@ -315,7 +315,7 @@ export default function RenewDashboardTab() {
                 selected={isSelected}
                 upgradeSelected={isSelected}
                 disabled={!plan.isCurrent && (!plan.isUpgradeAllowed || Boolean(upgradeQuote.pendingUpgrade))}
-                buttonLabel={plan.baseDifference > 0 ? 'Select' : 'Not available'}
+                buttonLabel={plan.isCurrent ? 'Your current plan' : plan.baseDifference > 0 ? 'Select' : 'Not available'}
                 onSelect={() => setSelectedUpgradePlanId(String(plan._id))}
                 details={plan.baseDifference > 0 ? <div className="member-upgrade-card-details">
                   <p>Pay Rs {numberFormat.format(plan.baseDifference)} + GST</p>
