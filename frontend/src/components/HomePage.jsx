@@ -101,10 +101,26 @@ export default function HomePage() {
   const [activeReview, setActiveReview] = useState(0);
   const universeRef = useRef(null);
   const universeScrollTriggerRef = useRef(null);
+  const videoRef = useRef(null);
   const shouldReduceMotion = useReducedMotion();
   const event = events[activeEvent];
   const previousEvent = (activeEvent - 1 + events.length) % events.length;
   const nextEvent = (activeEvent + 1) % events.length;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+    video.defaultMuted = true;
+    if (!shouldReduceMotion) {
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("Hero video autoplay failed:", err);
+        });
+      }
+    }
+  }, [shouldReduceMotion]);
 
   useEffect(() => {
     let active = true;
@@ -244,13 +260,14 @@ export default function HomePage() {
           aria-labelledby="home-hero-title"
         >
           <video
+            ref={videoRef}
             className="home-hero__video"
             autoPlay={!shouldReduceMotion}
             muted
             loop
             playsInline
             controls
-            preload="none"
+            preload="auto"
             poster="/videos/hero-poster.jpg"
             aria-label="Saptagiri Resorts video"
           >
