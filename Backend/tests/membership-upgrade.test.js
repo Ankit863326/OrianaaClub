@@ -109,24 +109,29 @@ describe('membership plan upgrades', () => {
     const member = await createActiveMember();
     const target = await createPlan(`Target ${targetPrice}`, targetPrice);
     await expect(createMembershipUpgrade(member.user._id, String(target._id)))
-      .rejects.toThrow('Only a higher-priced plan');
+      .rejects.toThrow('must be higher than your current plan');
   });
 
-  test('rejects a member who has not completed three months', async () => {
+  test('allows an active member to upgrade before three months', async () => {
     const member = await createActiveMember({ activatedAt: new Date(Date.now() - 30 * 86400000) });
     const target = await createPlan('Platinum Crest', 500000);
-    await expect(createMembershipUpgrade(member.user._id, String(target._id)))
-      .rejects.toThrow('not eligible to upgrade');
+    const quote = await quoteMembershipUpgrade(member.user._id);
+    expect(quote.eligibility).toBe(true);
+    expect(quote.eligibilityReason).toBeNull();
+    await expect(createMembershipUpgrade(member.user._id, String(target._id))).resolves.toMatchObject({
+      planName: 'Platinum Crest',
+    });
   });
 
   test.each([
-    ['expired membership', { endDate: new Date(Date.now() - 86400000) }],
-    ['inactive membership', { status: 'expired' }],
-  ])('rejects an %s', async (_label, overrides) => {
+    ['expired membership', { endDate: new Date(Date.now() - 86400000) }, 'expired'],
+    ['expired status', { status: 'expired' }, 'expired'],
+    ['inactive membership', { status: 'cancelled' }, 'inactive'],
+  ])('rejects an %s with a clear error', async (_label, overrides, reason) => {
     const member = await createActiveMember(overrides);
     const target = await createPlan(`Target ${new mongoose.Types.ObjectId()}`, 500000);
     await expect(createMembershipUpgrade(member.user._id, String(target._id)))
-      .rejects.toThrow('not eligible to upgrade');
+      .rejects.toThrow(reason);
   });
 
   test('blocks a second pending upgrade for the same membership', async () => {

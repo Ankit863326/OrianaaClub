@@ -259,6 +259,7 @@ export default function HomePage() {
           style={{ backgroundImage: `url()` }}
           aria-labelledby="home-hero-title"
         >
+<<<<<<< HEAD
           <video
             ref={videoRef}
             className="home-hero__video"
@@ -300,6 +301,39 @@ export default function HomePage() {
             <span />
           </a>
         </section>
+=======
+          <source src={heroVideo} type="video/mp4" />
+          Your browser does not support embedded video.
+        </video>
+        <Motion.div
+          className="home-hero__content"
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.75, ease: "easeOut" }}
+        >
+          <p className="home-eyebrow">
+            A more considered way to get away · Saptagiri Resorts · The OrianaaClub vision
+          </p>
+          <h1 id="home-hero-title">The Orianaa Club</h1>
+          <p className="home-hero__summary">
+            A members-only community of nature resorts across India. Through
+            OrianaaClub, discover restorative stays, pure vegetarian hospitality,
+            holistic wellness, and meaningful time together.
+          </p>
+          <div className="home-hero__actions">
+            <Button asChild>
+              <a className="home-button home-button--gold" href="/luxury-membership">About Membership</a>
+            </Button>
+            <Button asChild variant="outline">
+              <a className="home-button home-button--outline" href="#universe">Explore</a>
+            </Button>
+          </div>
+        </Motion.div>
+        <a className="home-hero__scroll" href="#universe" aria-label="Scroll to explore">
+          <span />
+        </a>
+      </section>
+>>>>>>> 1eb52c9 (Allow active members to upgrade any time)
 
         <section className="home-universe" id="universe" ref={universeRef}>
           <div className="home-universe__copy">

@@ -11,39 +11,31 @@ import { calculatePoints, creditPoints } from './points-ledger.service.js';
 import ApiError from '../utils/ApiError.js';
 import { getPayableAmount, paiseToRupees } from '../utils/money.js';
 
-export const UPGRADE_EXCLUDED_TIERS = Object.freeze([]);
-const UPGRADE_MINIMUM_MONTHS = 3;
-
-function addUtcMonths(date, months) {
-  const result = new Date(date);
-  const day = result.getUTCDate();
-  result.setUTCDate(1);
-  result.setUTCMonth(result.getUTCMonth() + months);
-  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
-  result.setUTCDate(Math.min(day, lastDay));
-  return result;
-}
-
 function normalizedTier(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function membershipIsEligible(membership, now) {
-  const activatedAt = membership.activatedAt || membership.startDate || membership.approvedAt;
   const endDate = membership.endDate || membership.membershipExpireAt;
-  const eligibleFrom = activatedAt ? addUtcMonths(new Date(activatedAt), UPGRADE_MINIMUM_MONTHS) : null;
-  const excluded = UPGRADE_EXCLUDED_TIERS.includes(normalizedTier(membership.tier));
-  return {
-    eligible: membership.status === 'active'
-      && membership.memberType === 'primary'
-      && endDate
-      && new Date(endDate) > now
-      && eligibleFrom
-      && eligibleFrom <= now
-      && !excluded,
-    eligibleFrom,
-    excluded,
-  };
+  if (membership.status !== 'active') {
+    return {
+      eligible: false,
+      reason: membership.status === 'expired'
+        ? 'Your membership has expired and cannot be upgraded.'
+        : 'Your membership is inactive and cannot be upgraded.',
+    };
+  }
+  if (!endDate) {
+    return { eligible: false, reason: 'Your membership expiry could not be verified and it cannot be upgraded.' };
+  }
+  const expiration = new Date(endDate);
+  if (Number.isNaN(expiration.getTime())) {
+    return { eligible: false, reason: 'Your membership expiry could not be verified and it cannot be upgraded.' };
+  }
+  if (expiration <= now) {
+    return { eligible: false, reason: 'Your membership has expired and cannot be upgraded.' };
+  }
+  return { eligible: true, reason: null };
 }
 
 function pointsFor(baseDifference, multiplier) {
@@ -185,8 +177,7 @@ export async function quoteMembershipUpgrade(userId, now = new Date()) {
   return {
     membershipId: String(membership._id),
     eligibility: eligibility.eligible,
-    eligibleFrom: eligibility.eligibleFrom,
-    excludedTier: eligibility.excluded,
+    eligibilityReason: eligibility.reason,
     currentPlan: {
       id: String(membership.plan),
       planModel: membership.planModel,
@@ -223,12 +214,7 @@ export async function createMembershipUpgrade(userId, targetPlanId) {
   if (!membership) throw new ApiError(404, 'Membership was not found.');
   const eligibility = membershipIsEligible(membership, now);
   if (!eligibility.eligible) {
-    throw new ApiError(409, eligibility.eligibleFrom
-      ? `Your membership is not eligible to upgrade until ${eligibility.eligibleFrom.toISOString().slice(0, 10)}.`
-      : 'Your membership is not eligible to upgrade.');
-  }
-  if (UPGRADE_EXCLUDED_TIERS.includes(normalizedTier(membership.tier))) {
-    throw new ApiError(409, 'Your membership tier is not eligible for upgrades.');
+    throw new ApiError(409, eligibility.reason);
   }
   if (await Payment.exists({ membership: membership._id, purpose: 'upgrade', status: 'pending' })) {
     throw new ApiError(409, 'An upgrade payment is already pending for this membership.');
@@ -242,7 +228,7 @@ export async function createMembershipUpgrade(userId, targetPlanId) {
   ]);
   if (!targetPlan) throw new ApiError(404, 'The selected membership plan was not found.');
   const baseDifference = targetPlan.price - currentPlan.price;
-  if (baseDifference <= 0) throw new ApiError(400, 'Only a higher-priced plan can be selected for an upgrade.');
+  if (baseDifference <= 0) throw new ApiError(400, 'The selected plan must be higher than your current plan.');
   const paymentBreakdown = getPayableAmount({ price: baseDifference }, {
     enabled: settings.gstEnabled,
     rate: settings.gstRate,
@@ -295,7 +281,7 @@ export async function applyMembershipUpgrade(session, payment, membership, admin
   if (!session?.inTransaction()) throw new TypeError('Membership upgrades must be confirmed inside a transaction.');
   if (payment.purpose !== 'upgrade') return null;
   const eligibility = membershipIsEligible(membership, now);
-  if (!eligibility.eligible) throw new ApiError(409, 'This membership is no longer eligible for an upgrade.');
+  if (!eligibility.eligible) throw new ApiError(409, eligibility.reason);
   if (await PointsLedger.exists({ payment: payment._id }).session(session)) {
     throw new ApiError(409, 'This upgrade has already credited points.');
   }
@@ -306,7 +292,7 @@ export async function applyMembershipUpgrade(session, payment, membership, admin
     getSettings({ forceRefresh: true }),
   ]);
   const baseDifference = targetPlan.price - oldPlan.price;
-  if (baseDifference <= 0) throw new ApiError(409, 'The target plan is no longer a higher-priced plan.');
+  if (baseDifference <= 0) throw new ApiError(409, 'The target plan must be higher than the current plan.');
   const breakdown = getPayableAmount({ price: baseDifference }, {
     enabled: settings.gstEnabled,
     rate: settings.gstRate,

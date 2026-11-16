@@ -271,16 +271,11 @@ export default function RenewDashboardTab() {
         <div><span>Current plan</span><strong>{upgradeQuote.currentPlan.name} · {formatINR(upgradeQuote.currentPlan.price)}</strong></div>
         <div><span>Points remaining</span><strong>{formatPts(upgradeQuote.pointsBalance)}</strong></div>
         <div><span>Member type</span><strong>{upgradeQuote.earlyBird ? 'Early bird x2' : 'Standard x1.6'}</strong></div>
-        <div><span>Upgrade available</span><strong>{upgradeQuote.eligibility
-          ? `Yes since ${new Date(upgradeQuote.eligibleFrom).toLocaleDateString('en-IN')}`
-          : `Not yet, from ${upgradeQuote.eligibleFrom ? new Date(upgradeQuote.eligibleFrom).toLocaleDateString('en-IN') : 'after membership activation'}`}</strong></div>
+        <div><span>Upgrade available</span><strong>{upgradeQuote.eligibility ? 'Yes' : 'No'}</strong></div>
       </div>
       {!upgradeQuote.eligibility && <div className="member-hub__warning" role="status">
-        {upgradeQuote.eligibleFrom
-          ? `You can upgrade from ${new Date(upgradeQuote.eligibleFrom).toLocaleDateString('en-IN')}, provided your membership is active and has not expired.`
-          : 'Upgrade is available only to an active primary member with an unexpired membership.'}
+        {upgradeQuote.eligibilityReason || 'Upgrade is available only while your membership is active and has not expired.'}
       </div>}
-      {upgradeQuote.excludedTier && <div className="member-hub__warning" role="status">Your current membership tier is not eligible for upgrades.</div>}
       {upgradeQuote.pendingUpgrade
         ? <div className="member-upgrade-pending" role="status">
           <h3>Upgrade payment pending</h3>
